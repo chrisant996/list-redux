@@ -1,0 +1,34 @@
+
+KEYS:
+
+       ESC  Exit the file chooser (and exits the LIST program).
+
+   F1 or ?  Show this help.
+   F5 or *  Refresh list of files.
+
+  HOME/END  Move selection to the first/last file.
+LEFT/RIGHT  Move selection left/right one file.
+   UP/DOWN  Move selection up/down one file.
+ PGUP/PGDN  Move selection up/down one page of files.
+
+     ENTER  View the selected file.
+    L or V  View the tagged files.
+         A  Change file attributes (NYI).
+         N  Create new directory (NYI).
+         R  Rename file (NYI).
+         M  Mark line (or file offset in hex mode).
+         T  Tag the selected file.
+         U  Clear marked line (unmark).
+     SPACE  Toggle tagged for the selected file.
+
+    Ctrl-A  Tag all files.
+    Ctrl-T  Tag all files.
+    Ctrl-U  Untag all files.
+
+OPTIONS:
+
+         1  Show only file names.
+         2  Show file names and sizes.
+         3  Show file names, dates, and sizes.
+         4  Show file names, dates, sizes, and attributes.
+

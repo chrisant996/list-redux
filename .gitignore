@@ -1,0 +1,11 @@
+.build
+.history
+.vscode
+tags
+*.exe
+*.log
+*.patch
+*.zip
+plus/**
+enhanced/**
+samples/**

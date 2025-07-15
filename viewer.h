@@ -1,0 +1,21 @@
+// Copyright (c) 2025 by Christopher Antos
+// License: http://opensource.org/licenses/MIT
+
+// vim: set et ts=4 sw=4 cino={0s:
+
+#pragma once
+
+#include <windows.h>
+#include "str.h"
+#include "fileinfo.h"
+
+#include <vector>
+
+enum class ViewerOutcome { CONTINUE, RETURN, EXITAPP };
+
+ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e);
+ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title=nullptr);
+
+void SetMaxLineLength(const WCHAR* arg);
+void SetPipedInput();
+
