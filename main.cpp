@@ -136,7 +136,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         fmt.SetA(MakeUsageString((width >= 88) ? 32 : 24));
         s.Printf(fmt.Text(), app.Text());
         ExpandTabs(s.Text(), s);
-        WrapText(s.Text(), s);
+        WrapText(s.Text(), s, width);
         OutputConsole(hout, s.Text());
         SetGracefulExit();
         return 0;
@@ -148,7 +148,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     {
         app.ToUpper();
         s.Clear();
-        s.Printf(L"%s %hs, built %hs\nhttps://github.com/chrisant996/list-redux\n", app.Text(), VERSION_STR, __DATE__);
+        s.Printf(L"List Redux %hs, built %hs\nhttps://github.com/chrisant996/list-redux\n", VERSION_STR, __DATE__);
         OutputConsole(hout, s.Text());
         SetGracefulExit();
         return 0;

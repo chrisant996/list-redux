@@ -29,8 +29,11 @@ struct FlagUsageInfo
 static const FlagUsageInfo c_usage_args =
 {
     USAGE,
-    "[arg]",
-    "Description of arg.\n"
+    "[filespec [filespec ...]]",
+    "Filespecs can be directories, file patterns, or file names.  If one or "
+    "more directories are provided, a file chooser is shown for the first "
+    "directory.  Otherwise, files matching file patterns or names are loaded "
+    "into a file viewer.\n"
 };
 
 static const FlagUsageInfo c_usage_info[] =
@@ -46,19 +49,27 @@ static const FlagUsageInfo c_usage_info[] =
 };
 
 static const char c_usage_prolog[] =
-"TBD\n"
+"List Redux - A File Viewing and Browsing Utility\n"
+"\n"
+"  \032This tool is a throwback to the famous LIST.COM for DOS, which was "
+    "written by Vernon D. Buerg (1948-2009).  List Redux lets you browse "
+    "files or view files, with various options.\n"
 "\n"
 "%s [options] [filespec [filespec ...]]\n"
 "\n"
 ;
 
 static const char c_usage_epilog[] =
+#if 0
 "\n"
 "TBD.\n"
 "\n"
 "Environment variables:\n"
 "\n"
 "TBD.\n"
+#else
+""
+#endif
 ;
 
 static unsigned s_flag_col_width = 24;
