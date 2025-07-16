@@ -575,6 +575,7 @@ void FormatSize(StrW& s, unsigned __int64 cbSize, unsigned max_width, WCHAR chSt
 
 static const WCHAR* GetDirectorySizeTag(WCHAR chStyle)
 {
+#ifdef USE_DIRECTORY_SIZE_TAGS
     static const WCHAR* const c_rgszSizeTags[] =
     {
         L"  <DIR>",         L"  <DIR>",     L" <D>",
@@ -595,6 +596,9 @@ static const WCHAR* GetDirectorySizeTag(WCHAR chStyle)
         break;
     }
     return c_rgszSizeTags[0 * 3 + iWidth];
+#else
+    return L"-";
+#endif
 }
 
 static void FormatFileSize(StrW& s, const FileInfo* pfi, WCHAR chStyle=0, const WCHAR* fallback_color=nullptr, unsigned size_width=0)
