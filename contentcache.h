@@ -89,6 +89,7 @@ public:
     size_t          Count() const { return m_lines.size(); }
     FileOffset      GetOffset(size_t index) const;
     bool            IsBinaryFile() const { return m_binary_file; }
+    bool            IsUTF8Compatible() const;
     UINT            GetCodePage() const { return m_codepage; }
     const WCHAR*    GetEncodingName(bool raw=false) const;
 

@@ -529,6 +529,19 @@ FileOffset FileLineMap::GetOffset(size_t index) const
     return index ? m_lines[index] : 0;
 }
 
+bool FileLineMap::IsUTF8Compatible() const
+{
+    switch (GetCodePage())
+    {
+    case 38:            // USA ASCII (IBM)
+    case 367:           // 7-bit US-ASCII (IBM)
+    case 20127:         // 7-bit US-ASCII (Windows)
+    case CP_UTF8:       // UTF-8
+        return true;
+    }
+    return false;
+}
+
 const WCHAR* FileLineMap::GetEncodingName(bool raw) const
 {
     if (IsBinaryFile())
