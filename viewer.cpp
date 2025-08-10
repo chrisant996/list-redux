@@ -267,7 +267,7 @@ LAutoFitContentWidth:
     {
         Error e;
         m_context.SetWrapWidth(m_wrap ? m_content_width : 0);
-        m_context.ProcessThrough(m_top + m_content_height - 1, e);
+        m_context.ProcessThrough(m_top + m_content_height, e);
         const unsigned new_margin_width = CalcMarginWidth();
         if (new_margin_width != m_margin_width)
         {

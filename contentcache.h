@@ -73,6 +73,34 @@ private:
 
 typedef std::vector<PipeChunk> PipeChunks;
 
+class FileLineIter
+{
+public:
+                    FileLineIter(const ViewerOptions& options);
+                    ~FileLineIter();
+    void            Reset();
+    void            SetCodePage(UINT codepage) { m_codepage = codepage; }
+    void            SetWrapWidth(uint32 wrap_width);
+    void            SetBytes(const BYTE* bytes, size_t available);
+    bool            Next(const BYTE*& bytes, uint32& length, uint32& width);
+    void            SetBinaryFile(bool binary_file) { m_binary_file = binary_file; }
+    bool            IsBinaryFile() const { return m_binary_file; }
+
+private:
+    const ViewerOptions& m_options;
+    uint32          m_wrap = 80;
+    UINT            m_codepage = 0;
+    bool            m_binary_file = true;
+    const BYTE*     m_bytes = nullptr;
+    size_t          m_count = 0;
+    size_t          m_available = 0;
+    StrW            m_tmp;
+    Utf8Accumulator m_decode;
+    wcwidth_iter    m_iter;
+    uint32          m_pending_length = 0;   // Length in bytes.
+    uint32          m_pending_width = 0;    // Width in character cells.
+};
+
 class FileLineMap
 {
 public:
@@ -88,27 +116,21 @@ public:
 
     size_t          Count() const { return m_lines.size(); }
     FileOffset      GetOffset(size_t index) const;
-    bool            IsBinaryFile() const { return m_binary_file; }
+    bool            IsBinaryFile() const { return m_line_iter.IsBinaryFile(); }
     bool            IsUTF8Compatible() const;
     UINT            GetCodePage() const { return m_codepage; }
     const WCHAR*    GetEncodingName(bool raw=false) const;
 
 private:
-    const ViewerOptions& m_options;
+    // const ViewerOptions& m_options;
     unsigned        m_wrap = 0;
 
     std::vector<FileOffset> m_lines;
     UINT            m_codepage = 0;
     StrW            m_encoding_name;
     FileOffset      m_processed = 0;
-    bool            m_binary_file = true;
-    bool            m_continue_last_line = false;
-    unsigned        m_last_length = 0;
-    unsigned        m_last_visible_width = 0;
-
-#ifdef DEBUG
-    bool            m_skipped_empty_line = false;
-#endif
+    FileOffset      m_pending_begin = 0;
+    FileLineIter    m_line_iter;
 };
 
 class ContentCache

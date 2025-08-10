@@ -73,18 +73,12 @@ static bool DetectCodePage(const BYTE* bytes, int32 length, UINT* codepage, StrW
         {
             if (codepage)
                 *codepage = info[0].nCodePage;
-
-            MIMECPINFO codepageinfo;
-            hr = s_mlang->GetCodePageInfo(info[0].nCodePage, info[0].nLangID, &codepageinfo);
             if (encoding_name)
             {
-                if (SUCCEEDED(hr))
+                MIMECPINFO codepageinfo;
+                if (SUCCEEDED(s_mlang->GetCodePageInfo(info[0].nCodePage, info[0].nLangID, &codepageinfo)))
                     encoding_name->Set(codepageinfo.wszDescription);
-                else
-                    encoding_name->Clear();
             }
-
-            hr = S_OK;
         }
     }
 
@@ -124,7 +118,12 @@ FileDataType AnalyzeFileType(const BYTE* const bytes, const size_t count, UINT* 
         *codepage = 0;
         encoding_name->Clear();
         assert(count < 1024 * 1024);
-        DetectCodePage(bytes, uint32(count), codepage, encoding_name);
+        if (!DetectCodePage(bytes, uint32(count), codepage, encoding_name) ||
+            !(*codepage == 20127 || *codepage == 437 /*|| *codepage == CP_UTF8*/))
+        {
+            *codepage = 437;
+            encoding_name->Set(L"OEM-US");
+        }
     }
 
     return FileDataType::Text;

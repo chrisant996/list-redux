@@ -11,6 +11,12 @@
 #include "wcwidth_iter.h"
 #include "filetype.h"
 
+#define DEBUG_LINE_PARSING
+
+#ifdef DEBUG_LINE_PARSING
+#include "output.h" // for dbgprintf()
+#endif
+
 // static const WCHAR c_eol_marker[] = L"\x1b[0;33;48;2;80;0;80m\u22a6\x1b[m";
 static const WCHAR c_eol_marker[] = L"\x1b[36m\u22a6\x1b[m";
 
@@ -328,10 +334,211 @@ void PipeChunk::Move(PipeChunk&& other)
 }
 
 #pragma endregion // PipeChunk
+#pragma region // FileLineIter
+
+FileLineIter::FileLineIter(const ViewerOptions& options)
+: m_options(options)
+, m_iter(nullptr, 0)
+{
+}
+
+FileLineIter::~FileLineIter()
+{
+}
+
+void FileLineIter::Reset()
+{
+    // m_wrap_width carries over.
+    // m_codepage carries over.
+    m_binary_file = true;
+    m_bytes = nullptr;
+    m_count = 0;
+    m_available = 0;
+    m_tmp.Clear();
+    m_decode.Reset();
+    new(&m_iter) wcwidth_iter(nullptr, 0);
+    m_pending_length = 0;
+    m_pending_width = 0;
+}
+
+void FileLineIter::SetWrapWidth(uint32 wrap)
+{
+    m_wrap = wrap ? wrap : m_options.max_line_length;
+}
+
+void FileLineIter::SetBytes(const BYTE* bytes, const size_t available)
+{
+    assert(!m_count);
+    m_bytes = bytes;
+    m_count = min<size_t>(available, c_data_buffer_main);
+    m_available = available;
+
+#if 0
+    if (m_codepage == CP_UTF8)
+    {
+    // TODO: decode as many of the bytes as can be fully decoded.
+    // TODO: convert them into UTF16 using a custom converter that keeps track
+    // of byte offsets from the original buffer, so that it can tell how many
+    // bytes it has processed (otherwise it loses track of how much it has
+    // processed and where to resume processing).
+    // TODO: FormatLineData will need to use that same converter so that
+    // parsing and formatting stay in sync.
+    // TODO: init wcwidth_iter with the UTF16 string.
+    }
+    else if (m_codepage != 437)
+    {
+    // TODO: for other codepages.
+    // TODO: maybe use CharNextExA(), and require callers to ensure a trailing
+    // NUL byte (or how about 4 just to be safe) after the 'available' bytes.
+    }
+#endif
+}
+
+bool FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_width)
+{
+    out_bytes = m_bytes;
+
+    if (!m_bytes)
+    {
+        out_length = m_pending_length;
+        out_width = m_pending_width;
+        m_pending_length = 0;
+        m_pending_width = 0;
+        return out_length > 0;
+    }
+
+    // Find end of line.
+    bool newline = false;
+    uint32 can_consume = 0;
+    // PERF: this can end up revisiting the same bytes multiple times if a
+    // line wraps before the newline.
+    for (const BYTE* walk = m_bytes; can_consume < m_count; ++walk)
+    {
+        const BYTE c = walk[0];
+        if (c == '\r' && can_consume + 1 <= m_available && walk[1] == '\n')
+        {
+            can_consume += 2;
+            newline = true;
+            break;
+        }
+        else if (c == '\n')
+        {
+            ++can_consume;
+            newline = true;
+            break;
+        }
+        else
+        {
+            ++can_consume;
+        }
+    }
+
+#ifdef DEBUG
+    const size_t cr_extended = (can_consume > m_count) ? can_consume - m_count : 0;
+#endif
+
+
+// TODO:  Smart wrapping after whitespaces or punctuation (a more complex
+// variant of delay_wrap, which will naturally eliminate the use of peek
+// ahead).  This will likely need different implementations for UTF8 files
+// versus other binary or text files.
+
+    // Get cells until it's time to wrap.
+    bool do_break = false;
+    uint32 length = 0;
+#if 0
+    if (m_codepage == CP_UTF8)
+    {
+// TODO:  For UTF8 text files, when wrapping is enabled, then read ahead and
+// use Utf8Accumulator to decode the UTF8.  Use an incremental-enabled version
+// of calculating wcswidths.  Read until the visible width exceeds the wrap
+// width or 2048 bytes, whichever comes first -- being careful not to sever
+// any UTF8 byte sequence, nor any run of codepoints that compose a grapheme.
+// Then wrap that string into multiple line units.
+    }
+    else
+#endif
+    {
+        uint32 index = 0;
+        for (const BYTE* walk = m_bytes; true; ++index, ++walk)
+        {
+            assert(index <= m_count + !!newline);
+            assert(index <= m_available);
+
+            if (index == can_consume)
+            {
+                // Reached end of consumable range.
+                if (newline)
+                    do_break = true;
+                break;
+            }
+
+            if (m_pending_length + length + 1 >= m_options.max_line_length)
+            {
+                // Line exceeds max bytes.
+                do_break = true;
+                break;
+            }
+
+            const BYTE c = walk[0];
+
+            // Calc width of byte.
+            unsigned clen;
+            if (c == '\t' && m_options.ctrl_mode != CtrlMode::EXPAND && m_options.tab_mode != TabMode::RAW)
+                clen = c_tab_width - (m_pending_width % c_tab_width);
+            else if (c == '\n' && !m_binary_file)
+                clen = 0;
+            else if (c == '\r' && !m_binary_file && index + 1 < can_consume && walk[1] == '\n')
+                clen = 0;
+            else if (c > 0 && c < ' ')
+                clen = (m_options.ctrl_mode == CtrlMode::EXPAND) ? 2 : 1;
+            else
+            {
+                // TODO:  This presumes single cell width, which isn't
+                // accurate in all OEM codepages (Chinese, for example).
+                clen = 1;
+            }
+
+            if (m_wrap > clen && m_pending_width + clen > m_wrap)
+            {
+                // Wrapping width reached.
+                do_break = true;
+                break;
+            }
+
+            ++length;
+            m_pending_width += clen;
+        }
+    }
+
+#ifdef DEBUG
+    assert(m_count >= length - cr_extended);
+    assert(m_available >= length);
+#endif
+
+    m_bytes += length;
+    if (m_count >= length)
+        m_count -= length;
+    else
+        m_count = 0;
+    m_available -= length;
+
+    out_length = length;            // Only length from this call.
+    out_width = m_pending_width;    // Includes previous calls for the same line.
+    if (do_break)
+    {
+        m_pending_length = 0;
+        m_pending_width = 0;
+    }
+
+    return do_break;
+}
+
+#pragma endregion // FileLineIter
 #pragma region // FileLineMap
 
 FileLineMap::FileLineMap(const ViewerOptions& options)
-: m_options(options)
+: m_line_iter(options)
 {
 }
 
@@ -352,180 +559,47 @@ void FileLineMap::Clear()
     m_codepage = 0;
     m_encoding_name.Clear();
     m_processed = 0;
-    m_binary_file = true;
-    m_continue_last_line = false;
-    m_last_length = 0;
-    m_last_visible_width = 0;
-
-#ifdef DEBUG
-    m_skipped_empty_line = false;
-#endif
+    m_line_iter.Reset();
 }
 
-void FileLineMap::Next(const BYTE* bytes, const size_t available)
+void FileLineMap::Next(const BYTE* bytes, size_t available)
 {
-#ifdef DEBUG_LINE_PARSING
-    dbgprintf(L"Next( %p, %lu )", bytes, available);
-#endif
-
     if (!m_processed)
-        m_binary_file = (AnalyzeFileType(bytes, available, &m_codepage, &m_encoding_name) == FileDataType::Binary);
+        m_line_iter.SetBinaryFile(AnalyzeFileType(bytes, available, &m_codepage, &m_encoding_name) == FileDataType::Binary);
 
-    const size_t count = std::min<size_t>(available, c_data_buffer_main);
-    assert(count <= available);
-#ifdef DEBUG_LINE_PARSING
-    dbgprintf(L"parse %lu of %lu", count, available);
-#endif
+    m_line_iter.SetBytes(bytes, available);
+    m_line_iter.SetWrapWidth(m_wrap);
 
-    DWORD offset_begin = 0;
-    unsigned line_length;
-    unsigned visible_width;
-    if (m_continue_last_line)
-    {
-        line_length = m_last_length;
-        visible_width = m_last_visible_width;
-    }
-    else
-    {
-        line_length = 0;
-        visible_width = 0;
-    }
-
-    const unsigned wrap_width = m_wrap ? m_wrap : m_options.max_line_length;
-    DWORD ii = 0;
-    while (true)
-    {
-        BYTE c;
-        bool newline;
-        if (ii < available)
-        {
-            c = *bytes;
-            newline = (c == '\n');
-        }
-        else
-        {
-            c = 0;
-            newline = false;
-        }
-
-        const bool delay_wrap = (c == '\r' && !m_binary_file && ii + 1 < available && bytes[ii + 1] == '\n');
-
-// TODO:  Smart wrapping after whitespaces or punctuation (a more complex
-// variant of delay_wrap, which will naturally eliminate the use of peek
-// ahead).  This will likely need different implementations for UTF8 files
-// versus other binary or text files.
-
-// TODO:  For UTF8 text files, when wrapping is enabled, then read ahead and
-// use Utf8Accumulator to decode the UTF8.  Use an incremental-enabled version
-// of calculating wcswidths.  Read until the visible width exceeds the wrap
-// width or 2048 bytes, whichever comes first -- being careful not to sever
-// any UTF8 byte sequence, nor any run of codepoints that compose a grapheme.
-// Then wrap that string into multiple line units.
-
-// TODO:  This is not the right way to measure cell width for wrapping!  It
-// needs to parse bytes and respect encoding and measure width of Unicode or
-// DBCS codepoints.
-        unsigned clen;
-        if (c == '\t' && m_options.ctrl_mode != CtrlMode::EXPAND && m_options.tab_mode != TabMode::RAW)
-            clen = c_tab_width - (visible_width % c_tab_width);
-        else if (c > 0 && c < ' ')
-            clen = (m_options.ctrl_mode == CtrlMode::EXPAND) ? 2 : 1;
-        else
-        {
-            // TODO:  This presumes single cell width, which isn't
-            // accurate in all OEM codepages (Chinese, for example).
-            clen = 1;
-        }
-
-        assert(ii <= available);
-        const bool end_line = (newline ||                   // Newline.
-              line_length >= m_options.max_line_length ||   // Line exceeds max bytes.
-              (wrap_width > clen && visible_width + clen > wrap_width)); // Wrapping width reached.
-        const bool reached_end = (ii == available || (ii >= count && end_line));
-#ifdef DEBUG_LINE_PARSING
-        dbgprintf(L"    ii %u, clen %u, count %lu, end_line %u, line_length %u, visible_width %u, offset %lu", ii, clen, count, end_line, line_length, visible_width, m_processed + ii);
-#endif
-        if (reached_end || (!delay_wrap && end_line))
-        {
-            const DWORD offset_end = ii + !!newline;
-            line_length += !!newline;
-
-            if (m_continue_last_line)
-            {
-                m_continue_last_line = false;
-                m_last_length = 0;
-                m_last_visible_width = 0;
-            }
-
-            // Add the start of the line that just finished being processed.
-            assert(!m_skipped_empty_line);
-            if (line_length)
-            {
-                m_lines.emplace_back(m_processed + offset_begin);
-#ifdef DEBUG_LINE_PARSING
-                dbgprintf(L"finished line %lu; offset %lu, length %lu", m_lines.size(), m_processed + offset_begin, ii + !!newline - offset_begin);
-                dbgprintf(L"        reached_end %u, delay_wrap %u, end_line %u", reached_end, delay_wrap, end_line);
-                if (end_line)
-                    dbgprintf(L"        newline %u, reached s_max_line_length %u, reached wrap width %u", newline, line_length >= s_max_line_length, wrap_width > clen && visible_width + clen > wrap_width);
-                if (wrap_width > clen && visible_width + clen > wrap_width)
-                    dbgprintf(L"        wrap_width %u, clen %u, visible_width %u", wrap_width, clen, visible_width);
-#endif
-            }
+    const BYTE* line_ptr;
+    uint32 line_length;
+    uint32 line_width;
 #ifdef DEBUG
-            else
-            {
-                m_skipped_empty_line = true;
-            }
+    uint32 consumed = 0;
 #endif
-
-            if (reached_end)
-            {
-                if (end_line)
-                {
+    while (m_line_iter.Next(line_ptr, line_length, line_width))
+    {
+        assert(line_length);
+        m_lines.emplace_back(m_pending_begin);
 #ifdef DEBUG_LINE_PARSING
-                    dbgprintf(L"reached end of line and end of parse chunk");
+        dbgprintf(L"finished line %lu; offset %lu, length %lu, width %lu", m_lines.size(), m_processed, line_length, line_width);
 #endif
-                    m_continue_last_line = false;
-                    m_last_length = 0;
-                    m_last_visible_width = 0;
-                    if (newline)
-                        ++ii;
-                    // Note:  bytes, line_length, and visible_width are not
-                    // used past here, so they don't need to be updated.
-                }
-                else
-                {
-#ifdef DEBUG_LINE_PARSING
-                    dbgprintf(L"reached end of parse chunk; continue line the next time");
+#ifdef DEBUG
+        consumed += line_length;
 #endif
-                    m_continue_last_line = true;
-                    m_last_length = line_length;
-                    m_last_visible_width = visible_width;
-                }
-                break;
-            }
-
-            offset_begin = ii + !!newline;
-            line_length = 0 - !!newline;
-            visible_width = 0;
-        }
-
-        ++line_length;
-        if (!newline)
-            visible_width += clen;
-
-        ++ii;
-        ++bytes;
+        m_processed += line_length;
+        m_pending_begin = m_processed;
     }
 
-    assert(ii <= available);
-    m_processed += ii;
+    m_processed += line_length;
+
+#ifdef DEBUG
+    assert(consumed <= available);
+#endif
 }
 
 FileOffset FileLineMap::GetOffset(size_t index) const
 {
     assert(!index || index < m_lines.size());
-    assert(!m_lines.size() || !m_lines[0]);
     return index ? m_lines[index] : 0;
 }
 
@@ -533,8 +607,6 @@ bool FileLineMap::IsUTF8Compatible() const
 {
     switch (GetCodePage())
     {
-    case 38:            // USA ASCII (IBM)
-    case 367:           // 7-bit US-ASCII (IBM)
     case 20127:         // 7-bit US-ASCII (Windows)
     case CP_UTF8:       // UTF-8
         return true;
@@ -544,10 +616,17 @@ bool FileLineMap::IsUTF8Compatible() const
 
 const WCHAR* FileLineMap::GetEncodingName(bool raw) const
 {
+    static StrW s_tmp;
     if (IsBinaryFile())
         return L"Binary";
     if (raw && m_codepage && !m_encoding_name.Empty())
         return m_encoding_name.Text();
+    if (m_codepage && !m_encoding_name.Empty())
+    {
+        s_tmp.Clear();
+        s_tmp.Printf(L"Text (%s)", m_encoding_name.Text());
+        return s_tmp.Text();
+    }
     return L"Text";
 }
 
@@ -697,11 +776,8 @@ unsigned ContentCache::FormatLineData(size_t line, unsigned left_offset, StrW& s
     const unsigned len = GetLength(line);
     assert(ptr + len <= m_data + m_data_length);
 
-// TODO:  Encodings.  This currently assumes ACP.
-// TODO:  Non-convertible characters will make conversion go haywire.
     StrW tmp;
-    // tmp.SetA(reinterpret_cast<const char*>(ptr), len);
-    tmp.SetFromCodepage(CP_OEMCP, reinterpret_cast<const char*>(ptr), len);
+    tmp.SetFromCodepage(m_map.GetCodePage(), reinterpret_cast<const char*>(ptr), len);
 
     unsigned visible_len = 0;
     unsigned total_cells = 0;
@@ -915,11 +991,8 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     const unsigned len = unsigned(std::min<FileOffset>(hex_bytes, GetFileSize() - offset));
     assert(ptr + len <= m_data + m_data_length);
 
-// TODO:  Encodings.  This currently assumes ACP.
-// TODO:  Non-convertible characters will make conversion go haywire.
     StrW tmp;
-    // tmp.SetA(reinterpret_cast<const char*>(ptr), len);
-    tmp.SetFromCodepage(CP_OEMCP, reinterpret_cast<const char*>(ptr), len);
+    tmp.SetFromCodepage(m_map.GetCodePage(), reinterpret_cast<const char*>(ptr), len);
     assert(tmp.Length() == len);
     if (tmp.Length() != len)
     {
@@ -1048,7 +1121,10 @@ bool ContentCache::ProcessThrough(size_t line, Error& e)
         }
 
         if (m_map.Processed() >= m_size)
+        {
+            m_map.Next(nullptr, 0);
             m_completed = true;
+        }
     }
     else
     {
@@ -1158,10 +1234,8 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
                 ++len;
         }
 
-// TODO:  Encodings.  This currently assumes ACP.
-// TODO:  Non-convertible characters will make conversion go haywire.
         StrW tmp;
-        tmp.SetFromCodepage(CP_OEMCP, reinterpret_cast<const char*>(ptr), len);
+        tmp.SetFromCodepage(m_map.GetCodePage(), reinterpret_cast<const char*>(ptr), len);
 
 // TODO:  Optional regex search.
 // TODO:  Boyer-Moore search.
@@ -1242,7 +1316,7 @@ bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, Foun
 // TODO:  Encodings.  But what does that even mean for hex mode?  Really it should have a hex entry mode.
 // TODO:  Non-convertible characters will make conversion go haywire.
         StrW tmp;
-        tmp.SetFromCodepage(CP_OEMCP, reinterpret_cast<const char*>(ptr), len);
+        tmp.SetFromCodepage(m_map.GetCodePage(), reinterpret_cast<const char*>(ptr), len);
 
 // TODO:  Optional regex search.
 // TODO:  Boyer-Moore search.
