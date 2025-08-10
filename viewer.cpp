@@ -572,7 +572,7 @@ LAutoFitContentWidth:
                         if (!color)
                             s.Append(c_clreol);
                         if (color && width + 1 < m_content_width)
-                            s.AppendSpaces(m_content_width - (width + 1));
+                            s.AppendSpaces(m_content_width - width);
                     }
                     if (color)
                         s.Append(c_norm);
