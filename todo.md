@@ -21,7 +21,8 @@
 - [x] view files as text
 - [x] view files as hex
 - [x] wrapping
-- [ ] text files wrap with awareness of word breaks (can split after a run of spaces, or on a transition from punctuation to word characters, or if a single word exceeds the max line length)
+- [x] text files wrap with awareness of word breaks (can split after a run of spaces, or on a transition from punctuation to word characters, or if a single word exceeds the max line length)
+  - [ ] word wrapping mutates line numbers; consider having an index of "user friendly" line numbers to show in the left margin for Go To Line.
 - [x] search in text mode (/ for case sensitive, \ for caseless)
 - [x] search in hex mode
 - [x] show ruler (both in text and hex modes)

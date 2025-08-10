@@ -11,7 +11,9 @@
 #include "wcwidth_iter.h"
 #include "filetype.h"
 
+#ifdef DEBUG
 #define DEBUG_LINE_PARSING
+#endif
 
 #ifdef DEBUG_LINE_PARSING
 #include "output.h" // for dbgprintf()
@@ -68,6 +70,11 @@ static const WCHAR* const c_oem437[] =
     L"\u25bc",  // ▼
 };
 static_assert(_countof(c_oem437) == 32);
+
+inline bool IsWhiteSpace(uint32 c)
+{
+    return (c == ' ' || c == '\t' || c == '\r' || c == '\n');
+}
 
 static DWORD GetSystemPageSize()
 {
@@ -354,11 +361,12 @@ void FileLineIter::Reset()
     m_bytes = nullptr;
     m_count = 0;
     m_available = 0;
-    m_tmp.Clear();
     m_decode.Reset();
     new(&m_iter) wcwidth_iter(nullptr, 0);
     m_pending_length = 0;
     m_pending_width = 0;
+    m_pending_wrap_length = 0;
+    m_pending_wrap_width = 0;
 }
 
 void FileLineIter::SetWrapWidth(uint32 wrap)
@@ -394,7 +402,7 @@ void FileLineIter::SetBytes(const BYTE* bytes, const size_t available)
 #endif
 }
 
-bool FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_width)
+FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_width)
 {
     out_bytes = m_bytes;
 
@@ -404,15 +412,18 @@ bool FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_
         out_width = m_pending_width;
         m_pending_length = 0;
         m_pending_width = 0;
-        return out_length > 0;
+        return (out_length > 0) ? Break : Exhausted;
     }
 
     // Find end of line.
     bool newline = false;
     uint32 can_consume = 0;
     // PERF: this can end up revisiting the same bytes multiple times if a
-    // line wraps before the newline.
-    for (const BYTE* walk = m_bytes; can_consume < m_count; ++walk)
+    // line wraps before the newline, up to max_line_length.
+    // TODO: cache and reuse the can_consume length to mitigate perf issue.
+    assert(m_options.max_line_length > m_pending_length);
+    const size_t max_consume = min<size_t>(m_count, m_options.max_line_length - m_pending_length);
+    for (const BYTE* walk = m_bytes; can_consume < max_consume; ++walk)
     {
         const BYTE c = walk[0];
         if (c == '\r' && can_consume + 1 <= m_available && walk[1] == '\n')
@@ -437,15 +448,9 @@ bool FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_
     const size_t cr_extended = (can_consume > m_count) ? can_consume - m_count : 0;
 #endif
 
-
-// TODO:  Smart wrapping after whitespaces or punctuation (a more complex
-// variant of delay_wrap, which will naturally eliminate the use of peek
-// ahead).  This will likely need different implementations for UTF8 files
-// versus other binary or text files.
-
     // Get cells until it's time to wrap.
-    bool do_break = false;
-    uint32 length = 0;
+    Outcome outcome = Exhausted;
+    const uint32 orig_pending_length = m_pending_length;
 #if 0
     if (m_codepage == CP_UTF8)
     {
@@ -460,6 +465,8 @@ bool FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_
 #endif
     {
         uint32 index = 0;
+        uint32 pending_wrap_length = m_pending_wrap_length;
+        uint32 pending_wrap_width = m_pending_wrap_width;
         for (const BYTE* walk = m_bytes; true; ++index, ++walk)
         {
             assert(index <= m_count + !!newline);
@@ -469,14 +476,14 @@ bool FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_
             {
                 // Reached end of consumable range.
                 if (newline)
-                    do_break = true;
+                    outcome = Break;
                 break;
             }
 
-            if (m_pending_length + length + 1 >= m_options.max_line_length)
+            if (m_pending_length + 1 >= m_options.max_line_length)
             {
                 // Line exceeds max bytes.
-                do_break = true;
+                outcome = Break;
                 break;
             }
 
@@ -502,19 +509,70 @@ bool FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_
             if (m_wrap > clen && m_pending_width + clen > m_wrap)
             {
                 // Wrapping width reached.
-                do_break = true;
+                if (m_pending_wrap_length)
+                {
+                    m_pending_length = m_pending_wrap_length;
+                    m_pending_width = m_pending_wrap_width;
+                    outcome = BreakSkip;
+                }
+                else
+                {
+                    outcome = Break;
+                }
                 break;
             }
 
-            ++length;
+            // Smart wrapping at whitespace in text files.
+            if (!m_binary_file)
+            {
+// TODO: This will likely need different implementations for UTF8 files versus
+// other binary or text files.
+                if (!IsWhiteSpace(c))
+                {
+                    pending_wrap_length = m_pending_length + 1;
+                    pending_wrap_width = m_pending_width + clen;
+                }
+                else
+                {
+                    m_pending_wrap_length = pending_wrap_length;
+                    m_pending_wrap_width = pending_wrap_width;
+                }
+            }
+
+            ++m_pending_length;
             m_pending_width += clen;
         }
     }
 
+    const uint32 length = m_pending_length - orig_pending_length;
+    const bool resync = (m_pending_length < orig_pending_length);
 #ifdef DEBUG
-    assert(m_count >= length - cr_extended);
-    assert(m_available >= length);
+    if (m_pending_length - orig_pending_length < m_pending_length)
+    {
+        // A pending wrap can effectively cause the line to be shortened to a
+        // length that falls within a previous data buffer!
+        assert(m_count >= (m_pending_length - orig_pending_length - cr_extended));
+        assert(m_available >= (m_pending_length - orig_pending_length));
+    }
 #endif
+
+    out_length = m_pending_length;
+    out_width = m_pending_width;
+    if (outcome != Exhausted)
+    {
+        m_pending_length = 0;
+        m_pending_width = 0;
+        m_pending_wrap_length = 0;
+        m_pending_wrap_width = 0;
+    }
+
+    if (resync)
+    {
+        assert(outcome == BreakSkip);
+        m_count = 0;
+        m_available = 0;
+        return BreakSkipResync;
+    }
 
     m_bytes += length;
     if (m_count >= length)
@@ -523,15 +581,41 @@ bool FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_
         m_count = 0;
     m_available -= length;
 
-    out_length = length;            // Only length from this call.
-    out_width = m_pending_width;    // Includes previous calls for the same line.
-    if (do_break)
+    return outcome;
+}
+
+bool FileLineIter::SkipWhitespace(uint32 curr_len, uint32& skipped)
+{
+    uint32 skip = 0;
+    assert(m_options.max_line_length >= curr_len);
+
+    size_t max_skip = min<size_t>(m_options.max_line_length - curr_len, m_count);
+    if (max_skip > m_count)
+        max_skip = m_count;
+
+    bool done = false;
+    for (const BYTE* walk = m_bytes; true; ++skip, ++walk)
     {
-        m_pending_length = 0;
-        m_pending_width = 0;
+        if (skip >= max_skip)
+        {
+            done = true;
+            break;
+        }
+
+        const BYTE c = *walk;
+        if (!IsWhiteSpace(c))
+        {
+            done = true;
+            break;
+        }
     }
 
-    return do_break;
+    m_bytes += skip;
+    m_count -= skip;
+    m_available -= skip;
+
+    skipped = skip;
+    return done;
 }
 
 #pragma endregion // FileLineIter
@@ -559,7 +643,9 @@ void FileLineMap::Clear()
     m_codepage = 0;
     m_encoding_name.Clear();
     m_processed = 0;
+    m_pending_begin = 0;
     m_line_iter.Reset();
+    m_skip_whitespace = 0;
 }
 
 void FileLineMap::Next(const BYTE* bytes, size_t available)
@@ -570,31 +656,68 @@ void FileLineMap::Next(const BYTE* bytes, size_t available)
     m_line_iter.SetBytes(bytes, available);
     m_line_iter.SetWrapWidth(m_wrap);
 
+do_skip_whitespace:
+    if (m_skip_whitespace)
+    {
+        uint32 skipped;
+        assert(m_processed >= m_pending_begin);
+        assert(!((m_processed - m_pending_begin) & ~0xffff));
+        const bool done = m_line_iter.SkipWhitespace(uint32(m_processed - m_pending_begin), skipped);
+        m_pending_begin += skipped;
+        m_processed += skipped;
+        if (done)
+            m_skip_whitespace = 0;
+        else if (!m_line_iter.More())
+        {
+            if (m_skip_whitespace < 2)
+            {
+                // This case is meant to handle when the last line in a file wraps
+                // and is followed by whitespace.  Once it reaches the end of the
+                // file, More() will always return false, so this needs a way to
+                // stop skipping whitespace even when More() returns false.
+                ++m_skip_whitespace;
+                return;
+            }
+            m_skip_whitespace = 0;
+        }
+    }
+
     const BYTE* line_ptr;
     uint32 line_length;
     uint32 line_width;
 #ifdef DEBUG
     uint32 consumed = 0;
 #endif
-    while (m_line_iter.Next(line_ptr, line_length, line_width))
+    while (true)
     {
+        const FileLineIter::Outcome outcome = m_line_iter.Next(line_ptr, line_length, line_width);
+#ifdef DEBUG_LINE_PARSING
+        if (outcome != FileLineIter::Exhausted && outcome != FileLineIter::Break)
+            dbgprintf(L"\u2193 outcome %s", (outcome == FileLineIter::BreakSkip) ? L"BreakSkip" : (outcome == FileLineIter::BreakSkipResync) ? L"BreakSkipResync" : L"??");
+#endif
+        if (outcome == FileLineIter::Exhausted)
+            break;
+
         assert(line_length);
         m_lines.emplace_back(m_pending_begin);
 #ifdef DEBUG_LINE_PARSING
-        dbgprintf(L"finished line %lu; offset %lu, length %lu, width %lu", m_lines.size(), m_processed, line_length, line_width);
+        dbgprintf(L"finished line %lu; offset %lu (%lx), length %lu, width %lu", m_lines.size(), m_pending_begin, m_pending_begin, line_length, line_width);
 #endif
 #ifdef DEBUG
         consumed += line_length;
 #endif
-        m_processed += line_length;
+        m_processed = m_pending_begin + line_length;
         m_pending_begin = m_processed;
+        if (outcome == FileLineIter::BreakSkip)
+        {
+            m_skip_whitespace = 1;
+            goto do_skip_whitespace;
+        }
+        if (outcome == FileLineIter::BreakSkipResync)
+            return;
     }
 
-    m_processed += line_length;
-
-#ifdef DEBUG
-    assert(consumed <= available);
-#endif
+    m_processed = m_pending_begin + line_length;
 }
 
 FileOffset FileLineMap::GetOffset(size_t index) const

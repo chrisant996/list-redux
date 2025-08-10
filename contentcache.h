@@ -76,13 +76,17 @@ typedef std::vector<PipeChunk> PipeChunks;
 class FileLineIter
 {
 public:
+    enum Outcome { Exhausted, Break, BreakSkip, BreakSkipResync };
+
                     FileLineIter(const ViewerOptions& options);
                     ~FileLineIter();
     void            Reset();
     void            SetCodePage(UINT codepage) { m_codepage = codepage; }
     void            SetWrapWidth(uint32 wrap_width);
     void            SetBytes(const BYTE* bytes, size_t available);
-    bool            Next(const BYTE*& bytes, uint32& length, uint32& width);
+    bool            More() const { return m_count > 0; }
+    Outcome         Next(const BYTE*& bytes, uint32& length, uint32& width);
+    bool            SkipWhitespace(uint32 curr_len, uint32& skipped);
     void            SetBinaryFile(bool binary_file) { m_binary_file = binary_file; }
     bool            IsBinaryFile() const { return m_binary_file; }
 
@@ -94,11 +98,12 @@ private:
     const BYTE*     m_bytes = nullptr;
     size_t          m_count = 0;
     size_t          m_available = 0;
-    StrW            m_tmp;
     Utf8Accumulator m_decode;
     wcwidth_iter    m_iter;
-    uint32          m_pending_length = 0;   // Length in bytes.
-    uint32          m_pending_width = 0;    // Width in character cells.
+    uint32          m_pending_length = 0;       // Length in bytes.
+    uint32          m_pending_width = 0;        // Width in character cells.
+    uint32          m_pending_wrap_length = 0;  // Candidate length for word wrap.
+    uint32          m_pending_wrap_width = 0;   // Candidate width for word wrap.
 };
 
 class FileLineMap
@@ -131,6 +136,7 @@ private:
     FileOffset      m_processed = 0;
     FileOffset      m_pending_begin = 0;
     FileLineIter    m_line_iter;
+    uint8           m_skip_whitespace = 0;
 };
 
 class ContentCache
