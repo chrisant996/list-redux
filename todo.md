@@ -12,6 +12,7 @@
 - [ ] `R` rename current file
 - [ ] `N` create new directory
 - [ ] some way to incrementally search the list of file names
+- [ ] option to sort horizontally instead of vertically
 
 ### File Viewer (list file content)
 
