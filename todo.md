@@ -34,6 +34,11 @@
 - [x] jump to marked line
 - [x] mark center line
 - [x] clear marked line (unmark)
+- [ ] go to line in hex mode
+  - [ ] go to offset
+  - [ ] go to line
+  - [ ] highlight newline characters in hex mode
+  - [ ] option to show line numbers next to offsets in hex mode
 - [ ] split screen display (view two files in two sizable windows in the terminal)
   - view any selected file in either window
 - [ ] `/@` to supply a file with a list of names to view
