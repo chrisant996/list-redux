@@ -114,10 +114,8 @@ ChooserOutcome Chooser::Go(Error& e)
                 const ChooserOutcome outcome = HandleInput(input, e);
                 if (outcome != ChooserOutcome::CONTINUE)
                     return outcome;
-// TODO:  Print an error box.
-#if 0
-                e.Report();
-#endif
+                if (e.Test())
+                    ReportError(e);
             }
             break;
         }
@@ -435,11 +433,8 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
                     }
 
                     Navigate(dir.Text(), e);
-// TODO:  Print an error box.
-#if 0
                     if (e.Test())
-                        e.Report();
-#endif
+                        ReportError(e);
                 }
                 else
                 {
@@ -762,5 +757,83 @@ void Chooser::RefreshDirectoryListing(Error& e)
     assert(*FindName(dir.Text()) == '*');
     dir.SetEnd(FindName(dir.Text()));   // Strip "*".
     Navigate(dir.Text(), e);
+}
+
+void Chooser::ReportError(Error& e)
+{
+    assert(e.Test());
+    if (!e.Test())
+        return;
+
+// TODO:  Display an error box.  The implementation below is a cheesy minimal
+// placeholder, and is rather incomplete.
+
+    StrW msg;
+    e.Format(msg);
+    while (msg.Length() && IsSpace(msg.Text()[msg.Length() - 1]))
+        msg.SetLength(msg.Length() - 1);
+
+    StrW s;
+    s.Printf(L"\x1b[%uH", m_terminal_height / 2);
+    s.AppendColor(GetColor(ColorElement::Divider));
+    for (size_t cols = m_terminal_width; cols--;)
+        s.Append(L"\u2500");
+    s.Append(L"\r\n");
+    s.AppendColor(GetColor(ColorElement::Error));
+    s.Append(L"\x1b[K");
+    s.Append(L"\r\n");
+// TODO: clear each line before printing text.
+// TODO: keep track of wrapping.
+    s.Append(L"\x1b[K");
+    s.Append(msg);
+    s.Append(L"\r\n");
+    s.Append(L"\x1b[K");
+    s.Append(L"\r\n");
+    s.Append(L"\x1b[K");
+    s.Append(L"\r\n");
+    s.Append(L"\x1b[K");
+    s.Append(L"\r\n");
+    s.AppendColor(GetColor(ColorElement::Divider));
+    for (size_t cols = m_terminal_width; cols--;)
+        s.Append(L"\u2500");
+    s.Append(L"\r\n");
+    s.Printf(L"\x1b[3A");
+    s.AppendColor(GetColor(ColorElement::Error));
+    s.Append(L"Press SPACE or ENTER or ESC to continue...");
+
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    while (true)
+    {
+        const InputRecord input = SelectInput();
+        switch (input.type)
+        {
+        case InputType::None:
+        case InputType::Error:
+        case InputType::Resize:
+            continue;
+        }
+
+        if (input.type == InputType::Key)
+        {
+            switch (input.key)
+            {
+            case Key::ENTER:
+            case Key::ESC:
+                goto LDone;
+            }
+        }
+        else if (input.type == InputType::Char)
+        {
+            switch (input.key_char)
+            {
+            case ' ':
+                goto LDone;
+            }
+        }
+    }
+
+LDone:
+    ForceUpdateAll();
 }
 

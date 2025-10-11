@@ -32,6 +32,7 @@ struct ColorDefinition
 
 static const ColorDefinition c_colors[] =
 {   //  Back            Text
+    {   L"",            L"91" },        // Error
     {   L"",            L"97" },        // File
     {   L"48;5;23",     L"97" },        // Selected
     {   L"",            L"36" },        // Tagged

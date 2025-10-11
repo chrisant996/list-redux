@@ -58,6 +58,7 @@ private:
     void            SetTop(intptr_t top);
     void            EnsureTop();
     void            RefreshDirectoryListing(Error& e);
+    void            ReportError(Error& e);
 
 private:
     const HANDLE    m_hout;

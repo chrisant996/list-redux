@@ -19,6 +19,7 @@ const WCHAR* StripLineStyles(const WCHAR* color);
 
 enum class ColorElement
 {
+    Error,
     File,
     Selected,
     Tagged,
