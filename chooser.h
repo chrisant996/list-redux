@@ -60,6 +60,8 @@ private:
     void            RefreshDirectoryListing(Error& e);
     void            ReportError(Error& e);
 
+    void            NewDirectory(Error& e);
+
 private:
     const HANDLE    m_hout;
     unsigned        m_terminal_width = 0;

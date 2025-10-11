@@ -21,6 +21,29 @@ static const WCHAR c_clreol[] = L"\x1b[K";
 
 static const WCHAR c_no_files_tagged[] = L"*** No Files Tagged ***";
 
+void MkDir(const WCHAR* dir, Error& e)
+{
+    PathW s;
+    s.Set(dir);
+
+    // Bail if there is no parent, or the parent is "" (current dir), or the
+    // parent exists.
+    if (!s.ToParent() || !s.Length())
+        return;
+    const DWORD dw = GetFileAttributesW(s.Text());
+    if (dw != 0xffffffff && (dw & FILE_ATTRIBUTE_DIRECTORY))
+        return;
+
+    // Recursively make the directory.
+    MkDir(s.Text(), e);
+    if (e.Test())
+        return;
+    if (CreateDirectoryW(s.Text(), 0))
+        return;
+    if (GetLastError() != ERROR_ALREADY_EXISTS)
+        e.Sys();
+}
+
 void MarkedList::Mark(intptr_t index, int tag)
 {
     if (tag > 0)
@@ -558,6 +581,13 @@ LNext:
                 RefreshDirectoryListing(e);
             }
             break;
+
+        case Key::DEL:
+            if (input.modifier == Modifier::None)
+            {
+                // TODO:  Delete selected or marked items.
+            }
+            break;
         }
     }
     else if (input.type == InputType::Char)
@@ -611,7 +641,7 @@ LNext:
         case 'n':
             if (input.modifier == Modifier::None)
             {
-                // TODO:  Create new directory.
+                NewDirectory(e);
             }
             break;
         case 'r':
@@ -835,5 +865,30 @@ void Chooser::ReportError(Error& e)
 
 LDone:
     ForceUpdateAll();
+}
+
+void Chooser::NewDirectory(Error& e)
+{
+    StrW s;
+    s.Printf(L"\x1b[%uH", m_terminal_height);
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Append(L"\rNew directory name> ");
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    ReadInput(s);
+
+    OutputConsole(m_hout, c_norm);
+
+    PathW dir;
+    dir.Set(m_dir);
+    assert(*FindName(dir.Text()) == '*');
+    dir.SetEnd(FindName(dir.Text()));   // Strip "*".
+    dir.JoinComponent(s.Text());
+    dir.Append(L"\\__dummy__");         // MkDir() makes dirs above filename.
+    MkDir(dir.Text(), e);
+    if (e.Test())
+        return;
+
+    RefreshDirectoryListing(e);
 }
 

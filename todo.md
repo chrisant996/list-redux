@@ -10,9 +10,10 @@
 - [ ] configure sort order
 - [ ] `A` attrib for current file (enter combination of `ashr`/`ASHR` to clear/set attributes)
 - [ ] `R` rename current file
-- [ ] `N` create new directory
+- [x] `N` create new directory
 - [ ] some way to incrementally search the list of file names
 - [ ] option to sort horizontally instead of vertically
+- [ ] show used and free space in footer
 
 ### File Viewer (list file content)
 
