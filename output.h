@@ -32,9 +32,13 @@ class Interactive
 public:
     Interactive(bool hide_cursor=false);
     ~Interactive();
+    void Begin();
+    void End();
+    bool Active() const { return m_active; }
 private:
     DWORD m_orig_mode_in;
     DWORD m_orig_mode_out;
+    bool m_active = false;
     const bool m_hide_cursor;
 };
 

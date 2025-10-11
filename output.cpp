@@ -786,6 +786,21 @@ void dbgprintf(const WCHAR* format, ...)
 Interactive::Interactive(bool hide_cursor)
 : m_hide_cursor(hide_cursor)
 {
+    Begin();
+}
+
+Interactive::~Interactive()
+{
+    if (Active())
+        End();
+}
+
+void Interactive::Begin()
+{
+    assert(!Active());
+    if (Active())
+        return;
+
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
@@ -798,10 +813,18 @@ Interactive::Interactive(bool hide_cursor)
     if (m_hide_cursor)
         OutputConsole(hout, c_hide_cursor);
     OutputConsole(hout, L"\x1b[?1049h\x1b[H\x1b[J");
+
+    m_active = true;
 }
 
-Interactive::~Interactive()
+void Interactive::End()
 {
+    assert(Active());
+    if (!Active())
+        return;
+
+    m_active = false;
+
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 

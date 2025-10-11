@@ -193,14 +193,12 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     if (piped)
         SetPipedInput();
 
-    Interactive interactive;
     Chooser chooser;
 
     if (piped)
     {
         done = true;
         files.emplace_back(L"<stdin>");
-        ViewFiles(files, s, e);
     }
     else
     {
@@ -229,6 +227,11 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         }
     }
 
+    Interactive interactive;
+
+    if (piped)
+        ViewFiles(files, s, e);
+
     while (!done && !e.Test())
     {
         if (files.size())
@@ -244,8 +247,11 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                     {
                         chooser.Navigate(s.Text(), e);
                         if (e.Test())
+                        {
 // TODO:  Print an error box instead of exiting.
+                            interactive.End();
                             return e.Report();
+                        }
                     }
                     break;
                 }
@@ -278,7 +284,10 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     }
 
     if (e.Test())
+    {
+        interactive.End();
         return e.Report();
+    }
 
     SetGracefulExit();
     return 0;
