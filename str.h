@@ -14,10 +14,69 @@ inline bool IsPathSeparator(WCHAR ch) { return ch == '/' || ch == '\\'; }
 
 const WCHAR* StripLineStyles(const WCHAR* color);
 
+inline int IsAscii(unsigned char ch) { return __isascii(ch); }
+inline int IsAscii(char ch) { return __isascii(static_cast<unsigned char>(ch)); }
+inline int IsAscii(WCHAR wch) { return iswascii(wch); }
+inline int IsPrint(unsigned char ch) { return isprint(ch); }
+inline int IsPrint(char ch) { return isprint(static_cast<unsigned char>(ch)); }
+inline int IsPrint(WCHAR wch) { return iswprint(wch); }
+inline int IsGraph(unsigned char ch) { return isgraph(ch); }
+inline int IsGraph(char ch) { return isgraph(static_cast<unsigned char>(ch)); }
+inline int IsGraph(WCHAR wch) { return iswgraph(wch); }
+
+inline int IsBlank(unsigned char ch) { return isblank(ch); }
+inline int IsBlank(char ch) { return isblank(static_cast<unsigned char>(ch)); }
+inline int IsBlank(WCHAR wch) { return iswblank(wch); }
+inline int IsSpace(unsigned char ch) { return isspace(ch); }
+inline int IsSpace(char ch) { return isspace(static_cast<unsigned char>(ch)); }
+inline int IsSpace(WCHAR wch) { return iswspace(wch); }
+inline int IsCntrl(unsigned char ch) { return iscntrl(ch); }
+inline int IsCntrl(char ch) { return iscntrl(static_cast<unsigned char>(ch)); }
+inline int IsCntrl(WCHAR wch) { return iswcntrl(wch); }
+
+inline int IsAlnum(unsigned char ch) { return isalnum(ch); }
+inline int IsAlnum(char ch) { return isalnum(static_cast<unsigned char>(ch)); }
+inline int IsAlnum(WCHAR wch) { return iswalnum(wch); }
+inline int IsAlpha(unsigned char ch) { return isalpha(ch); }
+inline int IsAlpha(char ch) { return isalpha(static_cast<unsigned char>(ch)); }
+inline int IsAlpha(WCHAR wch) { return iswalpha(wch); }
+inline int IsDigit(unsigned char ch) { return isdigit(ch); }
+inline int IsDigit(char ch) { return isdigit(static_cast<unsigned char>(ch)); }
+inline int IsDigit(WCHAR wch) { return iswdigit(wch); }
+inline int IsPunct(unsigned char ch) { return ispunct(ch); }
+inline int IsPunct(char ch) { return ispunct(static_cast<unsigned char>(ch)); }
+inline int IsPunct(WCHAR wch) { return iswpunct(wch); }
+inline int IsXDigit(unsigned char ch) { return isxdigit(ch); }
+inline int IsXDigit(char ch) { return isxdigit(static_cast<unsigned char>(ch)); }
+inline int IsXDigit(WCHAR wch) { return iswxdigit(wch); }
+
+inline int IsUpper(unsigned char ch) { return isupper(ch); }
+inline int IsUpper(char ch) { return isupper(static_cast<unsigned char>(ch)); }
+inline int IsUpper(WCHAR wch) { return iswupper(wch); }
+inline int IsLower(unsigned char ch) { return islower(ch); }
+inline int IsLower(char ch) { return islower(static_cast<unsigned char>(ch)); }
+inline int IsLower(WCHAR wch) { return iswlower(wch); }
+
+inline unsigned char ToUpper(unsigned char ch) { return (IsAscii(ch) && IsLower(ch)) ? static_cast<unsigned char>(toupper(ch)) : ch; }
+inline char ToUpper(char ch) { return (IsAscii(ch) && IsLower(ch)) ? char(toupper(static_cast<unsigned char>(ch))) : ch; }
+inline WCHAR ToUpper(WCHAR wch) { return towupper(wch); }
+inline unsigned char ToLower(unsigned char ch) { return (IsAscii(ch) && IsUpper(ch)) ? static_cast<unsigned char>(tolower(ch)) : ch; }
+inline char ToLower(char ch) { return (IsAscii(ch) && IsUpper(ch)) ? char(tolower(static_cast<unsigned char>(ch))) : ch; }
+inline WCHAR ToLower(WCHAR wch) { return towlower(wch); }
+
 // This is the extended max path length, including the NUL terminator.
+//
 // An explanation behind why can be found here:
 // https://stackoverflow.com/questions/15262110/what-happens-internally-when-a-file-path-exceeds-approx-32767-characters-in-win
-inline unsigned MaxPath() { return 32744; }
+//
+// Short version:  Empirically the limit is 32743.  There's a hard limit of
+// 65520 bytes (0xFFF0) in the kernel, which is 32760 wide characters, minus 1
+// for the terminating NUL, and minus 20 for replacing the drive spec 'C:'
+// with 'Device\HarddiskVolume1', effectively reducing the limit to 32739.
+// There's some detail of the math in the article that doesn't quite add up
+// precisely exactly, but it's a pretty solid breakdown from examining the
+// assembly instructions in the debugger.
+inline unsigned MaxPath() { return 32743; }
 
 template <class T>
 class Str
