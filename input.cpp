@@ -165,10 +165,8 @@ InputRecord ProcessInput(KEY_EVENT_RECORD const& record)
     case VK_RIGHT:  key = Key::RIGHT; break;
     case VK_HOME:   key = Key::HOME; break;
     case VK_END:    key = Key::END; break;
-#if 0
-    case VK_INSERT: key = Key::INSERT; break;
-    case VK_DELETE: key = Key::DELETE; break;
-#endif
+    case VK_INSERT: key = Key::INS; break;
+    case VK_DELETE: key = Key::DEL; break;
     case VK_PRIOR:  key = Key::PGUP; break;
     case VK_NEXT:   key = Key::PGDN; break;
     }

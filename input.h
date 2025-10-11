@@ -25,6 +25,8 @@ enum class Key
     DOWN,
     LEFT,
     RIGHT,
+    INS,
+    DEL,
     HOME,
     END,
     PGUP,
