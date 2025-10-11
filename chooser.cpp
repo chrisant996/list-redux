@@ -21,7 +21,79 @@ static const WCHAR c_clreol[] = L"\x1b[K";
 
 static const WCHAR c_no_files_tagged[] = L"*** No Files Tagged ***";
 
-void MkDir(const WCHAR* dir, Error& e)
+static StrW MakeMsgBoxText(const WCHAR* message, const WCHAR* directive, ColorElement color_elm)
+{
+// TODO:  Make a string to display an error box.  The implementation below is
+// a cheesy minimal placeholder.
+
+    assert(message && *message);
+    assert(directive && *directive);
+
+    const DWORD colsrows = GetConsoleColsRows(GetStdHandle(STD_OUTPUT_HANDLE));
+    const unsigned terminal_width = LOWORD(colsrows);
+    const unsigned terminal_height = HIWORD(colsrows);
+
+    StrW first;
+    StrW second;
+    WrapText(message, first);
+    WrapText(directive, second);
+    while (first.Length() && IsSpace(first.Text()[first.Length() - 1]))
+        first.SetLength(first.Length() - 1);
+    while (second.Length() && IsSpace(second.Text()[second.Length() - 1]))
+        second.SetLength(second.Length() - 1);
+
+    StrW msg;
+    msg.Printf(L"%s\r\n\n%s", first.Text(), second.Text());
+
+    size_t lines = 1;
+    for (const WCHAR* walk = msg.Text(); *walk;)
+    {
+        walk = wcschr(walk, '\n');
+        if (!walk)
+            break;
+        ++walk;
+        ++lines;
+    }
+
+    StrW s;
+    s.Printf(L"\x1b[%uH", (terminal_height - (2+lines+2 + 1)) / 2);
+
+    // Top border and blank line.
+    s.AppendColor(GetColor(ColorElement::Divider));
+    for (size_t cols = terminal_width; cols--;)
+        s.Append(L"\u2500");
+    s.Append(L"\r\n");
+
+    // Clear each line before printing text.
+    s.AppendColor(GetColor(color_elm));
+    for (size_t n = 1+lines+1; n--;)
+        s.Append(L"\r\x1b[K\n");
+
+    // Blank line and bottom border.
+    s.AppendColor(GetColor(ColorElement::Divider));
+    for (size_t cols = terminal_width; cols--;)
+        s.Append(L"\u2500");
+    s.Append(L"\r");
+
+    // Overlay the wrapped message text (the cursor lands at the end of it).
+    s.Printf(L"\x1b[%uA", lines+1);
+    s.AppendColor(GetColor(color_elm));
+    s.Append(msg);
+
+    return s;
+}
+
+static void ApplyAttr(DWORD& mask, DWORD& attr, bool& minus, DWORD flag)
+{
+    mask |= flag;
+    if (minus)
+        attr &= ~flag;
+    else
+        attr |= flag;
+    minus = false;
+}
+
+static bool MkDir(const WCHAR* dir, Error& e)
 {
     PathW s;
     s.Set(dir);
@@ -29,19 +101,22 @@ void MkDir(const WCHAR* dir, Error& e)
     // Bail if there is no parent, or the parent is "" (current dir), or the
     // parent exists.
     if (!s.ToParent() || !s.Length())
-        return;
+        return false;
     const DWORD dw = GetFileAttributesW(s.Text());
     if (dw != 0xffffffff && (dw & FILE_ATTRIBUTE_DIRECTORY))
-        return;
+        return false;
 
     // Recursively make the directory.
-    MkDir(s.Text(), e);
+    const bool ret = MkDir(s.Text(), e);
     if (e.Test())
-        return;
+        return ret;
     if (CreateDirectoryW(s.Text(), 0))
-        return;
-    if (GetLastError() != ERROR_ALREADY_EXISTS)
-        e.Sys();
+        return true;
+    if (GetLastError() == ERROR_ALREADY_EXISTS)
+        return ret;
+
+    e.Sys();
+    return false;
 }
 
 void MarkedList::Mark(intptr_t index, int tag)
@@ -585,7 +660,7 @@ LNext:
         case Key::DEL:
             if (input.modifier == Modifier::None)
             {
-                // TODO:  Delete selected or marked items.
+                DeleteEntries(e);
             }
             break;
         }
@@ -635,7 +710,7 @@ LNext:
         case 'a':
             if (input.modifier == Modifier::None)
             {
-                // TODO:  Change file attributes.
+                ChangeAttributes(e);
             }
             break;
         case 'n':
@@ -647,7 +722,7 @@ LNext:
         case 'r':
             if (input.modifier == Modifier::None)
             {
-                // TODO:  Rename file or directory.
+                RenameEntry(e);
             }
             break;
 
@@ -789,48 +864,55 @@ void Chooser::RefreshDirectoryListing(Error& e)
     Navigate(dir.Text(), e);
 }
 
+bool Chooser::AskForConfirmation(const WCHAR* msg)
+{
+    const WCHAR* const directive = L"Press Y to confirm, or any other key to cancel...";
+    // TODO:  ColorElement::Command might not be the most appropriate color.
+    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    bool confirmed = false;
+    while (true)
+    {
+        const InputRecord input = SelectInput();
+        switch (input.type)
+        {
+        case InputType::None:
+        case InputType::Error:
+        case InputType::Resize:
+            continue;
+        }
+
+        if (input.type == InputType::Char)
+        {
+            switch (input.key_char)
+            {
+            case 'y':
+            case 'Y':
+                confirmed = true;
+                goto LDone;
+            }
+        }
+
+        break;
+    }
+
+LDone:
+    ForceUpdateAll();
+    return confirmed;
+}
+
 void Chooser::ReportError(Error& e)
 {
     assert(e.Test());
     if (!e.Test())
         return;
 
-// TODO:  Display an error box.  The implementation below is a cheesy minimal
-// placeholder, and is rather incomplete.
+    StrW tmp;
+    e.Format(tmp);
 
-    StrW msg;
-    e.Format(msg);
-    while (msg.Length() && IsSpace(msg.Text()[msg.Length() - 1]))
-        msg.SetLength(msg.Length() - 1);
-
-    StrW s;
-    s.Printf(L"\x1b[%uH", m_terminal_height / 2);
-    s.AppendColor(GetColor(ColorElement::Divider));
-    for (size_t cols = m_terminal_width; cols--;)
-        s.Append(L"\u2500");
-    s.Append(L"\r\n");
-    s.AppendColor(GetColor(ColorElement::Error));
-    s.Append(L"\x1b[K");
-    s.Append(L"\r\n");
-// TODO: clear each line before printing text.
-// TODO: keep track of wrapping.
-    s.Append(L"\x1b[K");
-    s.Append(msg);
-    s.Append(L"\r\n");
-    s.Append(L"\x1b[K");
-    s.Append(L"\r\n");
-    s.Append(L"\x1b[K");
-    s.Append(L"\r\n");
-    s.Append(L"\x1b[K");
-    s.Append(L"\r\n");
-    s.AppendColor(GetColor(ColorElement::Divider));
-    for (size_t cols = m_terminal_width; cols--;)
-        s.Append(L"\u2500");
-    s.Append(L"\r\n");
-    s.Printf(L"\x1b[3A");
-    s.AppendColor(GetColor(ColorElement::Error));
-    s.Append(L"Press SPACE or ENTER or ESC to continue...");
-
+    const WCHAR* const directive = L"Press SPACE or ENTER or ESC to continue...";
+    const StrW s = MakeMsgBoxText(tmp.Text(), directive, ColorElement::Error);
     OutputConsole(m_hout, s.Text(), s.Length());
 
     while (true)
@@ -867,6 +949,86 @@ LDone:
     ForceUpdateAll();
 }
 
+void Chooser::ChangeAttributes(Error& e)
+{
+    if (size_t(m_index) >= m_files.size())
+        return;
+    if (m_files[m_index].IsPseudoDirectory())
+        return;
+
+    // TODO:  Support for marked files and directories.
+
+    StrW path = GetSelectedFile();
+    if (path.Empty())
+        return;
+
+    StrW s;
+    s.Printf(L"\x1b[%uH", m_terminal_height);
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Append(L"\r\x1b[KChange attributes ('ashr' to set or '-a-s-h-r' to clear)> ");
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    ReadInput(s);
+
+    OutputConsole(m_hout, c_norm);
+    ForceUpdateAll();
+
+    DWORD mask = 0;
+    DWORD attr = 0;
+    bool minus = false;
+    for (const WCHAR* walk = s.Text(); *walk; ++walk)
+    {
+        switch (*walk)
+        {
+        case '-':
+            minus = true;
+            break;
+        case '+':
+        case ' ':
+        case ',':
+        case ';':
+            minus = false;
+            break;
+        case 'a':
+        case 'A':
+            ApplyAttr(mask, attr, minus, FILE_ATTRIBUTE_ARCHIVE);
+            break;
+        case 's':
+        case 'S':
+            ApplyAttr(mask, attr, minus, FILE_ATTRIBUTE_SYSTEM);
+            break;
+        case 'h':
+        case 'H':
+            ApplyAttr(mask, attr, minus, FILE_ATTRIBUTE_HIDDEN);
+            break;
+        case 'r':
+        case 'R':
+            ApplyAttr(mask, attr, minus, FILE_ATTRIBUTE_READONLY);
+            break;
+        default:
+            e.Set(L"Unrecognized input '%1'.") << *walk;
+            return;
+        }
+    }
+
+    if (!mask)
+        return;
+
+    const DWORD current = GetFileAttributesW(path.Text());
+    if (current == 0xffffffff)
+    {
+LError:
+        e.Sys();
+        return;
+    }
+
+    const DWORD update = (current & ~mask) | attr;
+    if (!SetFileAttributesW(path.Text(), update))
+        goto LError;
+
+    m_files[m_index].UpdateAttributes(update);
+}
+
 void Chooser::NewDirectory(Error& e)
 {
     StrW s;
@@ -878,6 +1040,10 @@ void Chooser::NewDirectory(Error& e)
     ReadInput(s);
 
     OutputConsole(m_hout, c_norm);
+    ForceUpdateAll();
+
+    if (!s.Length())
+        return;
 
     PathW dir;
     dir.Set(m_dir);
@@ -885,10 +1051,149 @@ void Chooser::NewDirectory(Error& e)
     dir.SetEnd(FindName(dir.Text()));   // Strip "*".
     dir.JoinComponent(s.Text());
     dir.Append(L"\\__dummy__");         // MkDir() makes dirs above filename.
-    MkDir(dir.Text(), e);
-    if (e.Test())
+
+    if (!MkDir(dir.Text(), e))
         return;
 
     RefreshDirectoryListing(e);
+}
+
+void Chooser::RenameEntry(Error& e)
+{
+    if (size_t(m_index) >= m_files.size())
+        return;
+    if (m_files[m_index].IsPseudoDirectory())
+        return;
+
+    StrW old_name = GetSelectedFile();
+    if (old_name.Empty())
+        return;
+
+    StrW s;
+    s.Printf(L"\x1b[%uH", m_terminal_height);
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Append(L"\rNew name> ");
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    ReadInput(s);
+
+    OutputConsole(m_hout, c_norm);
+    ForceUpdateAll();
+
+    if (!s.Length())
+        return;
+
+    const WCHAR* invalid = wcspbrk(s.Text(), L"\\<>|:*?\"");
+    if (invalid)
+    {
+        e.Set(L"Invalid character '%1' in new name.") << *invalid;
+        return;
+    }
+
+    PathW new_name;
+    new_name.Set(m_dir);
+    assert(*FindName(new_name.Text()) == '*');
+    new_name.SetEnd(FindName(new_name.Text())); // Strip "*".
+    new_name.JoinComponent(s.Text());
+
+    if (!MoveFileW(old_name.Text(), new_name.Text()))
+    {
+        e.Sys();
+        return;
+    }
+
+    RefreshDirectoryListing(e);
+}
+
+void Chooser::DeleteEntries(Error& e)
+{
+    std::vector<StrW> files;
+    StrW name;
+    bool is_dir = false;
+
+    if (m_tagged.AnyMarked())
+    {
+        files = GetTaggedFiles();
+    }
+    else if (size_t(m_index) < m_files.size() && !m_files[m_index].IsPseudoDirectory())
+    {
+        name = GetSelectedFile();
+        if (name.Empty())
+            return;
+        is_dir = m_files[m_index].IsDirectory();
+    }
+
+    if (files.empty() && name.Empty())
+        return;
+
+    StrW msg;
+    if (files.size() <= 1)
+    {
+        const WCHAR* file = files.empty() ? name.Text() : files[0].Text();
+        const WCHAR* name_part = FindName(file);
+        if (name_part && *name_part)
+            msg.Printf(L"Confirm delete '%s'?", name_part);
+    }
+    if (msg.Empty())
+    {
+        const size_t n = files.size() + !name.Empty();
+        msg.Printf(L"Confirm delete %zu item%s?", n, (n == 1) ? L"" : L"s");
+    }
+    if (!AskForConfirmation(msg.Text()))
+        return;
+
+    UpdateDisplay();
+
+    bool any = false;
+    if (!files.empty())
+    {
+        for (const auto& file : files)
+        {
+            BOOL ok = false;
+#ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
+            SetLastError(ERROR_ACCESS_DENIED);
+            e.Set(L"(Destructive operations are disallowed.)");
+#else
+            ok = DeleteFileW(file.Text());
+#endif
+            if (!ok)
+            {
+                e.Sys();
+                const WCHAR* name_part = FindName(file.Text());
+                if (name_part && *name_part)
+                    e.Set(L"Unable to delete '%1'.") << name_part;
+                break;
+            }
+            any = true;
+        }
+    }
+    else if (!name.Empty())
+    {
+        BOOL ok = false;
+#ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
+        SetLastError(ERROR_ACCESS_DENIED);
+        e.Set(L"(Destructive operations are disallowed.)");
+#else
+        ok = DeleteFileW(name.Text());
+#endif
+        if (!ok)
+        {
+            e.Sys();
+            const WCHAR* name_part = FindName(name.Text());
+            if (name_part && *name_part)
+                e.Set(L"Unable to delete '%1'.") << name_part;
+        }
+        else
+        {
+            any = true;
+        }
+    }
+
+    if (any)
+    {
+        Error dummy;
+        Error* err = e.Test() ? &dummy : &e; // Don't overwrite e!
+        RefreshDirectoryListing(*err);
+    }
 }
 

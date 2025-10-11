@@ -1,5 +1,5 @@
 
-KEYS:
+BASIC KEYS:
 
        ESC  Exit the file viewer.
 
@@ -21,6 +21,8 @@ LEFT/RIGHT  Scroll file contents left/right.
 
     Ctrl-N  Next file.
     Ctrl-P  Previous file.
+
+MODE KEYS:
 
          C  Toggle how control characters are shown.
          H  Toggle viewing content as hexadecimal values.

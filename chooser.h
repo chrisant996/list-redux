@@ -58,9 +58,14 @@ private:
     void            SetTop(intptr_t top);
     void            EnsureTop();
     void            RefreshDirectoryListing(Error& e);
+
+    bool            AskForConfirmation(const WCHAR* msg);
     void            ReportError(Error& e);
 
+    void            ChangeAttributes(Error& e);
     void            NewDirectory(Error& e);
+    void            RenameEntry(Error& e);
+    void            DeleteEntries(Error& e);
 
 private:
     const HANDLE    m_hout;

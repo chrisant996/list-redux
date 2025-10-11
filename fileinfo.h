@@ -33,6 +33,8 @@ public:
     bool                IsPseudoDirectory() const;
     bool                IsDirectory() const;
 
+    void                UpdateAttributes(DWORD attr) { m_dwAttr = attr; }
+
 private:
     StrW                m_name;
     ULARGE_INTEGER      m_ulSize = {};

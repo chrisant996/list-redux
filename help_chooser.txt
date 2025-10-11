@@ -1,5 +1,5 @@
 
-KEYS:
+BASIC KEYS:
 
        ESC  Exit the file chooser (and exits the LIST program).
 
@@ -13,20 +13,25 @@ LEFT/RIGHT  Move selection left/right one file.
 
      ENTER  View the selected file.
     L or V  View the tagged files.
-         A  Change file attributes (* NYI *).
-         N  Create new directory.
-         R  Rename file (* NYI *).
-         M  Mark line (or file offset in hex mode).
-         T  Tag the selected file.
-         U  Clear marked line (unmark).
-     SPACE  Toggle tagged for the selected file.
-
-    Ctrl-A  Tag all files.
-    Ctrl-T  Tag all files.
-    Ctrl-U  Untag all files.
 
          1  Show only file names.
          2  Show file names and sizes.
          3  Show file names, dates, and sizes.
          4  Show file names, dates, sizes, and attributes.
+
+ACTION KEYS:
+
+         A  Change file or directory attributes.
+         N  Create new directory.
+         R  Rename file or directory.
+
+       DEL  Delete the selected or tagged files.
+
+TAGGING KEYS:
+
+         T  Tag the selected file.
+     SPACE  Toggle tagged for the selected file.
+    Ctrl-A  Tag all files.
+    Ctrl-T  Tag all files.
+    Ctrl-U  Untag all files.
 

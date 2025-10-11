@@ -11,6 +11,11 @@
 #include <uchar.h>
 #include <assert.h>
 
+// Define this to prevent executing destructive operations (such as deleting
+// a file or directory).  This only affects operations that have cooperatively
+// opted in to be controlled by this.
+//#define DISALLOW_DESTRUCTIVE_OPERATIONS
+
 #define implies(x, y)           (!(x) || (y))
 
 template <typename T> T clamp(T value, T min, T max)
