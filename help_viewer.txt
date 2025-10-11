@@ -22,8 +22,6 @@ LEFT/RIGHT  Scroll file contents left/right.
     Ctrl-N  Next file.
     Ctrl-P  Previous file.
 
-OPTIONS:
-
          C  Toggle how control characters are shown.
          H  Toggle viewing content as hexadecimal values.
          N  Toggle showing file line numbers.

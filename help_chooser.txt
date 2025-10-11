@@ -25,8 +25,6 @@ LEFT/RIGHT  Move selection left/right one file.
     Ctrl-T  Tag all files.
     Ctrl-U  Untag all files.
 
-OPTIONS:
-
          1  Show only file names.
          2  Show file names and sizes.
          3  Show file names, dates, and sizes.
