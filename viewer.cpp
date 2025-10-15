@@ -893,13 +893,13 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             }
             break;
 
-        case 'N'-'@':
+        case 'N'-'@':   // CTRL-N
             if (input.modifier == Modifier::CTRL)
             {
                 SetFile(m_index + 1);
             }
             break;
-        case 'P'-'@':
+        case 'P'-'@':   // CTRL-P
             if (input.modifier == Modifier::CTRL)
             {
                 SetFile(m_index - 1);
@@ -1025,6 +1025,7 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             break;
 
         case '/':
+        case 's':
             if (input.modifier == Modifier::None)
             {
                 // TODO:  What should it do in hex mode?
@@ -1032,6 +1033,7 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             }
             break;
         case '\\':
+        case 'f':
             if (input.modifier == Modifier::None)
             {
                 // TODO:  What should it do in hex mode?
