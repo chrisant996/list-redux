@@ -4,16 +4,17 @@ BASIC KEYS:
        ESC  Exit the file viewer.
 
    F1 or ?  Show this help.
-        F3  Find Next.
-  Shift-F3  Find Prev.
 
   HOME/END  Scroll to beginning/end of file.
 LEFT/RIGHT  Scroll file contents left/right.
    UP/DOWN  Scroll file contents up/down one line.
  PGUP/PGDN  Scroll file contents up/down one page.
 
-         /  Search for text (case sensitive).
-         \  Search for text (any case).
+    \ or F  Search for text (any case).
+    / or S  Search for text (case sensitive).
+        F3  Find Next.
+  Shift-F3  Find Prev.
+
          G  Go to line (or file offset in hex mode).
          J  Jump to marked line.
          M  Mark line (or file offset in hex mode).
@@ -31,4 +32,6 @@ MODE KEYS:
          R  Toggle showing a ruler at the top.
          T  Toggle how tab characters are shown.
          W  Toggle wrapping to the terminal width.
+
+     Alt-D  Toggle showing debug info.
 

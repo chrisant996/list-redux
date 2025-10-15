@@ -759,15 +759,15 @@ LNext:
                 }
             }
             break;
-        case '\x01':
-        case '\x14':
+        case '\x01':    // CTRL-A
+        case '\x14':    // CTRL-T
             if (!m_tagged.AllMarked())
             {
                 m_tagged.MarkAll();
                 m_dirty.MarkAll();
             }
             break;
-        case '\x15':
+        case '\x15':    // CTRL-U
             if (m_tagged.AnyMarked())
             {
                 m_tagged.Clear();

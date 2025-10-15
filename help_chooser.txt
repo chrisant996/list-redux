@@ -30,6 +30,7 @@ ACTION KEYS:
 TAGGING KEYS:
 
          T  Tag the selected file.
+         U  Untag the selected file.
      SPACE  Toggle tagged for the selected file.
     Ctrl-A  Tag all files.
     Ctrl-T  Tag all files.
