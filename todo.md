@@ -7,10 +7,16 @@
 - [x] support UNC and \\?\ syntax
 - [x] `*` or `F5` to refresh the directory listing
 - [ ] Launch the program associated with a file
-- [ ] configure sort order
-- [ ] `A` attrib for current file (enter combination of `ashr`/`ASHR` to clear/set attributes)
-- [ ] `R` rename current file
+- [ ] `W` for file sWeep command: execute a specified program using each tagged file as a parameter
+- [ ] `S` configure sort order
+- [x] `A` attrib for current file (enter combination of `ashr`/`ASHR` to clear/set attributes)
+- [x] `R` rename current file
 - [x] `N` create new directory
+- [x] `DEL` to delete file(s) or (empty) directory
+- [ ] `.` change to parent directory
+- [ ] `E` edit file (`%EDITOR%` or `notepad.exe` or maybe `edit.exe`)
+- [ ] `F` new file mask (wildcard)
+- [ ] `P` change drive/path
 - [ ] some way to incrementally search the list of file names
 - [ ] option to sort horizontally instead of vertically
 - [ ] show used and free space in footer
@@ -36,15 +42,14 @@
 - [x] jump to marked line
 - [x] mark center line
 - [x] clear marked line (unmark)
-- [ ] go to line in hex mode
+- [ ] `/@` to supply a file with a list of names to view
+- [ ] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
+- hex mode
   - [ ] go to offset
   - [ ] go to line
   - [ ] highlight newline characters in hex mode
   - [ ] option to show line numbers next to offsets in hex mode
-- [ ] split screen display (view two files in two sizable windows in the terminal)
-  - view any selected file in either window
-- [ ] `/@` to supply a file with a list of names to view
-- [ ] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
+  - [ ] option to end a row at a newline (requires computing and caching hex mode pagination/delineation offsets)
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
   - [x] Binary files **_and hex mode_** use OEM CP.
@@ -55,12 +60,16 @@
   - [ ] Toggle between Binary and Text (and UTF8).
   - [ ] Allow selecting between CP 437 ("Text") and UTF8 ("UTF8").  ASCII files can be displayed as either, so default to CP 437 ("Text") for them.
   - [ ] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
+- detect certain file types and render with formatting/color
+  - [ ] detect git patches and render some lines with color
+  - [ ] detect markdown and render some simple markdown formatting
 
 ### Future
 
-- [ ] mouse input (configurable on/off since it interferes with the terminal host)
-- [ ] detect certain file types (e.g. git patches) and render some lines with color
-- [ ] `W` for file sWeep command: execute a specified program using each tagged file as a parameter
+- [ ] mouse input
+  - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
+- [ ] split screen display (view two files in two sizable windows in the terminal)
+  - view any selected file in either window
 - Store configuration how?  In an .ini file?
   - Colors
   - Options
@@ -69,18 +78,19 @@
 
 - Option to suppress "Are you sure" confirmations on destructive operations (such as delete/moving files)?
 - Cut and paste to new or existing file [did it really "cut" or just "copy"?]
-- allow copying, deleting, moving tagged files?
+- allow copying, moving tagged files?
 - `/Nnn` lock the first `nn` lines of the file at the top of the display
 - `/Cnn` lock the first `nn` columns of each line on the left side of the display
 - search for hex bytes in hex mode
 - modify files in hex mode
 - search for text in multiple viewed files
 - search for text in files in file chooser
-- detect markdown and apply some simple markdown formatting
+- view file at cursor (`Alt-I` "insert file" in list.com)
 - `\` present a directory tree of the selected drive; select a subdirectory to list by moving the cursor and pressing Enter
-- View archive file directories and select files for viewing
-    - **Enhanced:** or extracting from or adding to archive files
-    - or printing files?  (**Enhanced:** partial or entire files)
+  - list.com shows 8 levels, but selecting any directory just goes to its top level parent directory
+- archive files
+  - view archive file contents and select files for viewing or extracting
+  - add to archive files
 - what would it take to support other 8-bit encodings?
 - handle UTF16 and UTF16-BE encodings?
 
@@ -94,6 +104,7 @@
 ### Not Planned
 
 - Telephone dialer
+- Printing
 
 
 
