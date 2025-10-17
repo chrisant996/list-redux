@@ -702,6 +702,18 @@ LNext:
                 RefreshDirectoryListing(e);
             }
             break;
+        case '.':
+            if (input.modifier == Modifier::None)
+            {
+                PathW dir(m_dir);
+                EnsureTrailingSlash(dir);   // Guarantee trailing slash (just in case).
+                dir.ToParent();             // Eats trailing slash.
+                dir.ToParent();             // Actually goes up to parent.
+                Navigate(dir.Text(), e);
+                if (e.Test())
+                    ReportError(e);
+            }
+            break;
 
         case 'l':
         case 'v':

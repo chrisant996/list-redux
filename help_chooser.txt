@@ -11,7 +11,7 @@ LEFT/RIGHT  Move selection left/right one file.
    UP/DOWN  Move selection up/down one file.
  PGUP/PGDN  Move selection up/down one page of files.
 
-     ENTER  View the selected file.
+     ENTER  View the selected file, or navigate to directory.
     L or V  View the tagged files.
 
          1  Show only file names.
@@ -20,6 +20,8 @@ LEFT/RIGHT  Move selection left/right one file.
          4  Show file names, dates, sizes, and attributes.
 
 ACTION KEYS:
+
+         .  Navigate to parent directory.
 
          A  Change file or directory attributes.
          N  Create new directory.

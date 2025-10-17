@@ -7,9 +7,12 @@
 template<class T, class Base>
 class Path : public Base
 {
-    Base base;
-
 public:
+                        Path() = default;
+                        Path(const WCHAR* p) { Set(p); }
+                        Path(const Base& s) { Set(s); }
+                        Path(Path<T,Base>&& s) { Set(std::move(s)); }
+
     void                SetMaybeRooted(const T* root, const T* component);
     void                JoinComponent(const T* component);
     bool                AppendComponent(const T* component);

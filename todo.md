@@ -13,7 +13,7 @@
 - [x] `R` rename current file
 - [x] `N` create new directory
 - [x] `DEL` to delete file(s) or (empty) directory
-- [ ] `.` change to parent directory
+- [x] `.` change to parent directory
 - [ ] `E` edit file (`%EDITOR%` or `notepad.exe` or maybe `edit.exe`)
 - [ ] `F` new file mask (wildcard)
 - [ ] `P` change drive/path
