@@ -193,7 +193,6 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     if (piped)
         SetPipedInput();
 
-    Chooser chooser;
 
     if (piped)
     {
@@ -220,17 +219,20 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
             }
             fileinfos.clear();
         }
-        else
-        {
-            chooser.Navigate(dir.Text(), std::move(fileinfos));
-            assert(fileinfos.empty());
-        }
     }
 
     Interactive interactive;
+    Chooser chooser(&interactive);
 
     if (piped)
+    {
         ViewFiles(files, s, e);
+    }
+    else
+    {
+        chooser.Navigate(dir.Text(), std::move(fileinfos));
+        assert(fileinfos.empty());
+    }
 
     while (!done && !e.Test())
     {

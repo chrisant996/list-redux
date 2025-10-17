@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <memory>
+
 bool IsConsole(HANDLE h);
 
 void SetUtf8Output(bool utf8);
@@ -30,16 +32,19 @@ void dbgprintf(const WCHAR* format, ...);
 class Interactive
 {
 public:
-    Interactive(bool hide_cursor=false);
+    Interactive(bool begin=true);
     ~Interactive();
     void Begin();
     void End();
     bool Active() const { return m_active; }
+    std::unique_ptr<Interactive> MakeReverseInteractive() const;
 private:
-    DWORD m_orig_mode_in;
-    DWORD m_orig_mode_out;
+    DWORD m_begin_mode_in;
+    DWORD m_begin_mode_out;
+    DWORD m_end_mode_in;
+    DWORD m_end_mode_out;
+    bool m_inverted = false;
     bool m_active = false;
-    const bool m_hide_cursor;
 };
 
 extern const WCHAR c_hide_cursor[];

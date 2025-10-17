@@ -10,6 +10,10 @@ inline int StrCmp(const char* pa, const char* pb) { return strcmp(pa, pb); }
 inline int StrCmp(const WCHAR* pa, const WCHAR* pb) { return wcscmp(pa, pb); }
 inline int StrCmpI(const char* pa, const char* pb) { return _strcmpi(pa, pb); }
 inline int StrCmpI(const WCHAR* pa, const WCHAR* pb) { return _wcsicmp(pa, pb); }
+inline const char* StrChr(const char* p, char ch) { return strchr(p, ch); }
+inline const WCHAR* StrChr(const WCHAR* p, WCHAR wch) { return wcschr(p, wch); }
+inline const char* StrPBrk(const char* p, const char* chars) { return strpbrk(p, chars); }
+inline const WCHAR* StrPBrk(const WCHAR* p, const WCHAR* chars) { return wcspbrk(p, chars); }
 inline bool IsPathSeparator(WCHAR ch) { return ch == '/' || ch == '\\'; }
 
 const WCHAR* StripLineStyles(const WCHAR* color);
@@ -127,6 +131,7 @@ public:
     void                Append(const T* p, size_t len=-1);
     void                Append(const Str<T>& s) { Append(s.Text(), s.Length()); }
     void                AppendSpaces(int spaces);
+    void                AppendMaybeQuoted(const T* p);
 
     void                AppendColor(const WCHAR* color) { if (color) Printf(L"\x1b[0;%sm", color); };
     void                AppendColorOverlay(const WCHAR* color, const WCHAR* overlay);
@@ -158,6 +163,7 @@ protected:
 
     static T            s_empty[1];
     static const T      c_spaces[33];
+    static const T      c_quote_chars[16];
 };
 
 class StrA;
@@ -335,6 +341,17 @@ void Str<T>::AppendSpaces(int spaces)
         Append(c_spaces, add);
         spaces -= add;
     }
+}
+
+template <class T>
+void Str<T>::AppendMaybeQuoted(const T* p)
+{
+    const bool quote = !!StrPBrk(p, c_quote_chars);
+    if (quote)
+        Append('"');
+    Append(p);
+    if (quote)
+        Append('"');
 }
 
 template <class T>

@@ -320,7 +320,7 @@ InputRecord SelectInput(DWORD timeout)
     return input;
 }
 
-void ReadInput(StrW& out, DWORD max_width)
+bool ReadInput(StrW& out, DWORD max_width)
 {
     out.Clear();
 
@@ -358,13 +358,13 @@ void ReadInput(StrW& out, DWORD max_width)
             {
             case Key::ESC:
                 out.Clear();
-                return;
+                return false;
             case Key::BACK:
                 if (out.Length())
                     TruncateWcwidth(out, __wcswidth(out.Text()) - 1, 0);
                 break;
             case Key::ENTER:
-                return;
+                return true;
             }
         }
         else if (input.type == InputType::Char)

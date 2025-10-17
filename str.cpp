@@ -28,6 +28,9 @@ WCHAR Str<WCHAR>::s_empty[1] = L"";
 const char Str<char>::c_spaces[33] = "                                ";
 const WCHAR Str<WCHAR>::c_spaces[33] = L"                                ";
 
+const char Str<char>::c_quote_chars[16] = " +=;,<>|&";
+const WCHAR Str<WCHAR>::c_quote_chars[16] = L" +=;,<>|&";
+
 void StrA::SetW(const WCHAR* p, size_t len)
 {
     Clear();

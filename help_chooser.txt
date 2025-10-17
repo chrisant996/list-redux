@@ -24,6 +24,7 @@ ACTION KEYS:
          A  Change file or directory attributes.
          N  Create new directory.
          R  Rename file or directory.
+         W  Sweep files: run a program on the selected or tagged files.
 
        DEL  Delete the selected or tagged files.
 

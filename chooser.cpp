@@ -119,6 +119,12 @@ static bool MkDir(const WCHAR* dir, Error& e)
     return false;
 }
 
+static bool RunProgram(const WCHAR* commandline, Error& e)
+{
+    errno = 0;
+    return (_wsystem(commandline) >= 0 || !errno);
+}
+
 void MarkedList::Mark(intptr_t index, int tag)
 {
     if (tag > 0)
@@ -162,8 +168,9 @@ bool MarkedList::AllMarked() const
     return (!m_set.size() && m_reverse);
 }
 
-Chooser::Chooser()
+Chooser::Chooser(const Interactive* interactive)
 : m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
+, m_interactive(interactive)
 {
 }
 
@@ -725,6 +732,12 @@ LNext:
                 RenameEntry(e);
             }
             break;
+        case 'w':
+            if (input.modifier == Modifier::None)
+            {
+                SweepFiles(e);
+            }
+            break;
 
         case ' ':
             if (input.modifier == Modifier::None)
@@ -902,18 +915,78 @@ LDone:
     return confirmed;
 }
 
-void Chooser::ReportError(Error& e)
+bool Chooser::ReportError(Error& e, ReportErrorFlags flags)
 {
+    bool ret = true;
+
     assert(e.Test());
     if (!e.Test())
-        return;
+        return ret;
 
     StrW tmp;
     e.Format(tmp);
 
-    const WCHAR* const directive = L"Press SPACE or ENTER or ESC to continue...";
-    const StrW s = MakeMsgBoxText(tmp.Text(), directive, ColorElement::Error);
+    const WCHAR* const directive = (
+        ((flags & ReportErrorFlags::CANABORT) == ReportErrorFlags::CANABORT) ?
+        L"Press SPACE or ENTER to continue, or ESC to cancel..." :
+        L"Press SPACE or ENTER or ESC to continue...");
+
+    StrW s;
+    if ((flags & ReportErrorFlags::INLINE) == ReportErrorFlags::INLINE)
+    {
+        e.Report();
+        s.Set(directive);
+        s.AppendNormalIf(true);
+    }
+    else
+    {
+        s = MakeMsgBoxText(tmp.Text(), directive, ColorElement::Error);
+    }
+
     OutputConsole(m_hout, s.Text(), s.Length());
+
+    while (true)
+    {
+        const InputRecord input = SelectInput();
+        switch (input.type)
+        {
+        case InputType::None:
+        case InputType::Error:
+        case InputType::Resize:
+            continue;
+        }
+
+        if (input.type == InputType::Key)
+        {
+            switch (input.key)
+            {
+            case Key::ENTER:
+                goto LDone;
+            case Key::ESC:
+                if ((flags & ReportErrorFlags::CANABORT) == ReportErrorFlags::CANABORT)
+                    ret = false;
+                goto LDone;
+            }
+        }
+        else if (input.type == InputType::Char)
+        {
+            switch (input.key_char)
+            {
+            case ' ':
+                goto LDone;
+            }
+        }
+    }
+
+LDone:
+    ForceUpdateAll();
+    e.Clear();
+    return ret;
+}
+
+void Chooser::WaitToContinue(bool erase_after)
+{
+    OutputConsole(m_hout, L"Press SPACE or ENTER or ESC to continue...");
 
     while (true)
     {
@@ -946,7 +1019,12 @@ void Chooser::ReportError(Error& e)
     }
 
 LDone:
-    ForceUpdateAll();
+    // BUGBUG: erase_after doesn't fully erase if the terminal width caused
+    // the message to wrap onto more than one line.
+    if (erase_after)
+        OutputConsole(m_hout, L"\r\x1b[K");
+    else
+        OutputConsole(m_hout, L"\r\n");
 }
 
 void Chooser::ChangeAttributes(Error& e)
@@ -965,7 +1043,7 @@ void Chooser::ChangeAttributes(Error& e)
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\r\x1b[KChange attributes ('ashr' to set or '-a-s-h-r' to clear)> ");
+    s.Append(L"\r\x1b[KChange attributes ('ashr' to set or '-a-s-h-r' to clear): ");
     OutputConsole(m_hout, s.Text(), s.Length());
 
     ReadInput(s);
@@ -1034,7 +1112,7 @@ void Chooser::NewDirectory(Error& e)
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\rNew directory name> ");
+    s.Append(L"\rEnter new directory name: ");
     OutputConsole(m_hout, s.Text(), s.Length());
 
     ReadInput(s);
@@ -1072,7 +1150,7 @@ void Chooser::RenameEntry(Error& e)
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\rNew name> ");
+    s.Append(L"\rEnter new name: ");
     OutputConsole(m_hout, s.Text(), s.Length());
 
     ReadInput(s);
@@ -1195,5 +1273,153 @@ void Chooser::DeleteEntries(Error& e)
         Error* err = e.Test() ? &dummy : &e; // Don't overwrite e!
         RefreshDirectoryListing(*err);
     }
+}
+
+void Chooser::SweepFiles(Error& e)
+{
+    std::vector<StrW> files;
+    StrW name;
+    bool is_dir = false;
+
+    if (m_tagged.AnyMarked())
+    {
+        files = GetTaggedFiles();
+    }
+    else if (size_t(m_index) < m_files.size() && !m_files[m_index].IsDirectory())
+    {
+        name = GetSelectedFile();
+        if (name.Empty())
+            return;
+        files.emplace_back(std::move(name));
+    }
+
+    if (files.empty())
+        return;
+
+    StrW s;
+    StrW program;
+    StrW args_before;
+    StrW args_after;
+    bool ok = true;
+
+    s.Clear();
+    s.Printf(L"\x1b[%uH", m_terminal_height);
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Append(L"\rEnter program to run: ");
+    OutputConsole(m_hout, s.Text(), s.Length());
+    ReadInput(program);
+    OutputConsole(m_hout, c_norm);
+    ForceUpdateAll();
+
+    while (program.Length() && IsSpace(program.Text()[program.Length() - 1]))
+        program.SetLength(program.Length() - 1);
+    if (!program.Length())
+        return;
+
+    UpdateDisplay();
+
+    s.Clear();
+    s.Printf(L"\x1b[%uH", m_terminal_height);
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Append(L"\rArguments before file name: ");
+    OutputConsole(m_hout, s.Text(), s.Length());
+    ok = ReadInput(args_before);
+    OutputConsole(m_hout, c_norm);
+    ForceUpdateAll();
+    if (!ok)
+        return;
+
+    UpdateDisplay();
+
+    s.Clear();
+    s.Printf(L"\x1b[%uH", m_terminal_height);
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Append(L"\rArguments after file name: ");
+    OutputConsole(m_hout, s.Text(), s.Length());
+    ok = ReadInput(args_after);
+    OutputConsole(m_hout, c_norm);
+    ForceUpdateAll();
+    if (!ok)
+        return;
+
+    UpdateDisplay();
+
+    // Clear the current (alternate) screen in case programs switch to it.
+    OutputConsole(m_hout, L"\x1b[J");
+
+    // Swap back to original screen and console modes.
+    std::unique_ptr<Interactive> inverted = m_interactive->MakeReverseInteractive();
+
+    // Report that it will run commands.
+    const StrW sweepdivider = MakeColor(ColorElement::SweepDivider);
+    const StrW sweepfile = MakeColor(ColorElement::SweepFile);
+    const WCHAR* const c_div = sweepdivider.Text();
+    s.Clear();
+    s.Printf(L"%s---- Sweep %zu Files ----%s\r\n", c_div, files.size(), c_norm);
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    bool completed = true;
+    size_t errors = 0;
+    for (const auto& file : files)
+    {
+        // Report each file.
+        s.Clear();
+        s.Printf(L"%s%s%s\r\n", sweepfile.Text(), file.Text(), c_norm);
+        OutputConsole(m_hout, s.Text(), s.Length());
+
+        bool ok = false;
+#ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
+        SetLastError(ERROR_ACCESS_DENIED);
+        e.Set(L"(Destructive operations are disallowed.)");
+#else
+        s.Clear();
+        s.AppendMaybeQuoted(program.Text());
+        if (args_before.Length() > 0)
+        {
+            s.Append(L" ");
+            s.Append(args_before.Text());
+        }
+        s.Append(L" ");
+        s.AppendMaybeQuoted(file.Text());
+        if (args_after.Length() > 0)
+        {
+            s.Append(L" ");
+            s.Append(args_after.Text());
+        }
+        ok = RunProgram(s.Text(), e);
+#endif
+        if (!ok)
+        {
+            ++errors;
+            e.Set(L"Error running program for '%1'.") << file.Text();
+            ok = ReportError(e, ReportErrorFlags::CANABORT|ReportErrorFlags::INLINE);
+            e.Clear();
+            OutputConsole(m_hout, L"\r\n");
+            if (!ok)
+            {
+                completed = false;
+                break;
+            }
+        }
+    }
+
+    // Report that it finished.
+    s.Clear();
+    if (!errors)
+        s.Printf(L"%s---- Completed ----%s\r\n", c_div, c_norm);
+    else if (completed)
+        s.Printf(L"%s---- Completed with %zu error(s) ----%s\r\n", c_div, errors, c_norm);
+    else
+        s.Printf(L"%s---- %zu error(s) ----%s\r\n", c_div, errors, c_norm);
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    // Wait for ENTER, SPACE, or ESC.
+    WaitToContinue(true/*erase_after*/);
+
+    // Swap back to alternate screen and console modes.
+    inverted.reset();
+
+    ForceUpdateAll();
+    e.Clear();
 }
 

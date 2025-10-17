@@ -10,6 +10,7 @@
 #include "fileinfo.h"
 #include "columns.h"
 #include "input.h"
+#include "output.h"
 
 #include <vector>
 #include <unordered_set>
@@ -34,10 +35,13 @@ private:
 
 enum class ChooserOutcome { CONTINUE, VIEWONE, VIEWTAGGED, EXITAPP };
 
+enum class ReportErrorFlags { NONE, CANABORT, INLINE };
+DEFINE_ENUM_FLAG_OPERATORS(ReportErrorFlags);
+
 class Chooser
 {
 public:
-                    Chooser();
+                    Chooser(const Interactive* interactive);
                     ~Chooser() = default;
 
     void            Navigate(const WCHAR* dir, std::vector<FileInfo>&& files);
@@ -60,15 +64,18 @@ private:
     void            RefreshDirectoryListing(Error& e);
 
     bool            AskForConfirmation(const WCHAR* msg);
-    void            ReportError(Error& e);
+    bool            ReportError(Error& e, ReportErrorFlags flags=ReportErrorFlags::NONE);
+    void            WaitToContinue(bool erase_after=false);
 
     void            ChangeAttributes(Error& e);
     void            NewDirectory(Error& e);
     void            RenameEntry(Error& e);
     void            DeleteEntries(Error& e);
+    void            SweepFiles(Error& e);
 
 private:
     const HANDLE    m_hout;
+    const Interactive* const m_interactive;
     unsigned        m_terminal_width = 0;
     unsigned        m_terminal_height = 0;
     const unsigned  m_padding = 2;

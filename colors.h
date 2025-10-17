@@ -32,13 +32,15 @@ enum class ColorElement
     MarkedLine,
     SearchFound,
     DebugRow,
+    SweepDivider,
+    SweepFile,
     MAX
 };
 
 const WCHAR* GetBackColorParams(ColorElement element);
 const WCHAR* GetTextColorParams(ColorElement element);
 const WCHAR* GetColor(ColorElement element);
+StrW MakeColor(ColorElement element);
 
 extern const WCHAR c_norm[];
-extern const WCHAR c_error[];
 

@@ -65,5 +65,5 @@ struct InputRecord
 };
 
 InputRecord SelectInput(DWORD timeout=INFINITE);
-void ReadInput(StrW& out, DWORD max_width=32);
+bool ReadInput(StrW& out, DWORD max_width=32);
 

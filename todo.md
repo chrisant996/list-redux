@@ -7,7 +7,7 @@
 - [x] support UNC and \\?\ syntax
 - [x] `*` or `F5` to refresh the directory listing
 - [ ] Launch the program associated with a file
-- [ ] `W` for file sWeep command: execute a specified program using each tagged file as a parameter
+- [x] `W` for file sWeep command: execute a specified program using each tagged file as a parameter
 - [ ] `S` configure sort order
 - [x] `A` attrib for current file (enter combination of `ashr`/`ASHR` to clear/set attributes)
 - [x] `R` rename current file

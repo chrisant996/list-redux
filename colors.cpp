@@ -18,7 +18,6 @@
 #include <cmath>
 
 extern const WCHAR c_norm[] = L"\x1b[m";
-extern const WCHAR c_error[] = L"1;91";
 
 static double s_min_luminance = 0.4;
 static double s_hidden_opacity = 0.0;
@@ -45,6 +44,8 @@ static const ColorDefinition c_colors[] =
     {   L"",            L"7" },         // MarkedLine
     {   L"",            L"7;36" },      // SearchFound
     {   L"",            L"7;36" },      // DebugRow
+    {   L"",            L"7" },         // SweepDivider
+    {   L"",            L"96" },        // SweepFile
 };
 static_assert(_countof(c_colors) == size_t(ColorElement::MAX));
 
@@ -84,6 +85,13 @@ const WCHAR* GetColor(ColorElement element)
     }
 
     return s_tmp[size_t(element)];
+}
+
+StrW MakeColor(ColorElement element)
+{
+    StrW s;
+    s.AppendColor(GetColor(element));
+    return s;
 }
 
 /*

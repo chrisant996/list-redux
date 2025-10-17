@@ -783,10 +783,13 @@ void dbgprintf(const WCHAR* format, ...)
  * Interactive.
  */
 
-Interactive::Interactive(bool hide_cursor)
-: m_hide_cursor(hide_cursor)
+static const WCHAR c_swap_to_alternate_and_clear[] = L"\x1b[?1049h\x1b[H\x1b[J";
+static const WCHAR c_swap_to_primary[] = L"\x1b[?1049l";
+
+Interactive::Interactive(bool begin)
 {
-    Begin();
+    if (begin)
+        Begin();
 }
 
 Interactive::~Interactive()
@@ -804,15 +807,23 @@ void Interactive::Begin()
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
-    GetConsoleMode(hin, &m_orig_mode_in);
-    GetConsoleMode(hout, &m_orig_mode_out);
+    if (m_inverted)
+        OutputConsole(hout, c_swap_to_primary);
 
-    SetConsoleMode(hin, ENABLE_WINDOW_INPUT | (m_orig_mode_in & ~(ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT|ENABLE_ECHO_INPUT|ENABLE_VIRTUAL_TERMINAL_INPUT)));
-    SetConsoleMode(hout, ENABLE_PROCESSED_OUTPUT|ENABLE_VIRTUAL_TERMINAL_PROCESSING | m_orig_mode_out);
+    GetConsoleMode(hin, &m_end_mode_in);
+    GetConsoleMode(hout, &m_end_mode_out);
 
-    if (m_hide_cursor)
-        OutputConsole(hout, c_hide_cursor);
-    OutputConsole(hout, L"\x1b[?1049h\x1b[H\x1b[J");
+    if (!m_inverted)
+    {
+        m_begin_mode_in = ENABLE_WINDOW_INPUT | (m_end_mode_in & ~(ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT|ENABLE_ECHO_INPUT|ENABLE_VIRTUAL_TERMINAL_INPUT));
+        m_begin_mode_out = ENABLE_PROCESSED_OUTPUT|ENABLE_VIRTUAL_TERMINAL_PROCESSING | m_end_mode_out;
+    }
+
+    SetConsoleMode(hin, m_begin_mode_in);
+    SetConsoleMode(hout, m_begin_mode_out);
+
+    if (!m_inverted)
+        OutputConsole(hout, c_swap_to_alternate_and_clear);
 
     m_active = true;
 }
@@ -828,11 +839,32 @@ void Interactive::End()
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
-    OutputConsole(hout, L"\x1b[?1049l");
-    if (m_hide_cursor)
-        OutputConsole(hout, c_show_cursor);
+    OutputConsole(hout, m_inverted ? c_swap_to_alternate_and_clear : c_swap_to_primary);
 
-    SetConsoleMode(hout, m_orig_mode_out);
-    SetConsoleMode(hin, m_orig_mode_in);
+    SetConsoleMode(hout, m_end_mode_out);
+    SetConsoleMode(hin, m_end_mode_in);
+}
+
+std::unique_ptr<Interactive> Interactive::MakeReverseInteractive() const
+{
+    assert(!m_inverted);
+    if (m_inverted)
+        return nullptr;
+    std::unique_ptr<Interactive> inverted = std::make_unique<Interactive>(false/*begin*/);
+    inverted->m_inverted = true;
+    if (Active())
+    {
+        inverted->m_begin_mode_in = m_begin_mode_in;
+        inverted->m_begin_mode_out = m_begin_mode_out;
+    }
+    else
+    {
+        const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
+        const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
+        GetConsoleMode(hin, &inverted->m_begin_mode_in);
+        GetConsoleMode(hout, &inverted->m_begin_mode_out);
+    }
+    inverted->Begin();
+    return inverted;
 }
 
