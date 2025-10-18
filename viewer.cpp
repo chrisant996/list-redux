@@ -1401,7 +1401,7 @@ ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title)
     s_options.show_line_numbers = false;
     s_options.show_file_offsets = false;
     s_options.show_ruler = false;
-    s_options.show_endoffile_line = false;
+    s_options.show_endoffile_line = true;
     s_options.show_debug_info = false;
 
     Viewer viewer(text, title);
