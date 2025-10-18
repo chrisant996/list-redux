@@ -10,6 +10,7 @@
 #include "colors.h"
 #include "fileinfo.h"
 #include "filesys.h"
+#include "os.h"
 #include "sorting.h"
 #include "output.h"
 
@@ -755,10 +756,9 @@ void InitColors()
         RegCloseKey(hkeyUser);
 #else
     PathW ini_filename;
-    WCHAR userprofile[MAX_PATH];
-    DWORD len = GetEnvironmentVariableW(L"USERPROFILE", userprofile, _countof(userprofile));
-    if (len && len < _countof(userprofile))
-        ini_filename.SetMaybeRooted(userprofile, L".listredux");
+    StrW userprofile;
+    if (OS::GetEnv(L"USERPROFILE", userprofile))
+        ini_filename.SetMaybeRooted(userprofile.Text(), L".listredux");
     for (uint32 i = 0; i < _countof(c_reg_color_name); ++i)
         ReadColor(ini_filename.Text(), i);
 #endif

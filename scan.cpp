@@ -7,6 +7,7 @@
 #include "scan.h"
 #include "filesys.h"
 #include "output.h"
+#include "os.h"
 
 static void AdjustSlashes(StrW& s)
 {
@@ -27,7 +28,7 @@ static bool IsDirPattern(const StrW& s)
 
 inline bool IsDriveOnly(const WCHAR* p)
 {
-    p += IsExtendedPath(p);
+    p += OS::IsExtendedPath(p);
 
     // If it does not have any path character, is 2 chars long and has a
     // ':' it must be a drive.
@@ -80,7 +81,7 @@ bool ParsePatterns(int argc, const WCHAR** argv, std::vector<StrW>& patterns, Er
 
     if (!patterns.size())
     {
-        GetCwd(tmp);
+        OS::GetCwd(tmp);
         patterns.emplace_back(std::move(tmp));
     }
 
@@ -91,7 +92,7 @@ bool ParsePatterns(int argc, const WCHAR** argv, std::vector<StrW>& patterns, Er
     for (auto& pattern : patterns)
     {
         if (!pattern.Length())
-            GetCwd(pattern);
+            OS::GetCwd(pattern);
 
         AdjustSlashes(pattern);
 
@@ -103,7 +104,7 @@ bool ParsePatterns(int argc, const WCHAR** argv, std::vector<StrW>& patterns, Er
             // the first directory pattern specified.
             StrW pat = std::move(pattern);
             if (IsDriveOnly(pat.Text()))
-                GetCwd(pat, *pat.Text());
+                OS::GetCwd(pat, *pat.Text());
             AddStar(pat);
             patterns.clear();
             patterns.emplace_back(std::move(pat));
@@ -226,7 +227,7 @@ bool ScanFiles(int argc, const WCHAR** argv, std::vector<FileInfo>& files, StrW&
             if (strip)
                 tmp.SetEnd(strip);
             else
-                GetCwd(tmp);
+                OS::GetCwd(tmp);
             AddStar(tmp);
             patterns.clear();
             patterns.emplace_back(std::move(tmp));
@@ -236,7 +237,7 @@ bool ScanFiles(int argc, const WCHAR** argv, std::vector<FileInfo>& files, StrW&
             if (!ScanPatterns(patterns, files, e) || !files.size())
             {
                 // One last try, using the current working directory.
-                GetCwd(patterns[0]);
+                OS::GetCwd(patterns[0]);
                 AddStar(patterns[0]);
                 ScanPatterns(patterns, files, e);
             }

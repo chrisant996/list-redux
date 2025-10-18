@@ -5,15 +5,6 @@
 
 #pragma once
 
-#include "str.h"
-
-bool IsPseudoDirectory(const WCHAR* dir);
-unsigned IsExtendedPath(const WCHAR* p);
-void GetCwd(StrW& dir, WCHAR chDrive='\0');
-bool GetDrive(const WCHAR* pattern, StrW& drive, Error& e);
-bool IsFATDrive(const WCHAR* path, Error& e);
-bool IsHidden(const WIN32_FIND_DATA& fd);
-
 enum class FileType { Invalid, Device, Dir, File };
 FileType GetFileType(const WCHAR* p);
 

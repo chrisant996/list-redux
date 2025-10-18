@@ -5,6 +5,7 @@
 
 #include "pch.h"
 #include "fileinfo.h"
+#include "os.h"
 
 std::vector<StrW> FileInfo::s_dirs;
 
@@ -59,7 +60,7 @@ void FileInfo::GetPathName(StrW& s) const
 bool FileInfo::IsPseudoDirectory() const
 {
     if (GetAttributes() & FILE_ATTRIBUTE_DIRECTORY)
-        return ::IsPseudoDirectory(m_name.Text());
+        return OS::IsPseudoDirectory(m_name.Text());
     return false;
 }
 
