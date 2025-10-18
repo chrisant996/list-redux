@@ -6,6 +6,7 @@
 #pragma once
 
 #include <windows.h>
+#include "scroll_car.h"
 
 class Error;
 class FileInfo;
@@ -34,6 +35,16 @@ enum class ColorElement
     DebugRow,
     SweepDivider,
     SweepFile,
+    FloatingScrollBar,
+    PopupBorder,
+#ifndef USE_HALF_CHARS
+    PopupScrollCar,
+#endif
+    PopupHeader,
+    PopupFooter,
+    PopupContent,
+    PopupContentDim,
+    PopupSelect,
     MAX
 };
 

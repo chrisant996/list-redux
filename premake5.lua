@@ -64,6 +64,7 @@ define_exe("list")
     links("user32")
     links("advapi32")
     links("shell32")
+    links("shlwapi")
 
     includedirs(".build/" .. toolchain .. "/bin") -- for the generated manifest.xml
     files("*.cpp")

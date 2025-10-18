@@ -8,6 +8,7 @@
 #include "contentcache.h"
 #include "input.h"
 #include "output.h"
+#include "popuplist.h"
 #include "list_format.h"
 #include "colors.h"
 #include "ellipsify.h"
@@ -55,7 +56,6 @@ private:
     unsigned        CalcMarginWidth() const;
     void            UpdateDisplay();
     unsigned        LinePercent(size_t line) const;
-    void            Relayout();
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
     void            SetFile(intptr_t index);
     size_t          CountForDisplay() const;
@@ -65,6 +65,7 @@ private:
     void            GoTo();
     size_t          GetFoundLine(const FoundLine& found_line);
     FileOffset      GetFoundOffset(const FoundLine& found_line);
+    void            ShowFileList();
 
 private:
     const HANDLE    m_hout;
@@ -856,6 +857,12 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             }
             break;
 
+        case Key::F2:
+            if (input.modifier == Modifier::None)
+            {
+                ShowFileList();
+            }
+            break;
         case Key::F3:
             {
                 // F3 = forward, Shift-F3 = backward.
@@ -903,6 +910,13 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             if (input.modifier == Modifier::CTRL)
             {
                 SetFile(m_index - 1);
+            }
+            break;
+
+        case '@':
+            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            {
+                ShowFileList();
             }
             break;
 
@@ -1286,6 +1300,14 @@ FileOffset Viewer::GetFoundOffset(const FoundLine& found_line)
     }
     offset &= ~FileOffset(m_hex_width - 1);
     return offset;
+}
+
+void Viewer::ShowFileList()
+{
+    const PopupResult result = ShowPopupList(*m_files, L"Choose File", m_index, PopupListFlags::DimPaths);
+    m_force_update = true;
+    if (!result.canceled)
+        SetFile(result.selected);
 }
 
 ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e)

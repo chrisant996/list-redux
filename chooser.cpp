@@ -13,6 +13,7 @@
 #include "ellipsify.h"
 #include "ecma48.h"
 #include "sorting.h"
+#include "scroll_car.h"
 #include "help.h"
 
 #include <algorithm>
@@ -240,6 +241,8 @@ void Chooser::Reset()
     m_num_rows = 0;
     m_num_per_row = 0;
     m_visible_rows = 0;
+    m_vert_scroll_car = 0;
+    m_vert_scroll_column = 0;
 
     m_top = 0;
     m_index = 0;
@@ -276,6 +279,12 @@ void Chooser::UpdateDisplay()
     StrW s;
 
     EnsureColumnWidths();
+
+    const int32 rows = int32(min<intptr_t>(m_visible_rows, m_num_rows));
+    m_vert_scroll_car = (m_terminal_width >= 8) ? calc_scroll_car_size(rows, m_num_rows) : 0;
+    if (m_vert_scroll_car)
+        m_vert_scroll_column = m_terminal_width - 2;
+    const int32 car_top = calc_scroll_car_offset(m_top, rows, m_num_rows, m_vert_scroll_car);
 
     // Header.
     if (m_dirty_header)
@@ -340,6 +349,24 @@ void Chooser::UpdateDisplay()
                     row_width += FormatFileInfo(s2, pfi, m_col_widths[jj], m_details, selected, tagged, m_max_size_width);
                 }
 
+                if (m_vert_scroll_car)
+                {
+                    const WCHAR* car = get_scroll_car_char(ii, car_top, m_vert_scroll_car, true/*floating*/);
+                    if (car)
+                    {
+                        // Space was reserved by update_layout() or col_max.
+                        const uint32 pad_to = m_terminal_width - 2;
+                        if (pad_to >= row_width)
+                        {
+                            s2.AppendSpaces(pad_to - row_width);
+                            s2.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                            s2.Append(car);                     // ┃ or etc
+                        }
+                        row_width = pad_to + 1;
+                    }
+                }
+
+                assert(row_width < m_terminal_width);
                 if (row_width < m_terminal_width)
                     s2.Append(c_clreol);
 
@@ -413,6 +440,8 @@ void Chooser::Relayout()
 {
     m_terminal_width = 0;
     m_terminal_height = 0;
+    m_vert_scroll_car = 0;
+    m_vert_scroll_column = 0;
     ForceUpdateAll();
 }
 
@@ -470,9 +499,9 @@ void Chooser::EnsureColumnWidths()
 
             if (!m_col_widths.empty())
             {
-                m_num_per_row = std::max<intptr_t>(1, m_col_widths.size());
+                m_num_per_row = int32(std::max<intptr_t>(1, m_col_widths.size()));
                 m_num_rows = std::min<intptr_t>(m_terminal_height - 2, m_files.size());
-                m_visible_rows = (terminal_height > 2) ? m_num_rows : 0;
+                m_visible_rows = int32((terminal_height > 2) ? m_num_rows : 0);
             }
         }
 
@@ -484,9 +513,9 @@ void Chooser::EnsureColumnWidths()
                 return WidthForFileInfo(&m_files[index], m_details, m_max_size_width);
             }, m_files.size(), true, m_padding, terminal_width, terminal_width / 4);
 
-            m_num_per_row = std::max<intptr_t>(1, m_col_widths.size());
+            m_num_per_row = int32(std::max<intptr_t>(1, m_col_widths.size()));
             m_num_rows = (m_count + m_num_per_row - 1) / m_num_per_row;
-            m_visible_rows = std::min<intptr_t>(m_num_rows, (terminal_height > 2) ? terminal_height - 2 : 0);
+            m_visible_rows = int32(std::min<intptr_t>(m_num_rows, (terminal_height > 2) ? terminal_height - 2 : 0));
         }
 
         if (m_col_widths.size() == 1 && m_col_widths[0] > m_terminal_width)
@@ -821,8 +850,12 @@ std::vector<StrW> Chooser::GetTaggedFiles() const
     {
         if (m_tagged.IsMarked(i))
         {
-            m_files[i].GetPathName(s);
-            files.emplace_back(std::move(s));
+            const auto& file = m_files[i];
+            if (!file.IsDirectory())
+            {
+                m_files[i].GetPathName(s);
+                files.emplace_back(std::move(s));
+            }
         }
     }
     return files;

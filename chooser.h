@@ -89,8 +89,10 @@ private:
     unsigned        m_max_size_width;
     intptr_t        m_count;
     intptr_t        m_num_rows;
-    intptr_t        m_num_per_row;
-    intptr_t        m_visible_rows;
+    int32           m_num_per_row;
+    int32           m_visible_rows;
+    int32           m_vert_scroll_car = 0;
+    int32           m_vert_scroll_column = 0;
     StrW            m_feedback;
 
     intptr_t        m_top;

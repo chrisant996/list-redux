@@ -10,6 +10,8 @@ inline int StrCmp(const char* pa, const char* pb) { return strcmp(pa, pb); }
 inline int StrCmp(const WCHAR* pa, const WCHAR* pb) { return wcscmp(pa, pb); }
 inline int StrCmpI(const char* pa, const char* pb) { return _strcmpi(pa, pb); }
 inline int StrCmpI(const WCHAR* pa, const WCHAR* pb) { return _wcsicmp(pa, pb); }
+inline int StrCmpN(const char* pa, const char* pb, size_t len) { return strncmp(pa, pb, len); }
+inline int StrCmpN(const WCHAR* pa, const WCHAR* pb, size_t len) { return wcsncmp(pa, pb, len); }
 inline const char* StrChr(const char* p, char ch) { return strchr(p, ch); }
 inline const WCHAR* StrChr(const WCHAR* p, WCHAR wch) { return wcschr(p, wch); }
 inline const char* StrPBrk(const char* p, const char* chars) { return strpbrk(p, chars); }

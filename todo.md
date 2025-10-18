@@ -42,8 +42,10 @@
 - [x] jump to marked line
 - [x] mark center line
 - [x] clear marked line (unmark)
+- [ ] `F` open a new file
+- [ ] toggle multi-file search (next/prev cross file boundaries)
 - [ ] `/@` to supply a file with a list of names to view
-- [ ] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
+- [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
 - hex mode
   - [ ] go to offset
   - [ ] go to line
