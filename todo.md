@@ -13,7 +13,7 @@
 - [x] Tag one, several, or all files for viewing
 - [x] support UNC and \\?\ syntax
 - [x] `*` or `F5` to refresh the directory listing
-- [ ] Launch the program associated with a file
+- [x] Launch the program associated with a file
 - [x] `W` for file sWeep command: execute a specified program using each tagged file as a parameter
 - [ ] `S` configure sort order
 - [x] `A` attrib for current file (enter combination of `ashr`/`ASHR` to clear/set attributes)
@@ -21,7 +21,7 @@
 - [x] `N` create new directory
 - [x] `DEL` to delete file(s) or (empty) directory
 - [x] `.` change to parent directory
-- [ ] `E` edit file (`%EDITOR%` or `notepad.exe` or maybe `edit.exe`)
+- [x] `E` edit file (`%EDITOR%` or `notepad.exe` or maybe `edit.exe`)
 - [ ] `F` new file mask (wildcard)
 - [ ] `P` change drive/path
 - [ ] some way to incrementally search the list of file names

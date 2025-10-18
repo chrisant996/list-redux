@@ -65,12 +65,13 @@ private:
 
     bool            AskForConfirmation(const WCHAR* msg);
     bool            ReportError(Error& e, ReportErrorFlags flags=ReportErrorFlags::NONE);
-    void            WaitToContinue(bool erase_after=false);
+    void            WaitToContinue(bool erase_after=false, bool new_line=false);
 
     void            ChangeAttributes(Error& e);
     void            NewDirectory(Error& e);
     void            RenameEntry(Error& e);
     void            DeleteEntries(Error& e);
+    void            RunFile(bool edit, Error& e);
     void            SweepFiles(Error& e);
 
 private:

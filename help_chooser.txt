@@ -30,6 +30,9 @@ ACTION KEYS:
 
        DEL  Delete the selected or tagged files.
 
+         E  Edit the file with %EDTIOR% or notepad.exe.
+     Alt-R  Run the file or program associated with the file.
+
 TAGGING KEYS:
 
          T  Tag the selected file.

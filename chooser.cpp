@@ -15,6 +15,7 @@
 #include "sorting.h"
 #include "scroll_car.h"
 #include "help.h"
+#include "os.h"
 
 #include <algorithm>
 
@@ -772,11 +773,22 @@ LNext:
             {
                 RenameEntry(e);
             }
+            else if (input.modifier == Modifier::ALT)
+            {
+                RunFile(false/*edit*/, e);
+            }
             break;
         case 'w':
             if (input.modifier == Modifier::None)
             {
                 SweepFiles(e);
+            }
+            break;
+
+        case 'e':
+            if (input.modifier == Modifier::None)
+            {
+                RunFile(true/*edit*/, e);
             }
             break;
 
@@ -1029,9 +1041,29 @@ LDone:
     return ret;
 }
 
-void Chooser::WaitToContinue(bool erase_after)
+void Chooser::WaitToContinue(bool erase_after, bool new_line)
 {
-    OutputConsole(m_hout, L"Press SPACE or ENTER or ESC to continue...");
+    StrW msg;
+    if (new_line)
+        msg.Append(L"\r\n");
+    msg.Append(L"Press SPACE or ENTER or ESC to continue...");
+
+    StrW s;
+    WrapText(msg.Text(), s);
+    while (s.Length() && IsSpace(s.Text()[s.Length() - 1]))
+        s.SetLength(s.Length() - 1);
+
+    size_t lines = 1;
+    for (const WCHAR* walk = s.Text(); *walk;)
+    {
+        walk = wcschr(walk, '\n');
+        if (!walk)
+            break;
+        ++walk;
+        ++lines;
+    }
+
+    OutputConsole(m_hout, s.Text(), s.Length());
 
     while (true)
     {
@@ -1064,12 +1096,21 @@ void Chooser::WaitToContinue(bool erase_after)
     }
 
 LDone:
-    // BUGBUG: erase_after doesn't fully erase if the terminal width caused
-    // the message to wrap onto more than one line.
     if (erase_after)
-        OutputConsole(m_hout, L"\r\x1b[K");
+    {
+        s.Clear();
+        while (lines--)
+        {
+            s.Append(L"\r\x1b[K");
+            if (lines)
+                s.Append(L"\x1b[A");
+        }
+        OutputConsole(m_hout, s.Text(), s.Length());
+    }
     else
+    {
         OutputConsole(m_hout, L"\r\n");
+    }
 }
 
 void Chooser::ChangeAttributes(Error& e)
@@ -1320,6 +1361,58 @@ void Chooser::DeleteEntries(Error& e)
     }
 }
 
+void Chooser::RunFile(bool edit, Error& e)
+{
+    const StrW file = GetSelectedFile().Text();
+    if (file.Empty())
+        return;
+
+    StrW s;
+    if (edit)
+    {
+        StrW editor;
+        if (!OS::GetEnv(L"EDITOR", editor))
+            editor = L"notepad.exe";
+        s.AppendMaybeQuoted(editor.Text());
+        s.Append(L" ");
+        s.AppendMaybeQuoted(file.Text());
+    }
+    else
+    {
+        bool ok = false;
+#ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
+        SetLastError(ERROR_ACCESS_DENIED);
+        e.Set(L"(Destructive operations are disallowed.)");
+#else
+        s.AppendMaybeQuoted(file.Text());
+#endif
+    }
+
+    if (s.Empty())
+        return
+
+    // Clear the current (alternate) screen in case programs switch to it.
+    OutputConsole(m_hout, L"\x1b[J");
+
+    // Swap back to original screen and console modes.
+    std::unique_ptr<Interactive> inverted = m_interactive->MakeReverseInteractive();
+
+    StrW msg;
+    msg.Printf(L"\r\n%s '%s'...\r\n", edit ? L"Editing" : L"Running", file.Text());
+    OutputConsole(m_hout, msg.Text(), msg.Length());
+
+    RunProgram(s.Text(), e);
+
+    if (!edit)
+        WaitToContinue(true/*erase_after*/, true/*new_line*/);
+
+    // Swap back to alternate screen and console modes.
+    inverted.reset();
+
+    ForceUpdateAll();
+    e.Clear();
+}
+
 void Chooser::SweepFiles(Error& e)
 {
     std::vector<StrW> files;
@@ -1387,8 +1480,6 @@ void Chooser::SweepFiles(Error& e)
     if (!ok)
         return;
 
-    UpdateDisplay();
-
     // Clear the current (alternate) screen in case programs switch to it.
     OutputConsole(m_hout, L"\x1b[J");
 
@@ -1400,7 +1491,7 @@ void Chooser::SweepFiles(Error& e)
     const StrW sweepfile = MakeColor(ColorElement::SweepFile);
     const WCHAR* const c_div = sweepdivider.Text();
     s.Clear();
-    s.Printf(L"%s---- Sweep %zu Files ----%s\r\n", c_div, files.size(), c_norm);
+    s.Printf(L"\r\n%s---- Sweep %zu Files ----%s\r\n", c_div, files.size(), c_norm);
     OutputConsole(m_hout, s.Text(), s.Length());
 
     bool completed = true;
@@ -1459,7 +1550,7 @@ void Chooser::SweepFiles(Error& e)
     OutputConsole(m_hout, s.Text(), s.Length());
 
     // Wait for ENTER, SPACE, or ESC.
-    WaitToContinue(true/*erase_after*/);
+    WaitToContinue(true/*erase_after*/, true/*new_line*/);
 
     // Swap back to alternate screen and console modes.
     inverted.reset();
