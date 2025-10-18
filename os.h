@@ -14,9 +14,10 @@ namespace OS {
 bool IsPseudoDirectory(const WCHAR* dir);
 unsigned IsExtendedPath(const WCHAR* p);
 
-bool GetEnv(const WCHAR* name, StrW&value);
+bool GetEnv(const WCHAR* name, StrW& value);
 void GetCwd(StrW& dir, WCHAR chDrive='\0');
 bool GetDrive(const WCHAR* pattern, StrW& drive, Error& e);
+bool GetFullPathName(const WCHAR* name, StrW& full, Error& e);
 bool IsFATDrive(const WCHAR* path, Error& e);
 bool IsHidden(const WIN32_FIND_DATA& fd);
 

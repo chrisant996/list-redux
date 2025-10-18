@@ -15,7 +15,6 @@
 - [x] `*` or `F5` to refresh the directory listing
 - [x] Launch the program associated with a file
 - [x] `W` for file sWeep command: execute a specified program using each tagged file as a parameter
-- [ ] `S` configure sort order
 - [x] `A` attrib for current file (enter combination of `ashr`/`ASHR` to clear/set attributes)
 - [x] `R` rename current file
 - [x] `N` create new directory
@@ -25,7 +24,6 @@
 - [ ] `F` new file mask (wildcard)
 - [ ] `P` change drive/path
 - [ ] some way to incrementally search the list of file names
-- [ ] option to sort horizontally instead of vertically
 - [ ] show used and free space in footer
 
 ### File Viewer (list file content)
@@ -34,22 +32,23 @@
 - [x] file size limit?  (LIST Plus did up to 16MB, LIST Enhanced did up to 500MB) _[Limited only by memory for line array.  Expensive for short lines.]_
 - [x] piping
 - [x] view files as text
-- [x] view files as hex
-- [x] wrapping
-- [x] text files wrap with awareness of word breaks (can split after a run of spaces, or on a transition from punctuation to word characters, or if a single word exceeds the max line length)
+- [x] `H` view files as hex
+- [x] `W` wrapping
+  - [x] text files wrap with awareness of word breaks (can split after a run of spaces, or on a transition from punctuation to word characters, or if a single word exceeds the max line length)
   - [ ] word wrapping mutates line numbers; consider having an index of "user friendly" line numbers to show in the left margin for Go To Line.
 - [x] search in text mode (/ for case sensitive, \ for caseless)
 - [x] search in hex mode
-- [x] show ruler (both in text and hex modes)
-- [x] show line numbers
-- [x] show file offset
-- [x] expand ctrl chars
-- [x] expand tabs
-- [x] go to line
-- [x] jump to marked line
-- [x] mark center line
-- [x] clear marked line (unmark)
-- [ ] `F` open a new file
+- [x] `R` show ruler (both in text and hex modes)
+- [x] `N` show line numbers
+- [x] `O` show file offset
+- [x] `C` expand ctrl chars
+- [x] `T`expand tabs
+- [x] `G` go to line
+- [x] `J` jump to marked line
+- [x] `M` mark center line
+- [x] `U` clear marked line (unmark)
+- [x] `Alt-O` open a new file
+- [x] `Alt-C` close current file
 - [ ] toggle multi-file search (next/prev cross file boundaries)
 - [ ] `/@` to supply a file with a list of names to view
 - [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
@@ -76,12 +75,15 @@
   - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
 - [ ] split screen display (view two files in two sizable windows in the terminal)
   - view any selected file in either window
+- [ ] `S` configure sort order
+- [ ] option to sort horizontally instead of vertically
 - detect certain file types and render with formatting/color
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
 
 ### Maybe
 
+- A key to temporarily swap back to the original screen?
 - Option to suppress "Are you sure" confirmations on destructive operations (such as delete/moving files)?
 - Cut and paste to new or existing file [did it really "cut" or just "copy"?]
 - allow copying, moving tagged files?

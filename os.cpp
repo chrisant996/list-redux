@@ -152,6 +152,27 @@ bool GetDrive(const WCHAR* pattern, StrW& drive, Error& e)
     return true;
 }
 
+bool GetFullPathName(const WCHAR* name, StrW& full, Error& e)
+{
+    full.Clear();
+    full.ReserveMaxPath();
+
+    LPWSTR file_part;
+    const DWORD len = ::GetFullPathName(name, full.Capacity(), full.Reserve(), &file_part);
+    if (!len)
+    {
+        e.Sys();
+        return false;
+    }
+    else if (len >= full.Capacity())
+    {
+        e.Sys(ERROR_FILENAME_EXCED_RANGE);
+        return false;
+    }
+
+    return true;
+}
+
 bool IsFATDrive(const WCHAR* path, Error& e)
 {
     StrW drive;

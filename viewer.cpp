@@ -17,6 +17,7 @@
 #include "wcwidth_iter.h"
 #include "filetype.h"
 #include "help.h"
+#include "os.h"
 
 static const WCHAR c_clreol[] = L"\x1b[K";
 static const WCHAR c_no_file_open[] = L"*** No File Open ***";
@@ -57,6 +58,7 @@ private:
     void            UpdateDisplay();
     unsigned        LinePercent(size_t line) const;
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
+    void            EnsureAltFiles();
     void            SetFile(intptr_t index);
     size_t          CountForDisplay() const;
     void            DoSearch(bool next, bool caseless);
@@ -66,6 +68,8 @@ private:
     size_t          GetFoundLine(const FoundLine& found_line);
     FileOffset      GetFoundOffset(const FoundLine& found_line);
     void            ShowFileList();
+    void            OpenNewFile(Error& e);
+    ViewerOutcome   CloseCurrentFile();
 
 private:
     const HANDLE    m_hout;
@@ -80,6 +84,7 @@ private:
     StrW            m_title;
     const char*     m_text = nullptr;
     const std::vector<StrW>* m_files = nullptr;
+    std::vector<StrW> m_alt_files;
     intptr_t        m_index = -1;
 
     ContentCache     m_context;
@@ -921,6 +926,11 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             break;
 
         case 'c':
+            if (input.modifier == Modifier::ALT)
+            {
+                return CloseCurrentFile();
+            }
+            __fallthrough;
         case '^':
             if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
             {
@@ -994,6 +1004,11 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
                     m_force_update = true;
                 }
             }
+            else if (input.modifier == Modifier::ALT)
+            {
+                if (!m_text) // Can't open files in ViewText() mode.
+                    OpenNewFile(e);
+            }
             break;
         case 'r':
             if (input.modifier == Modifier::None)
@@ -1058,6 +1073,18 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
     }
 
     return ViewerOutcome::CONTINUE;
+}
+
+void Viewer::EnsureAltFiles()
+{
+    if (m_files != &m_alt_files)
+    {
+        // Copy the list so it can be modified.
+        m_alt_files.clear();
+        for (const auto& file : *m_files)
+            m_alt_files.emplace_back(file);
+        m_files = &m_alt_files;
+    }
 }
 
 StrW Viewer::GetCurrentFile() const
@@ -1308,6 +1335,49 @@ void Viewer::ShowFileList()
     m_force_update = true;
     if (!result.canceled)
         SetFile(result.selected);
+}
+
+void Viewer::OpenNewFile(Error& e)
+{
+    StrW s;
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Append(L"\rEnter file to open> ");
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    ReadInput(s);
+
+    OutputConsole(m_hout, c_norm);
+
+    StrW full;
+    if (!OS::GetFullPathName(s.Text(), full, e))
+        return;
+
+    for (size_t i = 0; i < m_files->size(); ++i)
+    {
+        if (full.EqualI((*m_files)[i]))
+        {
+            SetFile(i);
+            return;
+        }
+    }
+
+    EnsureAltFiles();
+    m_alt_files.insert(m_alt_files.begin() + m_index + 1, std::move(full));
+    SetFile(m_index + 1);
+}
+
+ViewerOutcome Viewer::CloseCurrentFile()
+{
+    if (m_text || m_files->size() <= 1)
+        return ViewerOutcome::RETURN;
+
+    EnsureAltFiles();
+    m_alt_files.erase(m_alt_files.begin() + m_index);
+
+    const auto index = m_index;
+    m_index = -2;
+    SetFile(index);
+    return ViewerOutcome::CONTINUE;
 }
 
 ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e)

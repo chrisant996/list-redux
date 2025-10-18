@@ -154,20 +154,10 @@ bool ScanPattern(const WCHAR* pattern, std::vector<FileInfo>& files, Error& e)
             dir.Set(pattern);
             StripFilePart(dir);
 
-            WCHAR* file_part;
             StrW full;
             full.ReserveMaxPath();
-            const DWORD len = GetFullPathName(dir.Text(), full.Capacity(), full.Reserve(), &file_part);
-            if (!len)
-            {
-                e.Sys();
+            if (!OS::GetFullPathName(dir.Text(), full, e))
                 return false;
-            }
-            else if (len >= full.Capacity())
-            {
-                e.Sys(ERROR_FILENAME_EXCED_RANGE);
-                return false;
-            }
 
             dir = std::move(full);
         }
