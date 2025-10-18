@@ -1,5 +1,12 @@
 # FEATURES
 
+### General
+
+- [x] read color configuration from `.listredux` file
+- [ ] some way to configure colors inside the app
+- [ ] optionally save configured colors to `.listredux` file
+- [ ] some way to revert to default colors inside the app
+
 ### File Chooser (list files in directory)
 
 - [x] point & shoot to select a file for viewing
@@ -62,9 +69,6 @@
   - [ ] Toggle between Binary and Text (and UTF8).
   - [ ] Allow selecting between CP 437 ("Text") and UTF8 ("UTF8").  ASCII files can be displayed as either, so default to CP 437 ("Text") for them.
   - [ ] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
-- detect certain file types and render with formatting/color
-  - [ ] detect git patches and render some lines with color
-  - [ ] detect markdown and render some simple markdown formatting
 
 ### Future
 
@@ -72,9 +76,9 @@
   - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
 - [ ] split screen display (view two files in two sizable windows in the terminal)
   - view any selected file in either window
-- Store configuration how?  In an .ini file?
-  - Colors
-  - Options
+- detect certain file types and render with formatting/color
+  - [ ] detect git patches and render some lines with color
+  - [ ] detect markdown and render some simple markdown formatting
 
 ### Maybe
 
