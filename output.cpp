@@ -699,6 +699,7 @@ void WrapText(const WCHAR* s, StrW& out, unsigned max_width)
         }
 
         bool non_spaces = false;
+        bool deferred_flush = false;
         wcwidth_iter inner_iter(code.get_pointer(), code.get_length());
         while (true)
         {
@@ -710,13 +711,24 @@ void WrapText(const WCHAR* s, StrW& out, unsigned max_width)
             assert(c != '\b' && c != '\t');
             const unsigned len = unsigned(inner_iter.get_pointer() - s);
 
+            if (deferred_flush && c != '\r' && c != '\n')
+            {
+                build.FlushWord();
+                build.NewLine();
+                non_spaces = false;
+                deferred_flush = false;
+            }
+
             switch (c)
             {
             case '\r':
+                deferred_flush = true;
+                break;
             case '\n':
                 build.FlushWord();
                 build.NewLine();
                 non_spaces = false;
+                deferred_flush = false;
                 break;
             case ' ':
                 if (non_spaces)
