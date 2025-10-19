@@ -275,7 +275,7 @@ navigated:
             if (m_index < 0 || m_index >= m_count)
                 break;
             m_result.canceled = false;
-            m_result.selected = m_index;
+            m_result.selected = get_original_index(m_index);
             return true;
 
 #if 0
