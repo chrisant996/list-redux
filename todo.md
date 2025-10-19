@@ -63,8 +63,9 @@
   - [x] Text files default to OEM CP.
   - [x] Detect codepages via MLang.
   - [ ] Detect UTF8 text files and render the text nicely.
+  - [ ] Detect UTF16 text files and render the text nicely.
   - [ ] When spliting lines, do not sever multi-byte characters!
-  - [ ] Toggle between Binary and Text (and UTF8).
+  - [ ] Toggle between Binary and Text (and UTF8) (and UTF16?).
   - [ ] Allow selecting between CP 437 ("Text") and UTF8 ("UTF8").  ASCII files can be displayed as either, so default to CP 437 ("Text") for them.
   - [ ] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
 
