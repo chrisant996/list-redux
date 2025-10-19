@@ -46,7 +46,7 @@ LSysError:
     text.Printf("\n\t\t\t==== LIST REDUX v%s ====\n\n\t%s\n\n", VERSION_STR, STR_COPYRIGHTASCII);
     text.Append("\t\tIn memory of Vernon D. Buerg, 1948-2009,\n\t\t  author of the original LIST for DOS.");
     text.Append("\n\n");
-    text.Append(reinterpret_cast<const char*>(pv));
+    text.Append(reinterpret_cast<const char*>(pv), dwSize);
     return ViewText(text.Text(), e, help_text.title);
 }
 
