@@ -1179,7 +1179,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
 
     // Format the text characters.
     s.Printf(L"  ", 2);
-    s.AppendColor(L"38;2;80;80;80");
+    s.AppendColor(GetColor(ColorElement::Divider));
     // s.Append(L"\u2502", 1);
     s.Append(L"*", 1);
     if (marked_color)
@@ -1223,7 +1223,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     }
     if (marked_color)
         s.Append(c_norm);
-    s.AppendColor(L"38;2;80;80;80");
+    s.AppendColor(GetColor(ColorElement::Divider));
     // s.Append(L"\u2502", 1);
     s.Append(L"*", 1);
     s.Append(c_norm);
