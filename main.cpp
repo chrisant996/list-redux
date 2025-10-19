@@ -187,27 +187,25 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     StrW dir;
     std::vector<StrW> files;
     std::vector<FileInfo> fileinfos;
+    bool navigate = false;
     bool done = false;
 
     const bool piped = !IsConsole(GetStdHandle(STD_INPUT_HANDLE));
     if (piped)
-        SetPipedInput();
-
-
-    if (piped)
     {
         done = true;
         files.emplace_back(L"<stdin>");
+        SetPipedInput();
     }
     else
     {
-        const bool open_files = ScanFiles(argc, argv, fileinfos, dir, e);
+        navigate = !ScanFiles(argc, argv, fileinfos, dir, e);
         if (e.Test())
             return e.Report();
 
         std::stable_sort(fileinfos.begin(), fileinfos.end(), CmpFileInfo);
 
-        if (open_files)
+        if (!navigate)
         {
             for (const auto& info : fileinfos)
             {
@@ -228,7 +226,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     {
         ViewFiles(files, s, e);
     }
-    else
+    else if (navigate)
     {
         chooser.Navigate(dir.Text(), std::move(fileinfos));
         assert(fileinfos.empty());
@@ -241,23 +239,9 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
             switch (ViewFiles(files, s, e))
             {
             case ViewerOutcome::RETURN:
-                if (chooser.EverNavigated())
-                {
-                    // When exiting from the viewer back to the chooser,
-                    // navigate to the current file's directory.
-                    if (!chooser.EverNavigated())
-                    {
-                        chooser.Navigate(s.Text(), e);
-                        if (e.Test())
-                        {
-// TODO:  Print an error box instead of exiting.
-                            interactive.End();
-                            return e.Report();
-                        }
-                    }
+                if (navigate)
                     break;
-                }
-                // fall through
+                __fallthrough;
             case ViewerOutcome::EXITAPP:
                 done = true;
                 break;

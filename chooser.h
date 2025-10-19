@@ -46,7 +46,6 @@ public:
 
     void            Navigate(const WCHAR* dir, std::vector<FileInfo>&& files);
     void            Navigate(const WCHAR* dir, Error& e);
-    bool            EverNavigated() const { return m_ever_navigated; }
     ChooserOutcome  Go(Error& e);
     StrW            GetSelectedFile() const;
     std::vector<StrW> GetTaggedFiles() const;
@@ -81,7 +80,6 @@ private:
     unsigned        m_terminal_height = 0;
     const unsigned  m_padding = 2;
 
-    bool            m_ever_navigated = false;
     int             m_details = 1;
 
     StrW            m_dir;

@@ -182,7 +182,6 @@ void Chooser::Navigate(const WCHAR* dir, std::vector<FileInfo>&& files)
     m_dir.Set(dir);
     m_files = std::move(files);
     m_count = intptr_t(m_files.size());
-    m_ever_navigated = true;
 }
 
 void Chooser::Navigate(const WCHAR* dir, Error& e)
