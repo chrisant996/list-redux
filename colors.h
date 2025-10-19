@@ -27,6 +27,7 @@ enum class ColorElement
     SelectedTagged,
     Command,
     Divider,
+    LineNumber,
     Content,
     CtrlCode,
     EndOfFileLine,

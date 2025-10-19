@@ -53,11 +53,10 @@
 - [ ] `/@` to supply a file with a list of names to view
 - [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
 - hex mode
-  - [ ] go to offset
+  - [x] go to offset
+  - [x] highlight newline characters in hex mode
+  - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [ ] go to line
-  - [ ] highlight newline characters in hex mode
-  - [ ] option to show line numbers next to offsets in hex mode
-  - [ ] option to end a row at a newline (requires computing and caching hex mode pagination/delineation offsets)
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
   - [x] Binary files **_and hex mode_** use OEM CP.
@@ -113,6 +112,7 @@
 
 - Telephone dialer
 - Printing
+- hex mode: option to end a row at a newline (requires computing and caching hex mode pagination/delineation offsets) _[Too many drawbacks; including that it can't just seek without parsing anymore.]_
 
 
 

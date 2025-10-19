@@ -19,11 +19,11 @@
 
 enum class Justification { None, FAT, NONFAT };
 
-static WCHAR s_chTruncated = L'\x2026'; // Horizontal Ellipsis character.
-static const WCHAR c_dir_up[] = L"\x2191";
-static const WCHAR c_dir_down[] = L"\x2193";
-static const WCHAR c_tag_char[] = L"\x25c0";
-static const WCHAR c_div_char[] = L"\x2595"; //L"\x2592"; //L"\x2502"; //L"\x250a";
+static WCHAR s_chTruncated = L'\u2026'; // Horizontal Ellipsis character.
+static const WCHAR c_dir_up[] = L"\u2191";
+static const WCHAR c_dir_down[] = L"\u2193";
+static const WCHAR c_tag_char[] = L"\u25c0";
+static const WCHAR c_div_char[] = L"\u2595"; //L"\u2592"; //L"\u2502"; //L"\u250a";
 static ColorScaleFields s_scale_fields = SCALE_NONE;
 static bool s_gradient = true;
 static bool s_mini_decimal = true;

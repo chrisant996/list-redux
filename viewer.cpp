@@ -23,6 +23,7 @@ static const WCHAR c_clreol[] = L"\x1b[K";
 static const WCHAR c_no_file_open[] = L"*** No File Open ***";
 static const WCHAR c_endoffile_marker[] = L"*** End Of File ***";
 static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
+static const WCHAR c_div_char[] = L"\u2595"; //L":";
 
 const DWORD c_max_needle = 32;
 static_assert(c_max_needle <= c_data_buffer_slop); // Important for searching across word wrapped line breaks.
@@ -560,18 +561,20 @@ LAutoFitContentWidth:
                 else if (m_top + row < m_context.Count())
                 {
                     const WCHAR* color = found_line && (m_top + row == found_line->line) ? GetColor(ColorElement::MarkedLine) : nullptr;
-                    if (color)
-                        s.AppendColor(color);
-// TODO:  Color for line numbers / file offset?
                     if (m_margin_width)
                     {
+                        s.AppendColor(GetColor(ColorElement::LineNumber));
                         if (s_options.show_line_numbers)
-                            s.Printf(L"%*lu: ", m_margin_width - 2, m_top + row + 1);
+                            s.Printf(L"%*lu%s", m_margin_width - 2, m_top + row + 1, c_div_char);
                         else if (s_options.show_file_offsets)
-                            s.Printf(L"%0*lx: ", m_margin_width - 2, m_context.GetOffset(m_top + row));
+                            s.Printf(L"%0*lx%s", m_margin_width - 2, m_context.GetOffset(m_top + row), c_div_char);
                         else
                             assert(!m_margin_width);
+                        s.AppendNormalIf(true);
+                        s.Append(L" ");
                     }
+                    if (color)
+                        s.AppendColor(color);
                     const unsigned width = m_context.FormatLineData(m_top + row, m_left, s, m_content_width, e, color, found_line);
                     if (width < m_content_width)
                     {

@@ -40,6 +40,7 @@ static const ColorDefinition c_default_colors[] =
     {   L"48;5;23",     L"30" },        // SelectedTagged
     {   L"",            L"93" },        // Command
     {   L"",            L"90" },        // Divider
+    {   L"",            L"90" },        // LineNumber
     {   L"",            L"" },          // Content
     {   L"",            L"33" },        // CtrlCode
     {   L"",            L"7" },         // EndOfFileLine
@@ -647,6 +648,7 @@ static const WCHAR* const c_reg_color_name[] =
     L"SelectedTagged",
     L"Command",
     L"Divider",
+    L"LineNumber",
     L"Content",
     L"CtrlCode",
     L"EndOfFileLine",
