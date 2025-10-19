@@ -421,10 +421,14 @@ void Chooser::UpdateDisplay()
 
     if (s.Length())
     {
-        const unsigned y = 1 + unsigned((m_index % m_num_rows) - m_top) + 1;
-        unsigned x = 1;
-        for (size_t ii = m_index / m_num_rows; ii--;)
-            x += m_col_widths[ii] + m_padding;
+        unsigned y = 1/*for zero based to one based*/ + 1/*for header row*/;
+        unsigned x = 1/*for zero based to one based*/;
+        if (m_num_rows)
+        {
+            y += unsigned((m_index % m_num_rows) - m_top);
+            for (size_t ii = m_index / m_num_rows; ii--;)
+                x += m_col_widths[ii] + m_padding;
+        }
 
         OutputConsole(m_hout, c_hide_cursor);
         s.Printf(L"\x1b[%u;%uH", y, x);
@@ -604,7 +608,7 @@ LNext:
             break;
 
         case Key::LEFT:
-            if (m_index)
+            if (m_count && m_index)
             {
                 intptr_t index = m_index - m_num_rows;
                 if (index < 0)
@@ -619,7 +623,7 @@ LNext:
             }
             break;
         case Key::RIGHT:
-            if (!m_prev_latched)
+            if (m_count && !m_prev_latched)
             {
                 intptr_t index = m_index;
                 if (index + m_num_rows >= m_count && (index + 1) % m_num_rows == 0)
@@ -640,6 +644,7 @@ LNext:
 
         case Key::PGUP:
         case Key::PGDN:
+            if (m_count)
             {
                 const intptr_t y = m_index % m_num_rows;
                 const intptr_t rows = m_visible_rows;
@@ -874,15 +879,17 @@ std::vector<StrW> Chooser::GetTaggedFiles() const
 
 void Chooser::SetIndex(intptr_t index)
 {
-    assert(index >= 0);
-    assert(index < m_count);
+    assert(index >= -1); // Accept -1 because of m_count-1 when m_count==0.
+    assert(!index || index < m_count);
     if (index >= m_count)
         index = m_count - 1;
     if (index < 0)
         index = 0;
-    m_dirty.Mark(m_index % m_num_rows, 1);
+    if (m_count)
+        m_dirty.Mark(m_index % m_num_rows, 1);
     m_index = index;
-    m_dirty.Mark(m_index % m_num_rows, 1);
+    if (m_count)
+        m_dirty.Mark(m_index % m_num_rows, 1);
     m_dirty_footer = true;
 }
 
@@ -891,6 +898,10 @@ void Chooser::SetTop(intptr_t top)
     assert(top >= 0);
     assert(!top || top < m_num_rows);
     assert(m_num_rows >= m_visible_rows);
+
+    if (!m_count)
+        return;
+
     if (top != m_top)
     {
         const intptr_t num_per_page = (m_visible_rows * m_num_per_row);
@@ -911,6 +922,9 @@ void Chooser::SetTop(intptr_t top)
 
 void Chooser::EnsureTop()
 {
+    if (!m_count)
+        return;
+
     const intptr_t row = (m_index % m_num_rows);
     if (m_top > row)
     {
