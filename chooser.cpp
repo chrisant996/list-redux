@@ -1491,7 +1491,7 @@ void Chooser::SweepFiles(Error& e)
     const StrW sweepfile = MakeColor(ColorElement::SweepFile);
     const WCHAR* const c_div = sweepdivider.Text();
     s.Clear();
-    s.Printf(L"\r\n%s---- Sweep %zu Files ----%s\r\n", c_div, files.size(), c_norm);
+    s.Printf(L"\r\n%s---- Sweep %zu File(s) ----%s\r\n", c_div, files.size(), c_norm);
     OutputConsole(m_hout, s.Text(), s.Length());
 
     bool completed = true;
