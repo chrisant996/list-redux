@@ -1162,9 +1162,17 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             s.AppendColor(GetColor(ColorElement::SearchFound));
         }
         if (ii < len)
+        {
+            const bool hilite_newline = (!highlighting_found_text && ptr[ii] == '\n');
+            if (hilite_newline)
+                s.AppendColor(GetColor(ColorElement::CtrlCode));
             s.Printf(L"%02X", ptr[ii]);
+            s.AppendNormalIf(hilite_newline);
+        }
         else
+        {
             s.Append(L"  ", 2);
+        }
     }
     if (marked_color)
         s.Append(c_norm);
@@ -1196,12 +1204,22 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             }
         }
         if (c > 0 && c < ' ')
+        {
+            const bool hilite_newline = (!highlighting_found_text && c == '\n');
+            if (hilite_newline)
+                s.AppendColor(GetColor(ColorElement::CtrlCode));
             s.Append(c_oem437[c], 1);
+            s.AppendNormalIf(hilite_newline);
+        }
         else if (!c || wcwidth(tmp.Text()[ii]) != 1)
+        {
             // TODO:  Maybe apply color?
             s.Append(L".", 1);
+        }
         else
+        {
             s.Append(tmp.Text() + ii, 1);
+        }
     }
     if (marked_color)
         s.Append(c_norm);
