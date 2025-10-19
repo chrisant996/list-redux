@@ -79,6 +79,7 @@
 - detect certain file types and render with formatting/color
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
+  - [ ] detect C++, Lua, etc and render syntax coloring
 
 ### Maybe
 
