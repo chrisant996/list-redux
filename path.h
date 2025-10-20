@@ -77,14 +77,9 @@ const T* Path<T,Base>::FindEndOfRoot(const T* start)
 }
 
 template<class T, class Base>
-void Path<T,Base>::SetMaybeRooted(const T* root, const T* component)
+void Path<T,Base>::SetMaybeRooted(const T* _root, const T* component)
 {
-    if (!component || !*component)
-    {
-        Set(root);
-        return;
-    }
-    else if (!root || !*root)
+    if (!_root || !*_root)
     {
         Set(component);
         return;
@@ -95,9 +90,15 @@ void Path<T,Base>::SetMaybeRooted(const T* root, const T* component)
 
     size_t len = StrLen(component);
 
-    Base _root;         // In case 'root' is from 'this'.
-    _root.Set(root);
-    root = _root.Text();
+    Base tmp_root;          // In case '_root' is from 'this'.
+    tmp_root.Set(_root);
+    const WCHAR* root = tmp_root.Text();
+
+    if (!component || !*component)
+    {
+        Set(root);
+        return;
+    }
 
     Clear();
 
@@ -112,11 +113,11 @@ void Path<T,Base>::SetMaybeRooted(const T* root, const T* component)
         component += 2;
         len -= 2;
     }
-    else if (len >= 2 && component[0] == '\\' && component[1] == '\\' )
+    else if (len >= 2 && component[0] == '\\' && component[1] == '\\')
     {
         // Local is UNC.  Don't use root's drive.
     }
-    else if( root[0] && root[1] == ':' )
+    else if (root[0] && root[1] == ':')
     {
         Set( root, 2 );
         root += 2;
