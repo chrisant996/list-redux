@@ -66,6 +66,7 @@ private:
     bool            ReportError(Error& e, ReportErrorFlags flags=ReportErrorFlags::NONE);
     void            WaitToContinue(bool erase_after=false, bool new_line=false);
 
+    void            NewFileMask(Error& e);
     void            ChangeAttributes(Error& e);
     void            NewDirectory(Error& e);
     void            RenameEntry(Error& e);
@@ -85,20 +86,20 @@ private:
     StrW            m_dir;
     std::vector<FileInfo> m_files;
     ColumnWidths    m_col_widths;
-    unsigned        m_max_size_width;
-    intptr_t        m_count;
-    intptr_t        m_num_rows;
-    int32           m_num_per_row;
-    int32           m_visible_rows;
+    unsigned        m_max_size_width = 0;
+    intptr_t        m_count = 0;
+    intptr_t        m_num_rows = 0;
+    int32           m_num_per_row = 0;
+    int32           m_visible_rows = 0;
     int32           m_vert_scroll_car = 0;
     int32           m_vert_scroll_column = 0;
     StrW            m_feedback;
 
-    intptr_t        m_top;
-    intptr_t        m_index;
+    intptr_t        m_top = 0;
+    intptr_t        m_index = 0;
     MarkedList      m_tagged;
     InputRecord     m_prev_input;
-    bool            m_prev_latched;
+    bool            m_prev_latched = false;
 
     MarkedList      m_dirty;
     bool            m_dirty_header = false;

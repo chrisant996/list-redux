@@ -22,6 +22,7 @@ LEFT/RIGHT  Move selection left/right one file.
 ACTION KEYS:
 
          .  Navigate to parent directory.
+         F  New file mask or path.
 
          A  Change file or directory attributes.
          N  Create new directory.

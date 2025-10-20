@@ -241,14 +241,13 @@ void Chooser::Reset()
     m_visible_rows = 0;
     m_vert_scroll_car = 0;
     m_vert_scroll_column = 0;
+    m_feedback.Clear();
 
     m_top = 0;
     m_index = 0;
     m_tagged.Clear();
     m_prev_input.type = InputType::None;
     m_prev_latched = false;
-
-    m_feedback.Clear();
 
     ForceUpdateAll();
 }
@@ -258,7 +257,8 @@ void Chooser::ForceUpdateAll()
     m_dirty_header = true;
     m_dirty.MarkAll();
     m_dirty_footer = true;
-    m_prev_visible_rows = unsigned(-1);
+    m_prev_visible_rows = uintptr_t(-1) >> 1;
+    assert(m_prev_visible_rows > 0);
 }
 
 void Chooser::UpdateDisplay()
@@ -735,6 +735,12 @@ LNext:
                 RefreshDirectoryListing(e);
             }
             break;
+        case 'f':
+            if (input.modifier == Modifier::None)
+            {
+                NewFileMask(e);
+            }
+            break;
         case '.':
             if (input.modifier == Modifier::None)
             {
@@ -939,10 +945,7 @@ void Chooser::EnsureTop()
 
 void Chooser::RefreshDirectoryListing(Error& e)
 {
-    StrW dir;
-    dir.Set(m_dir);
-    assert(*FindName(dir.Text()) == '*');
-    dir.SetEnd(FindName(dir.Text()));   // Strip "*".
+    StrW dir(m_dir);
     Navigate(dir.Text(), e);
 }
 
@@ -1122,6 +1125,42 @@ LDone:
     {
         OutputConsole(m_hout, L"\r\n");
     }
+}
+
+void Chooser::NewFileMask(Error& e)
+{
+    StrW s;
+    s.Printf(L"\x1b[%uH", m_terminal_height);
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Append(L"\r\x1b[KEnter new file mask or path: ");
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    ReadInput(s);
+
+    OutputConsole(m_hout, c_norm);
+    ForceUpdateAll();
+
+    s.TrimRight();
+    if (s.Empty())
+        return;
+
+    const WCHAR* mask = s.Text();
+    while (IsSpace(*mask))
+        ++mask;
+
+    PathW path(m_dir);
+    path.EnsureTrailingSlash(); // Guarantee trailing slash (just in case).
+    path.ToParent();            // Eats trailing slash and mask.
+    path.JoinComponent(mask);
+
+    const DWORD dwAttr = GetFileAttributesW(path.Text());
+// REVIEW:  If the file system is FAT, is it necessary to append "*.*" instead of just "*"?
+    if (dwAttr != DWORD(-1) && (dwAttr & FILE_ATTRIBUTE_DIRECTORY))
+        path.JoinComponent(L"*");
+    else if (!StrChr(mask, '*') && !StrChr(mask, '?'))
+        path.JoinComponent(L"*");
+
+    Navigate(path.Text(), e);
 }
 
 void Chooser::ChangeAttributes(Error& e)

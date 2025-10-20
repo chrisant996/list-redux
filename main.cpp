@@ -199,7 +199,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     }
     else
     {
-        navigate = !ScanFiles(argc, argv, fileinfos, dir, e);
+        navigate = !ScanFiles(argc, argv, fileinfos, dir, e, true/*cmdline*/);
         if (e.Test())
             return e.Report();
 
@@ -216,6 +216,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                 }
             }
             fileinfos.clear();
+            navigate = files.empty();
         }
     }
 

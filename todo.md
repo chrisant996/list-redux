@@ -1,3 +1,5 @@
+# BUGS
+
 # FEATURES
 
 ### General
@@ -21,8 +23,8 @@
 - [x] `DEL` to delete file(s) or (empty) directory
 - [x] `.` change to parent directory
 - [x] `E` edit file (`%EDITOR%` or `notepad.exe` or maybe `edit.exe`)
-- [ ] `F` new file mask (wildcard)
-- [ ] `P` change drive/path
+- [x] `F` new file mask (wildcard) or path
+- [x] ~~`P` change drive/path~~
 - [ ] some way to incrementally search the list of file names
 - [ ] show used and free space in footer
 

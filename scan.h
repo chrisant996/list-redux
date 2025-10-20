@@ -12,6 +12,5 @@
 
 class Error;
 
-bool ScanFiles(int argc, const WCHAR** argv, std::vector<FileInfo>& files, StrW& dir, Error& e);
-bool ScanPattern(const WCHAR* pattern, std::vector<FileInfo>& files, Error& e);
+bool ScanFiles(int argc, const WCHAR** argv, std::vector<FileInfo>& files, StrW& dir, Error& e, bool cmdline=false);
 

@@ -129,7 +129,7 @@ static void StripFilePart(StrW& s)
         s.Set(L".\\");
 }
 
-bool ScanPattern(const WCHAR* pattern, std::vector<FileInfo>& files, Error& e)
+static bool ScanPattern(const WCHAR* pattern, std::vector<FileInfo>& files, Error& e, const bool include_files, const bool include_dirs)
 {
     WIN32_FIND_DATA fd;
     SHFind shFind = FindFirstFileW(pattern, &fd);
@@ -164,6 +164,12 @@ bool ScanPattern(const WCHAR* pattern, std::vector<FileInfo>& files, Error& e)
 
         do
         {
+            const bool is_dir = !!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+            if (is_dir && !include_dirs)
+                continue;
+            if (!is_dir && !include_files)
+                continue;
+
             if (fd.cFileName[0] != '.' || fd.cFileName[1])
             {
                 FileInfo info;
@@ -188,17 +194,28 @@ static bool ScanPatterns(const std::vector<StrW>& patterns, std::vector<FileInfo
 {
     files.clear();
 
-    StrW s;
+    PathW s;
     for (const auto& pat : patterns)
     {
-        if (!ScanPattern(pat.Text(), files, e))
+        const WCHAR* name = FindName(pat.Text());
+        const bool pure_star = (name[0] == '*' && !name[1]);
+        if (!ScanPattern(pat.Text(), files, e, true/*include_files*/, pure_star/*include_dirs*/))
             return false;
+        if (!pure_star)
+        {
+            s.Set(pat);
+            s.EnsureTrailingSlash();
+            s.ToParent();
+            s.JoinComponent(L"*");
+            if (!ScanPattern(s.Text(), files, e, false/*include_files*/, true/*include_dirs*/))
+                return false;
+        }
     }
 
     return true;
 }
 
-bool ScanFiles(int argc, const WCHAR** argv, std::vector<FileInfo>& files, StrW& dir, Error& e)
+bool ScanFiles(int argc, const WCHAR** argv, std::vector<FileInfo>& files, StrW& dir, Error& e, bool cmdline)
 {
     files.clear();
 
@@ -207,38 +224,60 @@ bool ScanFiles(int argc, const WCHAR** argv, std::vector<FileInfo>& files, StrW&
 
     if (!e.Test())
     {
-        if (ScanPatterns(patterns, files, e) && !files.size())
+        const bool pure_star = (patterns.size() == 1 && patterns[0].Length() == 1 && patterns[0].Text()[0] == '*');
+        if (ScanPatterns(patterns, files, e) && cmdline && !pure_star)
         {
-            // No matching files; take only the directory portion from the
-            // first pattern.
-            StrW tmp;
-            tmp.Set(patterns[0]);
-            const WCHAR* strip = FindName(tmp.Text());
-            if (strip)
-                tmp.SetEnd(strip);
-            else
-                OS::GetCwd(tmp);
-            AddStar(tmp);
-            patterns.clear();
-            patterns.emplace_back(std::move(tmp));
-
-            // Try again.
-            assert(patterns.size() == 1);
-            if (!ScanPatterns(patterns, files, e) || !files.size())
+            size_t num_files = 0;
+            for (const auto& file : files)
             {
-                // One last try, using the current working directory.
-                OS::GetCwd(patterns[0]);
-                AddStar(patterns[0]);
-                ScanPatterns(patterns, files, e);
+                if (!file.IsDirectory())
+                    ++num_files;
             }
+            if (!num_files)
+            {
+                PathW pat;
 
-            // Fall back to showing a file list.
-            open_files = false;
+                // No matching files; take only the directory portion from the
+                // first pattern.
+                {
+                    StrW tmp;
+                    tmp.Set(patterns[0]);
+                    tmp.SetEnd(FindName(tmp.Text()));
+                    if (!tmp.Empty())
+                    {
+                        OS::GetFullPathName(tmp.Text(), pat, e);
+                        e.Clear();
+                    }
+                }
+
+                if (pat.Empty())
+                    OS::GetCwd(pat);
+                pat.JoinComponent(L"*");
+
+                patterns.clear();
+                patterns.emplace_back(pat);
+
+                // Try again.
+                assert(patterns.size() == 1);
+                if (!ScanPatterns(patterns, files, e) || !files.size())
+                {
+                    // One last try, using the current working directory.
+                    OS::GetCwd(pat);
+                    pat.JoinComponent(L"*");
+                    patterns[0] = pat.Text();
+                    ScanPatterns(patterns, files, e);
+                }
+
+                // Fall back to showing a file list.
+                open_files = false;
+            }
         }
     }
 
-    if (!open_files && patterns.size())
+    if (patterns.size())
         dir.Set(patterns[0]);
+    else
+        dir.Clear();
 
     return open_files;
 }

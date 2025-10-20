@@ -162,11 +162,13 @@ bool GetFullPathName(const WCHAR* name, StrW& full, Error& e)
     if (!len)
     {
         e.Sys();
+        full.Clear();
         return false;
     }
     else if (len >= full.Capacity())
     {
         e.Sys(ERROR_FILENAME_EXCED_RANGE);
+        full.Clear();
         return false;
     }
 
