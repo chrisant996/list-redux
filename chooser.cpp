@@ -1348,7 +1348,10 @@ void Chooser::DeleteEntries(Error& e)
         SetLastError(ERROR_ACCESS_DENIED);
         e.Set(L"(Destructive operations are disallowed.)");
 #else
-        ok = DeleteFileW(name.Text());
+        if (is_dir)
+            ok = RemoveDirectoryW(name.Text());
+        else
+            ok = DeleteFileW(name.Text());
 #endif
         if (!ok)
         {
