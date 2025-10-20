@@ -20,7 +20,8 @@
 #endif
 
 // static const WCHAR c_eol_marker[] = L"\x1b[0;33;48;2;80;0;80m\u22a6\x1b[m";
-static const WCHAR c_eol_marker[] = L"\x1b[36m\u22a6\x1b[m";
+// static const WCHAR c_eol_marker[] = L"\x1b[36m\u22a6\x1b[m";
+static const WCHAR c_eol_marker[] = L"\x1b[36m\u2219\x1b[m";
 
 constexpr unsigned c_tab_width = 8;
 

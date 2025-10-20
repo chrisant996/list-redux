@@ -23,7 +23,7 @@ static const WCHAR c_clreol[] = L"\x1b[K";
 static const WCHAR c_no_file_open[] = L"*** No File Open ***";
 static const WCHAR c_endoffile_marker[] = L"*** End Of File ***";
 static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
-static const WCHAR c_div_char[] = L"\u2595"; //L":";
+static const WCHAR c_div_char[] = L":"; //L"\u2590"; //L"\u2595"; //L":";
 
 const DWORD c_max_needle = 32;
 static_assert(c_max_needle <= c_data_buffer_slop); // Important for searching across word wrapped line breaks.
@@ -354,10 +354,10 @@ LAutoFitContentWidth:
             else
             {
                 s.AppendSpaces(m_margin_width);
+                left.Set(L"\u252c\u252c\u252c\u252c\u253c\u252c\u252c\u252c");
                 for (unsigned width = 0; width < m_content_width; width += 10)
                 {
                     right.Clear();
-                    left.Set(L"\u252c\u252c\u252c\u252c\u253c\u252c\u252c\u252c");
                     right.Printf(L"%u", m_left + width + 10);
                     left.SetLength(std::min<unsigned>(10 - right.Length(), m_content_width - width));
                     s.Append(left);
