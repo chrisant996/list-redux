@@ -39,10 +39,8 @@ static StrW MakeMsgBoxText(const WCHAR* message, const WCHAR* directive, ColorEl
     StrW second;
     WrapText(message, first);
     WrapText(directive, second);
-    while (first.Length() && IsSpace(first.Text()[first.Length() - 1]))
-        first.SetLength(first.Length() - 1);
-    while (second.Length() && IsSpace(second.Text()[second.Length() - 1]))
-        second.SetLength(second.Length() - 1);
+    first.TrimRight();
+    second.TrimRight();
 
     StrW msg;
     msg.Printf(L"%s\r\n\n%s", first.Text(), second.Text());
@@ -561,13 +559,14 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
                 const auto& info = m_files[m_index];
                 if (info.IsDirectory())
                 {
-                    StrW dir;
+                    PathW dir;
                     info.GetPathName(dir);
                     if (info.IsPseudoDirectory())
                     {
-                        dir.SetEnd(FindName(dir.Text()));   // Strip "..".
-                        StripTrailingSlashes(dir);
-                        dir.SetEnd(FindName(dir.Text()));   // Go up to parent.
+                        const WCHAR* mask = FindName(m_dir.Text());
+                        dir.ToParent(); // Strip "..".
+                        dir.ToParent(); // Go up to parent.
+                        dir.JoinComponent(mask);
                     }
 
                     Navigate(dir.Text(), e);
@@ -1063,8 +1062,7 @@ void Chooser::WaitToContinue(bool erase_after, bool new_line)
 
     StrW s;
     WrapText(msg.Text(), s);
-    while (s.Length() && IsSpace(s.Text()[s.Length() - 1]))
-        s.SetLength(s.Length() - 1);
+    s.TrimRight();
 
     size_t lines = 1;
     for (const WCHAR* walk = s.Text(); *walk;)
@@ -1224,8 +1222,7 @@ void Chooser::NewDirectory(Error& e)
 
     PathW dir;
     dir.Set(m_dir);
-    assert(*FindName(dir.Text()) == '*');
-    dir.SetEnd(FindName(dir.Text()));   // Strip "*".
+    dir.ToParent();                     // Strip file mask.
     dir.JoinComponent(s.Text());
     dir.Append(L"\\__dummy__");         // MkDir() makes dirs above filename.
 
@@ -1269,8 +1266,8 @@ void Chooser::RenameEntry(Error& e)
 
     PathW new_name;
     new_name.Set(m_dir);
-    assert(*FindName(new_name.Text()) == '*');
-    new_name.SetEnd(FindName(new_name.Text())); // Strip "*".
+    EnsureTrailingSlash(new_name);  // Guarantee trailing slash (just in case).
+    new_name.ToParent();            // Remove trailing slash and file mask.
     new_name.JoinComponent(s.Text());
 
     if (!MoveFileW(old_name.Text(), new_name.Text()))
@@ -1462,8 +1459,7 @@ void Chooser::SweepFiles(Error& e)
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
 
-    while (program.Length() && IsSpace(program.Text()[program.Length() - 1]))
-        program.SetLength(program.Length() - 1);
+    program.TrimRight();
     if (!program.Length())
         return;
 

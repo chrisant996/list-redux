@@ -1139,8 +1139,7 @@ void Viewer::SetFile(intptr_t index)
         if (e.Test())
         {
             e.Format(m_errmsg);
-            while (m_errmsg.Length() && m_errmsg.Text()[m_errmsg.Length() - 1] == '\n')
-                m_errmsg.SetLength(m_errmsg.Length() - 1);
+            m_errmsg.TrimRight();
         }
 
         if (!m_context.IsPipe() && !m_text)

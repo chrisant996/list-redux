@@ -223,8 +223,7 @@ bool Error::Report()
     HANDLE herr = GetStdHandle(STD_ERROR_HANDLE);
     if (IsConsole(herr))
     {
-        while (s.Length() && s.Text()[s.Length() - 1] == ' ')
-            s.SetLength(s.Length() - 1);
+        s.TrimRight();
         OutputConsole(herr, s.Text(), s.Length(), L"0;91");
     }
     else
