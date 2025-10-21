@@ -25,84 +25,137 @@ static double s_min_luminance = 0.4;
 static double s_hidden_opacity = 0.0;
 static bool s_light_theme = false;
 
-struct ColorDefinition
+static const WCHAR* c_default_colors[] =
 {
-    const WCHAR* back;
-    const WCHAR* text;
-};
-
-static const ColorDefinition c_default_colors[] =
-{   //  Back            Text
-    {   L"",            L"91" },        // Error
-    {   L"",            L"97" },        // File
-    {   L"48;5;23",     L"97" },        // Selected
-    {   L"",            L"36" },        // Tagged
-    {   L"48;5;23",     L"30" },        // SelectedTagged
-    {   L"",            L"93" },        // Header
-    {   L"",            L"93" },        // Command
-    {   L"",            L"90" },        // Divider
-    {   L"",            L"90" },        // LineNumber
-    {   L"",            L"" },          // Content
-    {   L"",            L"33" },        // CtrlCode
-    {   L"",            L"7" },         // EndOfFileLine
-    {   L"",            L"7" },         // MarkedLine
-    {   L"",            L"7;36" },      // SearchFound
-    {   L"",            L"7;36" },      // DebugRow
-    {   L"",            L"7" },         // SweepDivider
-    {   L"",            L"96" },        // SweepFile
-    {   L"",            L"90" },        // FloatingScrollBar
-    {   L"",            L"90" },        // PopupBorder
+    L"91",              // Error
+    L"97",              // File
+    L"97;48;5;23",      // Selected
+    L"36",              // Tagged
+    L"30;48;5;23",      // SelectedTagged
+    L"93",              // Header
+    L"93",              // Command
+    L"90",              // Divider
+    L"90",              // LineNumber
+    L"",                // Content
+    L"33",              // CtrlCode
+    L"7",               // EndOfFileLine
+    L"7",               // MarkedLine
+    L"7;36",            // SearchFound
+    L"7;36",            // DebugRow
+    L"7",               // SweepDivider
+    L"96",              // SweepFile
+    L"90",              // FloatingScrollBar
+    L"90",              // PopupBorder
 #ifndef USE_HALF_CHARS
-    {   L"",            L"38;5;247" },  // PopupScrollCar
+    L"38;5;247",        // PopupScrollCar
 #endif
-    {   L"",            L"93;1" },      // PopupHeader
-    {   L"",            L"38;5;247" },  // PopupFooter
-    {   L"",            L"" },          // PopupContent
-    {   L"",            L"38;5;242" },  // PopupContentDim
-    {   L"",            L"7" },         // PopupSelect
+    L"93;1",            // PopupHeader
+    L"38;5;247",        // PopupFooter
+    L"",                // PopupContent
+    L"38;5;242",        // PopupContentDim
+    L"7",               // PopupSelect
 };
 static_assert(_countof(c_default_colors) == size_t(ColorElement::MAX));
 
-static ColorDefinition s_colors[_countof(c_default_colors)];
-static WCHAR s_back_colors[_countof(c_default_colors)][48];
-static WCHAR s_text_colors[_countof(c_default_colors)][48];
-
-const WCHAR* GetBackColorParams(ColorElement element)
-{
-    return s_colors[size_t(element)].back;
-}
+static WCHAR s_colors[_countof(c_default_colors)][48];
 
 const WCHAR* GetTextColorParams(ColorElement element)
 {
-    return s_colors[size_t(element)].text;
+    static StrW s_color;
+
+    int32 value = -1;
+    uint32 eat = 0;
+    bool keep_eaten = false;
+    bool select_format = false;
+
+    s_color.Clear();
+
+    int num = 0;
+    for (const WCHAR* p = GetColor(element); true; ++p)
+    {
+        if (!*p || *p == ';')
+        {
+            if (eat)
+            {
+                --eat;
+                if (keep_eaten)
+                    value = num;
+                if (!eat)
+                    keep_eaten = false;
+            }
+            else if (select_format)
+            {
+                select_format = false;
+                switch (num)
+                {
+                case 2:
+                    eat = 3;
+                    break;
+                case 5:
+                    eat = 1;
+                    break;
+                default:
+                    return nullptr;
+                }
+                if (keep_eaten)
+                    value = num;
+            }
+            else
+            {
+                switch (num)
+                {
+                case 0:
+                    value = 39;
+                    break;
+                case 1:  case 2:  case 22:
+                case 3:  case 23:
+                case 4:  case 24:
+                case 9:  case 29:
+                case 53: case 55:
+                case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97:
+                case 30: case 31: case 32: case 33: case 34: case 35: case 36: case 37:
+                case 39:
+                    value = num;
+                    break;
+                case 38:
+                    value = num;
+                    select_format = true;
+                    keep_eaten = true;
+                    break;
+                case 48:
+                    select_format = true;
+                    assert(!keep_eaten);
+                    break;
+                }
+            }
+
+            if (value >= 0)
+                s_color.Printf(L";%u", value);
+
+            if (!*p)
+                break;
+
+            value = -1;
+            num = 0;
+        }
+        else
+        {
+            if (*p >= '0' && *p <= '9')
+                num = (num * 10) + (*p - '0');
+            else
+                return nullptr;
+        }
+    }
+
+    const WCHAR* color = s_color.Text();
+    while (*color == ';')
+        ++color;
+    return color;
 }
 
 const WCHAR* GetColor(ColorElement element)
 {
-    static WCHAR s_tmp[size_t(ColorElement::MAX)][48] = {};
-
-    if (!s_tmp[size_t(element)][0])
-    {
-        const ColorDefinition& def = s_colors[size_t(element)];
-        const WCHAR* back = def.back;
-        const WCHAR* text = def.text;
-        WCHAR* p = s_tmp[size_t(element)];
-        if (*back)
-        {
-            for (const WCHAR* q = back; *q; ++q)
-                *(p++) = *q;
-        }
-        if (*text)
-        {
-            if (*back)
-                *(p++) = ';';
-            for (const WCHAR* q = text; *q; ++q)
-                *(p++) = *q;
-        }
-        *(p++) = '\0';
-    }
-
-    return s_tmp[size_t(element)];
+    return s_colors[size_t(element)];
 }
 
 StrW MakeColor(ColorElement element)
@@ -676,60 +729,26 @@ static_assert(_countof(c_reg_color_name) == size_t(ColorElement::MAX));
 #ifdef USE_REGISTRY_FOR_COLORS
 void ReadColor(HKEY hkeyApp, uint32 index)
 {
-    WCHAR name_back[32];
-    WCHAR name_text[32];
-    StringCchPrintfW(name_back, _countof(name_back), L"%sBack", c_reg_color_name[index]);
-    StringCchPrintfW(name_text, _countof(name_text), L"%sText", c_reg_color_name[index]);
-
     DWORD type;
     WCHAR* data;
     DWORD max_len;
     DWORD len;
 
-    data = s_back_colors[index];
-    len = max_len = _countof(s_back_colors[index]);
-    if (RegGetValueW(hkeyApp, nullptr, name_back, RRF_RT_REG_SZ, &type, &data, &len) != ERROR_SUCCESS ||
+    data = s_colors[index];
+    len = max_len = _countof(s_colors[index]);
+    if (RegGetValueW(hkeyApp, nullptr, c_reg_color_name[index], RRF_RT_REG_SZ, &type, &data, &len) != ERROR_SUCCESS ||
         type != REG_SZ || !len || len >= max_len)
     {
-        s_colors[index].back = c_default_colors[index].back;
-    }
-    else
-    {
-        s_colors[index].back = data;
-    }
-
-    data = s_text_colors[index];
-    len = max_len = _countof(s_text_colors[index]);
-    if (RegGetValueW(hkeyApp, nullptr, name_text, RRF_RT_REG_SZ, &type, &data, &len) != ERROR_SUCCESS ||
-        type != REG_SZ || !len || len >= max_len)
-    {
-        s_colors[index].text = c_default_colors[index].text;
-    }
-    else
-    {
-        s_colors[index].text = data;
+        StringCchCopy(s_colors[index], _countof(s_colors[index]), c_default_colors[index]);
     }
 }
 #else
 void ReadColor(const WCHAR* ini_filename, uint32 index)
 {
     if (ini_filename && *ini_filename)
-    {
-        WCHAR name_back[32];
-        WCHAR name_text[32];
-        StringCchPrintfW(name_back, _countof(name_back), L"%sBack", c_reg_color_name[index]);
-        StringCchPrintfW(name_text, _countof(name_text), L"%sText", c_reg_color_name[index]);
-
-        GetPrivateProfileStringW(L"Colors", name_back, c_default_colors[index].back, s_back_colors[index], _countof(s_back_colors[index]), ini_filename);
-        GetPrivateProfileStringW(L"Colors", name_text, c_default_colors[index].text, s_text_colors[index], _countof(s_text_colors[index]), ini_filename);
-        s_colors[index].back = s_back_colors[index];
-        s_colors[index].text = s_text_colors[index];
-    }
+        GetPrivateProfileStringW(L"Colors", c_reg_color_name[index], c_default_colors[index], s_colors[index], _countof(s_colors[index]), ini_filename);
     else
-    {
-        s_colors[index].back = c_default_colors[index].back;
-        s_colors[index].text = c_default_colors[index].text;
-    }
+        StringCchCopy(s_colors[index], _countof(s_colors[index]), c_default_colors[index]);
 }
 #endif
 

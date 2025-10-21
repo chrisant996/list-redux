@@ -50,7 +50,6 @@ enum class ColorElement
     MAX
 };
 
-const WCHAR* GetBackColorParams(ColorElement element);
 const WCHAR* GetTextColorParams(ColorElement element);
 const WCHAR* GetColor(ColorElement element);
 StrW MakeColor(ColorElement element);
