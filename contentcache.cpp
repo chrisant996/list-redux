@@ -265,21 +265,30 @@ InvalidCurrentData:
         if (m_ax == 4 && c >= 0x90 && m_expected == 4 && m_length == 1)
             goto InvalidPrecedingData;
 
-        // Detect an overlong encoding (0xE0 followed by less than 0xA0, or
-        // 0xF0 followed by less than 0x90).
+        // Detect overlong encodings.
         if (m_ax == 0)
         {
-            if (m_expected == 3 && c < 0xA0 && m_length == 1)
-                goto InvalidPrecedingData;
-            if (m_expected == 4 && c < 0x90 && m_length == 1)
-                goto InvalidPrecedingData;
+            switch (m_expected)
+            {
+            case 3:
+                // 0xE0 followed by less than 0xA0.
+                if (c < 0xA0 && m_length == 1)
+                    goto InvalidPrecedingData;
+                break;
+            case 4:
+                // 0xF0 followed by less than 0x90.
+                if (c < 0x90 && m_length == 1)
+                    goto InvalidPrecedingData;
+                break;
+            case 2:
+                // 0xC0 followed by 0x80 is an overlong encoding for U+0000,
+                // which is accepted so that U+0000 can be encoded without
+                // using any NUL bytes.  But no other use of 0xC0 is allowed.
+                if (m_length == 1 && c != 0x80)
+                    goto InvalidPrecedingData;
+                break;
+            }
         }
-
-        // 0xC0 followed by 0x80 is an overlong encoding for U+0000, which is
-        // accepted so that U+0000 can be encoded without using any NUL bytes.
-        // But no other use of 0xC0 is allowed.
-        if (m_ax == 0 && m_expected == 2 && m_length == 1 && c != 0x80)
-            goto InvalidPrecedingData;
 
         m_buffer[m_length++] = c;
         m_ax = (m_ax << 6) | (c & 0b01111111);
