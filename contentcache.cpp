@@ -984,7 +984,8 @@ unsigned ContentCache::FormatLineData(size_t line, unsigned left_offset, StrW& s
                 {
                     unsigned spaces = c_tab_width - (total_cells % c_tab_width);
                     const bool something_fits = (visible_len + spaces > left_offset);
-                    if (m_options.tab_mode == TabMode::HIGHLIGHT && something_fits)
+                    const bool apply_color = (m_options.tab_mode == TabMode::HIGHLIGHT && something_fits && !color);
+                    if (apply_color)
                         s.AppendColor(GetColor(ColorElement::CtrlCode));
                     while (spaces--)
                     {
@@ -995,15 +996,15 @@ unsigned ContentCache::FormatLineData(size_t line, unsigned left_offset, StrW& s
                         if (!left_offset && visible_len >= max_width)
                             break;
                     }
-                    if (m_options.tab_mode == TabMode::HIGHLIGHT && something_fits)
-                        s.Append(c_norm);
+                    s.AppendNormalIf(apply_color);
                 }
                 else if (c >= 0 && c < ' ')
                 {
                     if (m_options.ctrl_mode == CtrlMode::EXPAND)
                     {
                         const bool something_fits = (visible_len + 2 > left_offset);
-                        if (something_fits && !color)
+                        const bool apply_color = (something_fits && !color);
+                        if (apply_color)
                             s.AppendColor(GetColor(ColorElement::CtrlCode));
                         append_text(L"^", 1);
                         if (left_offset || visible_len < max_width)
@@ -1011,18 +1012,17 @@ unsigned ContentCache::FormatLineData(size_t line, unsigned left_offset, StrW& s
                             WCHAR text[2] = { WCHAR('@' + c) };
                             append_text(text, 1);
                         }
-                        if (something_fits && !color)
-                            s.Append(c_norm);
+                        s.AppendNormalIf(apply_color);
                     }
 #ifdef INCLUDE_CTRLMODE_PERIOD
                     else if (m_options.ctrl_mode == CtrlMode::PERIOD)
                     {
                         assert(left_offset || visible_len < max_width);
-                        if (!left_offset)
+                        const bool apply_color = (!left_offset && !color);
+                        if (apply_color)
                             s.AppendColor(GetColor(ColorElement::CtrlCode));
                         append_text(L".", 1);
-                        if (!left_offset)
-                            s.Append(c_norm);
+                        s.AppendNormalIf(apply_color);
                     }
 #endif
 #ifdef INCLUDE_CTRLMODE_SPACE
@@ -1173,7 +1173,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         }
         if (ii < len)
         {
-            const bool hilite_newline = (!highlighting_found_text && ptr[ii] == '\n');
+            const bool hilite_newline = (!highlighting_found_text && ptr[ii] == '\n' && !marked_color);
             if (hilite_newline)
                 s.AppendColor(GetColor(ColorElement::CtrlCode));
             s.Printf(L"%02X", ptr[ii]);
