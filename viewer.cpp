@@ -565,7 +565,14 @@ LAutoFitContentWidth:
                     {
                         s.AppendColor(GetColor(ColorElement::LineNumber));
                         if (s_options.show_line_numbers)
-                            s.Printf(L"%*lu%s", m_margin_width - 2, m_top + row + 1, c_div_char);
+                        {
+                            const size_t prev_num = (m_top + row > 0) ? m_context.GetLineNunber(m_top + row - 1) : 0;
+                            const size_t num = m_context.GetLineNunber(m_top + row);
+                            if (num > prev_num)
+                                s.Printf(L"%*lu%s", m_margin_width - 2, m_context.GetLineNunber(m_top + row), c_div_char);
+                            else
+                                s.Printf(L"%*s%s", m_margin_width - 2, L"", c_div_char);
+                        }
                         else if (s_options.show_file_offsets)
                             s.Printf(L"%0*lx%s", m_margin_width - 2, m_context.GetOffset(m_top + row), c_div_char);
                         else
@@ -1278,6 +1285,7 @@ void Viewer::GoTo()
             unsigned __int64 line;
             if (wcstonum(s.Text(), 10, line) && line > 0)
             {
+                line = m_context.FriendlyLineNumberToIndex(line);
                 m_found_line.MarkLine(line - 1);
                 Center(m_found_line);
                 m_force_update = true;

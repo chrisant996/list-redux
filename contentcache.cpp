@@ -11,6 +11,8 @@
 #include "wcwidth_iter.h"
 #include "filetype.h"
 
+#include <algorithm>
+
 #ifdef DEBUG
 #define DEBUG_LINE_PARSING
 #endif
@@ -422,7 +424,7 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
         out_width = m_pending_width;
         m_pending_length = 0;
         m_pending_width = 0;
-        return (out_length > 0) ? Break : Exhausted;
+        return (out_length > 0) ? BreakNewline : Exhausted;
     }
 
     // Find end of line.
@@ -486,14 +488,14 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
             {
                 // Reached end of consumable range.
                 if (newline)
-                    outcome = Break;
+                    outcome = BreakNewline;
                 break;
             }
 
             if (m_pending_length + 1 >= m_options.max_line_length)
             {
                 // Line exceeds max bytes.
-                outcome = Break;
+                outcome = BreakMax;
                 break;
             }
 
@@ -523,11 +525,11 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
                 {
                     m_pending_length = m_pending_wrap_length;
                     m_pending_width = m_pending_wrap_width;
-                    outcome = BreakSkip;
+                    outcome = BreakWrapSkip;
                 }
                 else
                 {
-                    outcome = Break;
+                    outcome = BreakWrap;
                 }
                 break;
             }
@@ -578,10 +580,10 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
 
     if (resync)
     {
-        assert(outcome == BreakSkip);
+        assert(outcome == BreakWrapSkip);
         m_count = 0;
         m_available = 0;
-        return BreakSkipResync;
+        return BreakWrapResync;
     }
 
     m_bytes += length;
@@ -650,12 +652,15 @@ bool FileLineMap::SetWrapWidth(unsigned wrap)
 void FileLineMap::Clear()
 {
     m_lines.clear();
+    m_line_numbers.clear();
     m_codepage = 0;
     m_encoding_name.Clear();
+    m_current_line_number = 1;
     m_processed = 0;
     m_pending_begin = 0;
     m_line_iter.Reset();
     m_skip_whitespace = 0;
+    m_wrapped_current_line = false;
 }
 
 void FileLineMap::Next(const BYTE* bytes, size_t available)
@@ -702,14 +707,20 @@ do_skip_whitespace:
     {
         const FileLineIter::Outcome outcome = m_line_iter.Next(line_ptr, line_length, line_width);
 #ifdef DEBUG_LINE_PARSING
-        if (outcome != FileLineIter::Exhausted && outcome != FileLineIter::Break)
-            dbgprintf(L"\u2193 outcome %s", (outcome == FileLineIter::BreakSkip) ? L"BreakSkip" : (outcome == FileLineIter::BreakSkipResync) ? L"BreakSkipResync" : L"??");
+        if (outcome != FileLineIter::Exhausted && outcome != FileLineIter::BreakNewline)
+            dbgprintf(L"\u2193 outcome %s",
+                      ((outcome == FileLineIter::BreakMax) ? L"BreakMax" :
+                       (outcome == FileLineIter::BreakWrap) ? L"BreakWrap" :
+                       (outcome == FileLineIter::BreakWrapSkip) ? L"BreakWrapSkip" :
+                       (outcome == FileLineIter::BreakWrapResync) ? L"BreakWrapResync" : L"??"));
 #endif
         if (outcome == FileLineIter::Exhausted)
             break;
 
         assert(line_length);
         m_lines.emplace_back(m_pending_begin);
+        if (m_wrap)
+            m_line_numbers.emplace_back(m_current_line_number);
 #ifdef DEBUG_LINE_PARSING
         dbgprintf(L"finished line %lu; offset %lu (%lx), length %lu, width %lu", m_lines.size(), m_pending_begin, m_pending_begin, line_length, line_width);
 #endif
@@ -718,13 +729,23 @@ do_skip_whitespace:
 #endif
         m_processed = m_pending_begin + line_length;
         m_pending_begin = m_processed;
-        if (outcome == FileLineIter::BreakSkip)
+        switch (outcome)
         {
+        case FileLineIter::BreakMax:
+        case FileLineIter::BreakWrap:
+            if (!IsBinaryFile())
+                break;
+            __fallthrough;
+        case FileLineIter::BreakNewline:
+            ++m_current_line_number;
+            m_wrapped_current_line = false;
+            break;
+        case FileLineIter::BreakWrapSkip:
             m_skip_whitespace = 1;
             goto do_skip_whitespace;
-        }
-        if (outcome == FileLineIter::BreakSkipResync)
+        case FileLineIter::BreakWrapResync:
             return;
+        }
     }
 
     m_processed = m_pending_begin + line_length;
@@ -734,6 +755,28 @@ FileOffset FileLineMap::GetOffset(size_t index) const
 {
     assert(!index || index < m_lines.size());
     return index ? m_lines[index] : 0;
+}
+
+size_t FileLineMap::GetLineNumber(size_t index) const
+{
+    assert(!index || index < m_lines.size());
+    if (!m_wrap)
+        return index + 1;
+    assert(index < m_line_numbers.size());
+    return m_line_numbers[index];
+}
+
+size_t FileLineMap::FriendlyLineNumberToIndex(size_t line) const
+{
+    if (m_wrap)
+    {
+        const auto iter = std::lower_bound(m_line_numbers.begin(), m_line_numbers.end(), line);
+        if (iter == m_line_numbers.end())
+            line = size_t(-1);
+        else
+            line = iter - m_line_numbers.begin() + 1;
+    }
+    return line;
 }
 
 bool FileLineMap::IsUTF8Compatible() const

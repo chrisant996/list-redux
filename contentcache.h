@@ -76,7 +76,16 @@ typedef std::vector<PipeChunk> PipeChunks;
 class FileLineIter
 {
 public:
-    enum Outcome { Exhausted, Break, BreakSkip, BreakSkipResync };
+    enum Outcome
+    {
+        Exhausted,              // Reached end up data buffer.
+        BreakNewline,           // Break because newline character.
+        BreakMax,               // Break because max line length was reached.
+        BreakWrap,              // Break because wrapping width was reached.
+        BreakWrapSkip,          // Wrapping break, and then skip whitespace.
+        BreakWrapResync,        // Wrapping break, and trigger resync (caller
+                                // clears data buffer and loads a new block).
+    };
 
                     FileLineIter(const ViewerOptions& options);
                     ~FileLineIter();
@@ -121,6 +130,8 @@ public:
 
     size_t          Count() const { return m_lines.size(); }
     FileOffset      GetOffset(size_t index) const;
+    size_t          GetLineNumber(size_t index) const;
+    size_t          FriendlyLineNumberToIndex(size_t line) const;
     bool            IsBinaryFile() const { return m_line_iter.IsBinaryFile(); }
     bool            IsUTF8Compatible() const;
     UINT            GetCodePage() const { return m_codepage; }
@@ -131,12 +142,15 @@ private:
     unsigned        m_wrap = 0;
 
     std::vector<FileOffset> m_lines;
+    std::vector<size_t> m_line_numbers;
     UINT            m_codepage = 0;
     StrW            m_encoding_name;
+    size_t          m_current_line_number = 1;
     FileOffset      m_processed = 0;
     FileOffset      m_pending_begin = 0;
     FileLineIter    m_line_iter;
     uint8           m_skip_whitespace = 0;
+    bool            m_wrapped_current_line = false;
 };
 
 class ContentCache
@@ -170,6 +184,8 @@ public:
     FileOffset      GetFileSize() const { return m_size; }
     FileOffset      GetMaxHexOffset(unsigned hex_width) const;
     FileOffset      GetOffset(size_t index) const { return m_map.GetOffset(index); }
+    size_t          GetLineNunber(size_t index) const { return m_map.GetLineNumber(index); }
+    size_t          FriendlyLineNumberToIndex(size_t index) const { return m_map.FriendlyLineNumberToIndex(index); }
     unsigned        GetLength(size_t index) const;
 
     bool            Find(bool next, const WCHAR* needle, FoundLine& found, bool caseless);
