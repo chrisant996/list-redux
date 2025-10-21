@@ -330,7 +330,7 @@ LAutoFitContentWidth:
 
         s.Clear();
         s.Append(L"\x1b[1H");
-        s.AppendColor(GetColor(ColorElement::Command));
+        s.AppendColor(GetColor(ColorElement::Header));
 
         if (s_options.show_ruler)
         {

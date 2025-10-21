@@ -38,6 +38,7 @@ static const ColorDefinition c_default_colors[] =
     {   L"48;5;23",     L"97" },        // Selected
     {   L"",            L"36" },        // Tagged
     {   L"48;5;23",     L"30" },        // SelectedTagged
+    {   L"",            L"93" },        // Header
     {   L"",            L"93" },        // Command
     {   L"",            L"90" },        // Divider
     {   L"",            L"90" },        // LineNumber
@@ -646,6 +647,7 @@ static const WCHAR* const c_reg_color_name[] =
     L"Selected",
     L"Tagged",
     L"SelectedTagged",
+    L"Header",
     L"Command",
     L"Divider",
     L"LineNumber",

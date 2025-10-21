@@ -25,6 +25,7 @@ enum class ColorElement
     Selected,
     Tagged,
     SelectedTagged,
+    Header,
     Command,
     Divider,
     LineNumber,

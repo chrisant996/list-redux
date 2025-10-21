@@ -292,7 +292,7 @@ void Chooser::UpdateDisplay()
         StrW dir;
 
         s.Append(L"\x1b[1H");
-        s.AppendColor(GetColor(ColorElement::Command));
+        s.AppendColor(GetColor(ColorElement::Header));
 
         left.Printf(L"LIST - Path: ");
 #ifdef DEBUG
