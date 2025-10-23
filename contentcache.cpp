@@ -136,178 +136,6 @@ void FoundLine::Found(FileOffset found_offset, unsigned found_len)
 }
 
 #pragma endregion // FoundLine
-#pragma region // Utf8Accumulator
-
-int32 Utf8Accumulator::Build(const char _c)
-{
-    // Returns:
-    //  1   = A UTF8 codepoint has been completed; use Codepoint() and etc to
-    //        get information about it.
-    //  0   = A UTF8 codepoint is in progress but is not completed.
-    //  -1  = Invalid UTF8 data has been detected in preceding data.  Use
-    //        Length() to find out how many bytes were involved in the invalid
-    //        data, use ClearInvalid() to clear the error state, and then call
-    //        Build() again with the same byte to continue.
-    //
-    // Sometimes the current byte may be detected as invalid, but in that case
-    // 0 is returned and the next call to Build() will return -1.  This is to
-    // simplify the usage contract.
-
-    // https://en.wikipedia.org/wiki/UTF-8
-    //
-    //  - Bytes that never appear in UTF-8: 0xC0, 0xC1, 0xF5–0xFF,
-    //  - A "continuation byte" (0x80–0xBF) at the start of a character,
-    //  - A non-continuation byte (or the string ending) before the end of a
-    //    character.
-    //  - An overlong encoding (0xE0 followed by less than 0xA0, or 0xF0
-    //    followed by less than 0x90).
-    //  - A 4-byte sequence that decodes to a value greater than U+10FFFF
-    //    (0xF4 followed by 0x90 or greater).
-    //
-    // HOWEVER, overlong 0xC0 0x80 should be allowed for U+0000.
-
-    if (m_invalid)
-    {
-        // -1 means preceding data was invalid.
-        // 1 means deferred reporting; convert it into -1 as the data has now
-        // become preceding data.
-        if (m_invalid == 1)
-            m_invalid = -1;
-        // Keep reporting the error state until ClearInvalid() is called.
-        return -1;
-    }
-
-    const uint8 c = uint8(_c);
-    if (c <= 0x7F)
-    {
-        // A non-continuation byte (or the string ending) cannot appear before
-        // the end of a character.
-        if (!Ready())
-        {
-InvalidPrecedingData:
-            m_invalid = -1;
-            m_ax = 0xFFFD;
-            return -1;
-        }
-
-        // An ASCII byte.
-        m_expected = 1;
-        m_length = 1;
-        m_buffer[0] = c;
-        m_ax = c;
-        return 1;
-    }
-    else if (c >= 0xF5 || c == 0xC1)
-    {
-        // Bytes that never appear in UTF-8: 0xC1, 0xF5–0xFF.
-        if (!Ready())
-            goto InvalidPrecedingData;
-InvalidCurrentData:
-        m_expected = 1;
-        m_length = 1;
-        m_buffer[0] = c;
-        m_ax = 0xFFFD;
-        m_invalid = 1;
-        return 0;
-    }
-    else if (c >= 0b11110000)
-    {
-        // A non-continuation byte (or the string ending) cannot appear before
-        // the end of a character.
-        if (!Ready())
-            goto InvalidPrecedingData;
-
-        // Start a four byte sequence.
-        m_expected = 4;
-        m_length = 1;
-        m_buffer[0] = c;
-        m_ax = c & 0b00000111;
-        return 0;
-    }
-    else if (c >= 0b11100000)
-    {
-        // A non-continuation byte (or the string ending) cannot appear before
-        // the end of a character.
-        if (!Ready())
-            goto InvalidPrecedingData;
-
-        // Start a three byte sequence.
-        m_expected = 3;
-        m_length = 1;
-        m_buffer[0] = c;
-        m_ax = c & 0b00001111;
-        return 0;
-    }
-    else if (c >= 0b11000000)
-    {
-        // A non-continuation byte (or the string ending) cannot appear before
-        // the end of a character.
-        if (!Ready())
-            goto InvalidPrecedingData;
-
-        // Start a two byte sequence.
-        m_expected = 2;
-        m_length = 1;
-        m_buffer[0] = c;
-        m_ax = c & 0b00011111;
-        return 0;
-    }
-    else
-    {
-        // Continuation byte.
-        assert(c >= 0b10000000);
-
-        // A "continuation byte" (0x80–0xBF) cannot appear at the start of a
-        // character.
-        if (Ready())
-            goto InvalidCurrentData;
-
-        // Detect a 4-byte sequence that decodes to a value greater than
-        // U+10FFFF (0xF4 followed by 0x90 or greater).
-        if (m_ax == 4 && c >= 0x90 && m_expected == 4 && m_length == 1)
-            goto InvalidPrecedingData;
-
-        // Detect overlong encodings.
-        if (m_ax == 0)
-        {
-            switch (m_expected)
-            {
-            case 3:
-                // 0xE0 followed by less than 0xA0.
-                if (c < 0xA0 && m_length == 1)
-                    goto InvalidPrecedingData;
-                break;
-            case 4:
-                // 0xF0 followed by less than 0x90.
-                if (c < 0x90 && m_length == 1)
-                    goto InvalidPrecedingData;
-                break;
-            case 2:
-                // 0xC0 followed by 0x80 is an overlong encoding for U+0000,
-                // which is accepted so that U+0000 can be encoded without
-                // using any NUL bytes.  But no other use of 0xC0 is allowed.
-                if (m_length == 1 && c != 0x80)
-                    goto InvalidPrecedingData;
-                break;
-            }
-        }
-
-        m_buffer[m_length++] = c;
-        m_ax = (m_ax << 6) | (c & 0b01111111);
-        return Ready();
-    }
-}
-
-void Utf8Accumulator::ClearInvalid()
-{
-    assert(m_invalid);
-    m_expected = 0;
-    m_length = 0;
-    m_ax = 0;
-    m_invalid = 0;
-}
-
-#pragma endregion // Utf8Accumulator
 #pragma region // PipeChunk
 
 PipeChunk::PipeChunk()
@@ -370,10 +198,10 @@ void FileLineIter::Reset()
     // m_wrap_width carries over.
     // m_codepage carries over.
     m_binary_file = true;
+    m_offset = 0;
     m_bytes = nullptr;
     m_count = 0;
     m_available = 0;
-    m_decode.Reset();
     new(&m_iter) wcwidth_iter(nullptr, 0);
     m_pending_length = 0;
     m_pending_width = 0;
@@ -381,37 +209,25 @@ void FileLineIter::Reset()
     m_pending_wrap_width = 0;
 }
 
+void FileLineIter::SetEncoding(FileDataType type, UINT codepage)
+{
+    m_binary_file = (type == FileDataType::Binary);
+    m_codepage = codepage;
+    m_decoder = CreateDecoder(m_codepage);
+}
+
 void FileLineIter::SetWrapWidth(uint32 wrap)
 {
     m_wrap = wrap ? wrap : m_options.max_line_length;
 }
 
-void FileLineIter::SetBytes(const BYTE* bytes, const size_t available)
+void FileLineIter::SetBytes(FileOffset offset, const BYTE* bytes, const size_t available)
 {
     assert(!m_count);
+    m_offset = offset;
     m_bytes = bytes;
     m_count = min<size_t>(available, c_data_buffer_main);
     m_available = available;
-
-#if 0
-    if (m_codepage == CP_UTF8)
-    {
-    // TODO: decode as many of the bytes as can be fully decoded.
-    // TODO: convert them into UTF16 using a custom converter that keeps track
-    // of byte offsets from the original buffer, so that it can tell how many
-    // bytes it has processed (otherwise it loses track of how much it has
-    // processed and where to resume processing).
-    // TODO: FormatLineData will need to use that same converter so that
-    // parsing and formatting stay in sync.
-    // TODO: init wcwidth_iter with the UTF16 string.
-    }
-    else if (m_codepage != 437)
-    {
-    // TODO: for other codepages.
-    // TODO: maybe use CharNextExA(), and require callers to ensure a trailing
-    // NUL byte (or how about 4 just to be safe) after the 'available' bytes.
-    }
-#endif
 }
 
 FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_width)
@@ -430,9 +246,9 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
     // Find end of line.
     bool newline = false;
     uint32 can_consume = 0;
-    // PERF: this can end up revisiting the same bytes multiple times if a
-    // line wraps before the newline, up to max_line_length.
-    // TODO: cache and reuse the can_consume length to mitigate perf issue.
+    // PERF:  This can end up revisiting the same bytes multiple times if a
+    // line wraps before the newline, up to max_line_length.  Could it be
+    // worth caching and reusing the can_consume length?
     assert(m_options.max_line_length > m_pending_length);
     const size_t max_consume = min<size_t>(m_count, m_options.max_line_length - m_pending_length);
     for (const BYTE* walk = m_bytes; can_consume < max_consume; ++walk)
@@ -463,28 +279,17 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
     // Get cells until it's time to wrap.
     Outcome outcome = Exhausted;
     const uint32 orig_pending_length = m_pending_length;
-#if 0
-    if (m_codepage == CP_UTF8)
-    {
-// TODO:  For UTF8 text files, when wrapping is enabled, then read ahead and
-// use Utf8Accumulator to decode the UTF8.  Use an incremental-enabled version
-// of calculating wcswidths.  Read until the visible width exceeds the wrap
-// width or 2048 bytes, whichever comes first -- being careful not to sever
-// any UTF8 byte sequence, nor any run of codepoints that compose a grapheme.
-// Then wrap that string into multiple line units.
-    }
-    else
-#endif
     {
         uint32 index = 0;
         uint32 pending_wrap_length = m_pending_wrap_length;
         uint32 pending_wrap_width = m_pending_wrap_width;
-        for (const BYTE* walk = m_bytes; true; ++index, ++walk)
+        const BYTE* walk = m_bytes;
+        while (true)
         {
             assert(index <= m_count + !!newline);
             assert(index <= m_available);
 
-            if (index == can_consume)
+            if (index >= can_consume)
             {
                 // Reached end of consumable range.
                 if (newline)
@@ -499,23 +304,69 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
                 break;
             }
 
-            const BYTE c = walk[0];
+            uint32 c;
+            uint32 clen;
+            uint32 blen;
+            if (m_binary_file)
+            {
+                // Multibyte encodings are not supported in binary file mode.
+                // Raw bytes are processed using a single-byte OEM codepage.
+                // AnalyzeFileType() simplifies the algorithm here by ensuring
+                // any multibyte OEM codepages fall back to 437 instead.
+                c = walk[0];
+                blen = 1;
 
-            // Calc width of byte.
-            unsigned clen;
-            if (c == '\t' && m_options.ctrl_mode != CtrlMode::EXPAND && m_options.tab_mode != TabMode::RAW)
-                clen = c_tab_width - (m_pending_width % c_tab_width);
-            else if (c == '\n' && !m_binary_file)
-                clen = 0;
-            else if (c == '\r' && !m_binary_file && index + 1 < can_consume && walk[1] == '\n')
-                clen = 0;
-            else if (c > 0 && c < ' ')
-                clen = (m_options.ctrl_mode == CtrlMode::EXPAND) ? 2 : 1;
+                // Calc width of codepoint.
+                if (c == '\t' && m_options.ctrl_mode != CtrlMode::EXPAND && m_options.tab_mode != TabMode::RAW)
+                    clen = c_tab_width - (m_pending_width % c_tab_width);
+                else if (c > 0 && c < ' ')
+                    clen = (m_options.ctrl_mode == CtrlMode::EXPAND) ? 2 : 1;
+                else
+                    clen = 1;
+            }
             else
             {
-                // TODO:  This presumes single cell width, which isn't
-                // accurate in all OEM codepages (Chinese, for example).
-                clen = 1;
+                // FUTURE:  In modern encodings (OEM and ANSI encodings) both
+                // 0x0D and 0x0A are never be part of a multibyte sequence.
+                // But EBCDIC is different:  control characters can be part of
+                // multibyte sequences in EBCDIC.
+
+                // Let the decoder read past can_consume.
+                c = m_decoder->Decode(walk, uint32(m_available - index), blen);
+                if (can_consume < index + blen && m_available > can_consume)
+                    break; // Not enough data; resync and continue.
+
+                // Calc width of codepoint.
+// TODO:  Be careful not to sever any run of codepoints in a grapheme...
+                if (c == '\t' && m_options.ctrl_mode != CtrlMode::EXPAND && m_options.tab_mode != TabMode::RAW)
+                    clen = c_tab_width - (m_pending_width % c_tab_width);
+                else if (c == '\n')
+                    clen = 0;
+                else if (c == '\r' && index + 1 < can_consume && walk[1] == '\n')
+                    clen = 0;
+                else if (c > 0 && c < ' ')
+                    clen = (m_options.ctrl_mode == CtrlMode::EXPAND) ? 2 : 1;
+                else if (c == 0xfeff)
+                {
+                    if (m_offset == 0)
+                    {
+                        clen = 0;
+                    }
+                    else
+                    {
+                        c = 0xfffd;
+                        goto calc_width;
+                    }
+                }
+                else
+                {
+calc_width:
+// TODO:  Use wcswidth_iter or similar logic to determine cell widths.  It's
+// complicated because graphemes may be composed by multiple codepoints.
+// Technically the number can be infinite, so it may be worth imposing some
+// upper bound here, but the max line length could operate as a soft limit.
+                    clen = 1;
+                }
             }
 
             if (m_wrap > clen && m_pending_width + clen > m_wrap)
@@ -537,11 +388,9 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
             // Smart wrapping at whitespace in text files.
             if (!m_binary_file)
             {
-// TODO: This will likely need different implementations for UTF8 files versus
-// other binary or text files.
                 if (!IsWhiteSpace(c))
                 {
-                    pending_wrap_length = m_pending_length + 1;
+                    pending_wrap_length = m_pending_length + blen;
                     pending_wrap_width = m_pending_width + clen;
                 }
                 else
@@ -551,8 +400,11 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
                 }
             }
 
-            ++m_pending_length;
+            m_pending_length += blen;
             m_pending_width += clen;
+
+            index += blen;
+            walk += blen;
         }
     }
 
@@ -587,7 +439,7 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
     }
 
     m_bytes += length;
-    if (m_count >= length)
+    if (m_count >= length && outcome != Exhausted)
         m_count -= length;
     else
         m_count = 0;
@@ -661,14 +513,33 @@ void FileLineMap::Clear()
     m_line_iter.Reset();
     m_skip_whitespace = 0;
     m_wrapped_current_line = false;
+    m_is_unicode_encoding = false;
 }
 
 void FileLineMap::Next(const BYTE* bytes, size_t available)
 {
     if (!m_processed)
-        m_line_iter.SetBinaryFile(AnalyzeFileType(bytes, available, &m_codepage, &m_encoding_name) == FileDataType::Binary);
+    {
+        const FileDataType type = AnalyzeFileType(bytes, available, &m_codepage, &m_encoding_name);
+        m_line_iter.SetEncoding(type, m_codepage);
 
-    m_line_iter.SetBytes(bytes, available);
+        switch (m_codepage)
+        {
+#ifdef USE_MULTIBYTE_ENCODINGS
+        case CP_UTF7:
+        case CP_UTF8:
+        case CP_WINUNICODE:
+            m_is_unicode_encoding = true;
+            break;
+#endif
+        case 437:
+        default:
+            m_is_unicode_encoding = false;
+            break;
+        }
+    }
+
+    m_line_iter.SetBytes(m_processed, bytes, available);
     m_line_iter.SetWrapWidth(m_wrap);
 
 do_skip_whitespace:
@@ -998,6 +869,7 @@ unsigned ContentCache::FormatLineData(size_t line, unsigned left_offset, StrW& s
 
     const WCHAR* const end = tmp.Text() + tmp.Length();
     const WCHAR* walk = tmp.Text();
+    const WCHAR* const maybe_bom = (offset == 0 && !m_map.IsBinaryFile() && m_map.IsUnicodeEncoding()) ? walk : nullptr;
     while (walk < end)
     {
         if (!*walk)
@@ -1081,6 +953,10 @@ unsigned ContentCache::FormatLineData(size_t line, unsigned left_offset, StrW& s
                         assert(left_offset || visible_len < max_width);
                         append_text(c_oem437[c], 1);
                     }
+                }
+                else if (maybe_bom == walk && c == 0xfeff)
+                {
+                    // Omit byte order mark at beginning of file.
                 }
                 else
                 {
@@ -1168,7 +1044,8 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     assert(ptr + len <= m_data + m_data_length);
 
     StrW tmp;
-    tmp.SetFromCodepage(m_map.GetCodePage(), reinterpret_cast<const char*>(ptr), len);
+    const UINT sbcp = EnsureSingleByteCP(m_map.GetCodePage());
+    tmp.SetFromCodepage(sbcp, reinterpret_cast<const char*>(ptr), len);
     assert(tmp.Length() == len);
     if (tmp.Length() != len)
     {

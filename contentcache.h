@@ -4,6 +4,7 @@
 // vim: set et ts=4 sw=4 cino={0s:
 
 #include "vieweroptions.h"
+#include "filetype.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
 
@@ -26,25 +27,6 @@ struct FoundLine
     unsigned        len;            // Length of found text in line (NOTE: may extend past end of line if a line break occurred).
     bool            is_valid;       // True when line or offset are valid, False otherwise.
     bool            is_line;        // True for found line, False for absolute file offset.
-};
-
-class Utf8Accumulator
-{
-public:
-                    Utf8Accumulator() { Reset(); }
-    void            Reset() { ZeroMemory(this, sizeof(*this)); }
-    int32           Build(char c);      // 0=building, 1=completed, -1=invalid.
-    bool            Ready() const { return m_length == m_expected; }
-    void            ClearInvalid();
-    uint32          Codepoint() const { assert(Ready()); return m_ax; }
-    const char*     Bytes() const { assert(Ready()); return m_buffer; }
-    uint32          Length() const { assert(Ready()); return m_length; }
-private:
-    uint32          m_ax;
-    uint8           m_expected;         // Number of bytes expected.
-    uint8           m_length;           // Number of bytes accumulated.
-    char            m_buffer[4 + 1];    // Bytes accumulated.
-    int8            m_invalid;          // An invalid data state occurred.
 };
 
 struct PipeChunk
@@ -78,7 +60,7 @@ class FileLineIter
 public:
     enum Outcome
     {
-        Exhausted,              // Reached end up data buffer.
+        Exhausted,              // Reached end of data buffer.
         BreakNewline,           // Break because newline character.
         BreakMax,               // Break because max line length was reached.
         BreakWrap,              // Break because wrapping width was reached.
@@ -90,13 +72,12 @@ public:
                     FileLineIter(const ViewerOptions& options);
                     ~FileLineIter();
     void            Reset();
-    void            SetCodePage(UINT codepage) { m_codepage = codepage; }
+    void            SetEncoding(FileDataType type, UINT codepage);
     void            SetWrapWidth(uint32 wrap_width);
-    void            SetBytes(const BYTE* bytes, size_t available);
+    void            SetBytes(FileOffset offset, const BYTE* bytes, size_t available);
     bool            More() const { return m_count > 0; }
     Outcome         Next(const BYTE*& bytes, uint32& length, uint32& width);
     bool            SkipWhitespace(uint32 curr_len, uint32& skipped);
-    void            SetBinaryFile(bool binary_file) { m_binary_file = binary_file; }
     bool            IsBinaryFile() const { return m_binary_file; }
 
 private:
@@ -104,10 +85,11 @@ private:
     uint32          m_wrap = 80;
     UINT            m_codepage = 0;
     bool            m_binary_file = true;
+    FileOffset      m_offset = 0;
     const BYTE*     m_bytes = nullptr;
     size_t          m_count = 0;
     size_t          m_available = 0;
-    Utf8Accumulator m_decode;
+    std::unique_ptr<IDecoder> m_decoder;
     wcwidth_iter    m_iter;
     uint32          m_pending_length = 0;       // Length in bytes.
     uint32          m_pending_width = 0;        // Width in character cells.
@@ -134,6 +116,7 @@ public:
     size_t          FriendlyLineNumberToIndex(size_t line) const;
     bool            IsBinaryFile() const { return m_line_iter.IsBinaryFile(); }
     bool            IsUTF8Compatible() const;
+    bool            IsUnicodeEncoding() const { return m_is_unicode_encoding; }
     UINT            GetCodePage() const { return m_codepage; }
     const WCHAR*    GetEncodingName(bool raw=false) const;
 
@@ -151,6 +134,7 @@ private:
     FileLineIter    m_line_iter;
     uint8           m_skip_whitespace = 0;
     bool            m_wrapped_current_line = false;
+    bool            m_is_unicode_encoding = false;
 };
 
 class ContentCache
