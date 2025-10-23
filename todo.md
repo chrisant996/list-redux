@@ -8,6 +8,7 @@
 - [ ] some way to configure colors inside the app
 - [ ] optionally save configured colors to `.listredux` file
 - [ ] some way to revert to default colors inside the app
+- [ ] documentation for the `.listredux` file
 
 ### File Chooser (list files in directory)
 
@@ -64,12 +65,10 @@
   - [x] Binary files **_and hex mode_** use OEM CP.
   - [x] Text files default to OEM CP.
   - [x] Detect codepages via MLang.
-  - [ ] Detect UTF8 text files and render the text nicely.
-  - [ ] Detect UTF16 text files and render the text nicely.
-  - [ ] When spliting lines, do not sever multi-byte characters!
-  - [ ] Toggle between Binary and Text (and UTF8) (and UTF16?).
-  - [ ] Allow selecting between CP 437 ("Text") and UTF8 ("UTF8").  ASCII files can be displayed as either, so default to CP 437 ("Text") for them.
-  - [ ] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
+  - [x] Decode individual codepoints from single-byte and multibyte encodings.
+  - [ ] Calculate grapheme widths of sequences of Unicode codepoints.
+  - [ ] Decode UTF16 encoding.
+  - [x] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
 
 ### Future
 
@@ -83,6 +82,8 @@
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
   - [ ] detect C++, Lua, etc and render syntax coloring
+- [ ] Allow toggling between Binary and detected Text codepage.
+- [ ] Allow manual override for Text encoding.
 
 ### Maybe
 
@@ -103,7 +104,7 @@
   - view archive file contents and select files for viewing or extracting
   - add to archive files
 - what would it take to support other 8-bit encodings?
-- handle UTF16 and UTF16-BE encodings?
+- handle UTF16-BE encoding (1201)?
 
 
 
