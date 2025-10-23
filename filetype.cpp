@@ -10,6 +10,7 @@
 
 #define USE_CUSTOM_UTF8_DECODER
 
+static bool s_multibyte_enabled = false;
 static HRESULT s_hr_coinit = E_UNEXPECTED;
 static IMultiLanguage* s_mlang1 = nullptr;
 static IMultiLanguage2* s_mlang = nullptr;
@@ -36,7 +37,6 @@ inline bool IsBinary(BYTE c)
 }
 
 #pragma region // Utf8Accumulator
-#ifdef USE_MULTIBYTE_ENCODINGS
 
 class Utf8Accumulator
 {
@@ -226,7 +226,6 @@ void Utf8Accumulator::ClearInvalid()
     m_invalid = 0;
 }
 
-#endif
 #pragma endregion // Utf8Accumulator
 #pragma region // MLang
 
@@ -360,14 +359,12 @@ static bool DetectCodePage(const BYTE* bytes, int32 length, UINT* codepage, StrW
         }
     }
 
-#ifndef USE_MULTIBYTE_ENCODINGS
-    if (cp != 20127 && cp != 437)
+    if (!s_multibyte_enabled && cp != 20127 && cp != 437)
     {
         if (encoding_name)
             encoding_name->Clear();
         return false;
     }
-#endif
 
     if (codepage)
         *codepage = cp;
@@ -415,9 +412,8 @@ binary_encoding:
         }
     }
 
-#ifdef USE_MULTIBYTE_ENCODINGS
     // Check for UTF8 files.
-    if (count >= sizeof(c_tag_UTF8))
+    if (s_multibyte_enabled && count >= sizeof(c_tag_UTF8))
     {
         if (!memcmp(bytes, c_tag_UTF8, sizeof(c_tag_UTF8)))
         {
@@ -428,7 +424,6 @@ binary_encoding:
             return FileDataType::Text;
         }
     }
-#endif
 
     // Check for binary files by scanning the first 4096 bytes for control
     // characters other than BEL, TAB, CR, LF, VT, FF, or ^Z.
@@ -494,7 +489,6 @@ uint32 SingleByteDecoder::Decode(const BYTE* p, uint32 available, uint32& num_by
     return *p;
 }
 
-#ifdef USE_MULTIBYTE_ENCODINGS
 class Utf8Decoder : public IDecoder
 {
 public:
@@ -531,9 +525,7 @@ uint32 Utf8Decoder::Decode(const BYTE* p, uint32 available, uint32& num_bytes)
 #endif
     return acc.Codepoint();
 }
-#endif // USE_MULTIBYTE_ENCODINGS
 
-#ifdef USE_MULTIBYTE_ENCODINGS
 class MultiByteDecoder : public IDecoder
 {
 public:
@@ -643,38 +635,42 @@ uint32 MultiByteDecoder::Decode(const BYTE* p, uint32 available, uint32& num_byt
     num_bytes = 1;
     return *p;
 }
-#endif // USE_MULTIBYTE_ENCODINGS
 
 std::unique_ptr<IDecoder> CreateDecoder(UINT codepage)
 {
-#ifdef USE_MULTIBYTE_ENCODINGS
-    switch (codepage)
+    if (s_multibyte_enabled)
     {
-    case CP_WINUNICODE:
-        // FUTURE:  UTF16 requires special handling; for now treat it like binary data.
-        return std::make_unique<SingleByteDecoder>();
-    case CP_UTF7:
-    case CP_UTF8:
+        switch (codepage)
+        {
+        case CP_WINUNICODE:
+            // FUTURE:  UTF16 requires special handling; for now treat it like
+            // binary data.
+            return std::make_unique<SingleByteDecoder>();
+        case CP_UTF7:
+        case CP_UTF8:
 #ifdef USE_CUSTOM_UTF8_DECODER
-        return std::make_unique<Utf8Decoder>();
+            return std::make_unique<Utf8Decoder>();
 #else
-        return std::make_unique<MultiByteDecoder>(codepage);
+            return std::make_unique<MultiByteDecoder>(codepage);
 #endif
+        }
+
+        const UINT sbcp = EnsureSingleByteCP(codepage);
+        if (sbcp == codepage)
+            return std::make_unique<SingleByteDecoder>();
     }
 
-    const UINT sbcp = EnsureSingleByteCP(codepage);
-    if (sbcp == codepage)
-        return std::make_unique<SingleByteDecoder>();
-#endif // USE_MULTIBYTE_ENCODINGS
-
     std::unique_ptr<IDecoder> decoder;
-#ifdef USE_MULTIBYTE_ENCODINGS
-    if (SUCCEEDED(EnsureMLang()))
+    if (s_multibyte_enabled && SUCCEEDED(EnsureMLang()))
         decoder = std::make_unique<MultiByteDecoder>(codepage);
-#endif
     if (!decoder || !decoder->Valid())
         decoder = std::make_unique<SingleByteDecoder>();
     return decoder;
+}
+
+void SetMultiByteEnabled()
+{
+    s_multibyte_enabled = true;
 }
 
 #pragma endregion // Decoders

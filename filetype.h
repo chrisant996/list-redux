@@ -7,8 +7,6 @@
 
 #include <memory>
 
-//#define USE_MULTIBYTE_ENCODINGS
-
 class StrW;
 
 enum class FileDataType { Binary, Text };
@@ -28,4 +26,6 @@ bool TryCoInitialize();
 bool IsCoInitialized();
 UINT GetSingleByteOEMCP(StrW* encoding_name=nullptr);
 UINT EnsureSingleByteCP(UINT cp);
+
+void SetMultiByteEnabled();
 

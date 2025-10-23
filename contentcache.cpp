@@ -525,14 +525,12 @@ void FileLineMap::Next(const BYTE* bytes, size_t available)
 
         switch (m_codepage)
         {
-#ifdef USE_MULTIBYTE_ENCODINGS
         case CP_UTF7:
         case CP_UTF8:
-        case CP_WINUNICODE:
+        case CP_WINUNICODE:     // UTF16-LE
+        case 1201:              // UTF16-BE
             m_is_unicode_encoding = true;
             break;
-#endif
-        case 437:
         default:
             m_is_unicode_encoding = false;
             break;
