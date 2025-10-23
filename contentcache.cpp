@@ -185,7 +185,6 @@ void PipeChunk::Move(PipeChunk&& other)
 
 FileLineIter::FileLineIter(const ViewerOptions& options)
 : m_options(options)
-, m_iter(nullptr, 0)
 {
 }
 
@@ -202,7 +201,7 @@ void FileLineIter::Reset()
     m_bytes = nullptr;
     m_count = 0;
     m_available = 0;
-    new(&m_iter) wcwidth_iter(nullptr, 0);
+    m_width_state.reset();
     m_pending_length = 0;
     m_pending_width = 0;
     m_pending_wrap_length = 0;
@@ -228,6 +227,8 @@ void FileLineIter::SetBytes(FileOffset offset, const BYTE* bytes, const size_t a
     m_bytes = bytes;
     m_count = min<size_t>(available, c_data_buffer_main);
     m_available = available;
+// REVIEW:  Does the width state need to span across adjacent buffers?
+    m_width_state.reset();
 }
 
 FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_length, uint32& out_width)
@@ -337,7 +338,6 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
                     break; // Not enough data; resync and continue.
 
                 // Calc width of codepoint.
-// TODO:  Be careful not to sever any run of codepoints in a grapheme...
                 if (c == '\t' && m_options.ctrl_mode != CtrlMode::EXPAND && m_options.tab_mode != TabMode::RAW)
                     clen = c_tab_width - (m_pending_width % c_tab_width);
                 else if (c == '\n')
@@ -361,11 +361,17 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
                 else
                 {
 calc_width:
-// TODO:  Use wcswidth_iter or similar logic to determine cell widths.  It's
-// complicated because graphemes may be composed by multiple codepoints.
-// Technically the number can be infinite, so it may be worth imposing some
-// upper bound here, but the max line length could operate as a soft limit.
-                    clen = 1;
+                    if (m_width_state.next(c))
+                    {
+                        clen = m_width_state.width();
+                    }
+                    else
+                    {
+// BUGBUG:  The width can increase later in a sequence, but the wrapping logic
+// here quits as soon as the width exceeds the wrapping limit, and that can
+// potentially sever a Unicode character sequence.
+                        clen = m_width_state.width_delta();
+                    }
                 }
             }
 
@@ -514,14 +520,32 @@ void FileLineMap::Clear()
     m_skip_whitespace = 0;
     m_wrapped_current_line = false;
     m_is_unicode_encoding = false;
+#ifdef USE_SMALL_DATA_BUFFER
+    m_need_type = true;
+#endif
 }
+
+#ifdef USE_SMALL_DATA_BUFFER
+void FileLineMap::SetFileType(FileDataType type, UINT codepage, const WCHAR* encoding_name)
+{
+    m_codepage = codepage;
+    m_encoding_name = encoding_name;
+    m_line_iter.SetEncoding(type, m_codepage);
+    m_need_type = false;
+}
+#endif
 
 void FileLineMap::Next(const BYTE* bytes, size_t available)
 {
     if (!m_processed)
     {
-        const FileDataType type = AnalyzeFileType(bytes, available, &m_codepage, &m_encoding_name);
-        m_line_iter.SetEncoding(type, m_codepage);
+#ifdef USE_SMALL_DATA_BUFFER
+        if (m_need_type)
+#endif
+        {
+            const FileDataType type = AnalyzeFileType(bytes, available, &m_codepage, &m_encoding_name);
+            m_line_iter.SetEncoding(type, m_codepage);
+        }
 
         switch (m_codepage)
         {
@@ -659,20 +683,11 @@ bool FileLineMap::IsUTF8Compatible() const
     return false;
 }
 
-const WCHAR* FileLineMap::GetEncodingName(bool raw) const
+const WCHAR* FileLineMap::GetEncodingName() const
 {
-    static StrW s_tmp;
-    if (IsBinaryFile())
-        return L"Binary";
-    if (raw && m_codepage && !m_encoding_name.Empty())
-        return m_encoding_name.Text();
     if (m_codepage && !m_encoding_name.Empty())
-    {
-        s_tmp.Clear();
-        s_tmp.Printf(L"Text (%s)", m_encoding_name.Text());
-        return s_tmp.Text();
-    }
-    return L"Text";
+        return m_encoding_name.Text();
+    return IsBinaryFile() ? L"Binary" : L"Text";
 }
 
 #pragma endregion // FileLineMap
@@ -737,6 +752,26 @@ bool ContentCache::Open(const WCHAR* name, Error& e)
         LARGE_INTEGER liSize;
         if (GetFileSizeEx(m_file, &liSize))
             m_size = liSize.QuadPart;
+
+#ifdef USE_SMALL_DATA_BUFFER
+        // Debug builds use a very small read chunk size, which greatly
+        // degrades the accuracy of file type and encoding detection.
+        // Compensate by pre-reading and analyzing a big chunk.
+        const DWORD to_read = 4096 * 24;
+        DWORD bytes_read;
+        BYTE* buffer = new BYTE[to_read];
+        if (buffer)
+        {
+            if (ReadFile(m_file, buffer, to_read, &bytes_read, nullptr))
+            {
+                UINT codepage;
+                StrW encoding_name;
+                FileDataType type = AnalyzeFileType(buffer, bytes_read, &codepage, &encoding_name);
+                m_map.SetFileType(type, codepage, encoding_name.Text());
+            }
+            delete [] buffer;
+        }
+#endif
 
         return true;
     }
@@ -978,7 +1013,8 @@ unsigned ContentCache::FormatLineData(size_t line, unsigned left_offset, StrW& s
                     }
                     else
                     {
-                        assert(clen == 1);
+// TODO:  Figure out what should happen for this assert now...
+//                        assert(clen == 1);
                         if (!left_offset)
                         {
                             if (truncate_cells < 0 && visible_len + clen > max_width)

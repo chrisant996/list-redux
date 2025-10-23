@@ -39,3 +39,36 @@ private:
     int32           m_chr_wcwidth = 0;
     bool            m_emoji = false;
 };
+
+//------------------------------------------------------------------------------
+class character_sequence_state
+{
+    enum parsing_state : uint8 { START, MAYBE_FLAG, BEGIN_EMOJI, CONSUME_EMOJI_SEQ, CONSUME_EMOJI_SEQ_ZWJ, CONTINUING };
+
+public:
+                    character_sequence_state(int32 ctrl_width=1);
+    void            reset();
+    bool            next(char32_t c);   // true=began sequence, false=continued sequence.
+    uint32          width() const { return m_curr_width; }
+    uint32          width_delta() const { return m_curr_width - m_curr_last_width; }
+    uint32          prev_width() const { return m_prev_width; }
+
+private:
+    void            finish_sequence();
+
+private:
+    const int32     c_ctrl_width;
+    const bool      c_color_emoji;
+
+    parsing_state   m_state = START;
+    int32           m_prev_width = 0;
+    int32           m_curr_width = 0;
+    int32           m_curr_last_width = 0;
+
+    char32_t        m_prev_c = 0;           // Only used in BEGIN_EMOJI state.
+    bool            m_unqualified = false;  // Only used in BEGIN_EMOJI state.
+
+#ifdef DEBUG
+    bool            m_emoji = false;
+#endif
+};

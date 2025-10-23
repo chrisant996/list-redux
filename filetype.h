@@ -27,5 +27,5 @@ bool IsCoInitialized();
 UINT GetSingleByteOEMCP(StrW* encoding_name=nullptr);
 UINT EnsureSingleByteCP(UINT cp);
 
-void SetMultiByteEnabled();
+void SetMultiByteEnabled(bool enabled);
 

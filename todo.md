@@ -66,7 +66,7 @@
   - [x] Text files default to OEM CP.
   - [x] Detect codepages via MLang.
   - [x] Decode individual codepoints from single-byte and multibyte encodings.
-  - [ ] Calculate grapheme widths of sequences of Unicode codepoints.
+  - [x] Calculate grapheme widths of sequences of Unicode codepoints.
   - [ ] Decode UTF16 encoding.
   - [x] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
 

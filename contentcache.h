@@ -90,7 +90,7 @@ private:
     size_t          m_count = 0;
     size_t          m_available = 0;
     std::unique_ptr<IDecoder> m_decoder;
-    wcwidth_iter    m_iter;
+    character_sequence_state m_width_state;
     uint32          m_pending_length = 0;       // Length in bytes.
     uint32          m_pending_width = 0;        // Width in character cells.
     uint32          m_pending_wrap_length = 0;  // Candidate length for word wrap.
@@ -118,7 +118,11 @@ public:
     bool            IsUTF8Compatible() const;
     bool            IsUnicodeEncoding() const { return m_is_unicode_encoding; }
     UINT            GetCodePage() const { return m_codepage; }
-    const WCHAR*    GetEncodingName(bool raw=false) const;
+    const WCHAR*    GetEncodingName() const;
+
+#ifdef USE_SMALL_DATA_BUFFER
+    void            SetFileType(FileDataType type, UINT codepage, const WCHAR* encoding_name);
+#endif
 
 private:
     // const ViewerOptions& m_options;
@@ -135,6 +139,10 @@ private:
     uint8           m_skip_whitespace = 0;
     bool            m_wrapped_current_line = false;
     bool            m_is_unicode_encoding = false;
+
+#ifdef USE_SMALL_DATA_BUFFER
+    bool            m_need_type = true;
+#endif
 };
 
 class ContentCache
@@ -148,7 +156,7 @@ public:
     bool            IsPipe() const { return m_redirected; }
     bool            IsBinaryFile() const { return m_map.IsBinaryFile(); }
     UINT            GetCodePage() const { return m_map.GetCodePage(); }
-    const WCHAR*    GetEncodingName(bool raw=false) const { return m_map.GetEncodingName(raw); }
+    const WCHAR*    GetEncodingName() const { return m_map.GetEncodingName(); }
     bool            SetTextContent(const char* text, Error& e);
     bool            Open(const WCHAR* name, Error& e);
     void            Close();

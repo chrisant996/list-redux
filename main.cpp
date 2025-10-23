@@ -103,6 +103,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         LOI_UNIQUE_IDS              = 0x7FFF,
         LOI_MAX_LINE_LENGTH,
         LOI_MULTIBYTE,
+        LOI_NO_MULTIBYTE,
     };
 
     static LongOption<WCHAR> long_opts[] =
@@ -111,6 +112,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         { L"version",               nullptr,            'V' },
         { L"max-line-length",       nullptr,            LOI_MAX_LINE_LENGTH, LOHA_REQUIRED },
         { L"multibyte",             nullptr,            LOI_MULTIBYTE },
+        { L"no-multibyte",          nullptr,            LOI_NO_MULTIBYTE },
         { nullptr }
     };
 
@@ -179,7 +181,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                 SetMaxLineLength(opt_value);
                 break;
             case LOI_MULTIBYTE:
-                SetMultiByteEnabled();
+            case LOI_NO_MULTIBYTE:
+                SetMultiByteEnabled(long_opt->value == LOI_MULTIBYTE);
                 break;
             }
             break;

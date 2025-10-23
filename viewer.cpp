@@ -635,11 +635,7 @@ LAutoFitContentWidth:
                 right.Printf(L"    Found: offset %06lx, len %u", m_found_line.offset, m_found_line.len);
         }
         if (m_context.GetCodePage())
-        {
-            right.Printf(L"    Encoding: %u", m_context.GetCodePage());
-            if (m_context.GetEncodingName(true/*raw*/))
-                right.Printf(L", %s", m_context.GetEncodingName(true/*raw*/));
-        }
+            right.Printf(L"    Encoding: %u, %s", m_context.GetCodePage(), m_context.GetEncodingName());
         if (left.Length() + right.Length() > m_terminal_width)
             right.Clear();
 

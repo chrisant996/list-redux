@@ -10,7 +10,7 @@
 
 #define USE_CUSTOM_UTF8_DECODER
 
-static bool s_multibyte_enabled = false;
+static bool s_multibyte_enabled = true;
 static HRESULT s_hr_coinit = E_UNEXPECTED;
 static IMultiLanguage* s_mlang1 = nullptr;
 static IMultiLanguage2* s_mlang = nullptr;
@@ -398,16 +398,18 @@ binary_encoding:
     {
         if (!memcmp(bytes, c_tag_Intel, sizeof(c_tag_Intel)))
         {
-            // FUTURE:  Handle UTF16-LE.
+            // FUTURE:  Handle UTF16-LE.  Also maybe try to get localized
+            // codepage name for 1200?
             if (encoding_name)
-                encoding_name->Set(L"Binary File (UTF16)");
+                encoding_name->Set(L"Binary File (UTF-16)");
             goto binary_file;
         }
         if (!memcmp(bytes, c_tag_Motorola, sizeof(c_tag_Motorola)))
         {
-            // FUTURE:  Handle UTF16-BE.
+            // FUTURE:  Handle UTF16-BE.  Also maybe try to get localized
+            // codepage name for 1201?
             if (encoding_name)
-                encoding_name->Set(L"Binary File (UTF16-BE)");
+                encoding_name->Set(L"Binary File (UTF-16 Big Endian)");
             goto binary_file;
         }
     }
@@ -420,7 +422,7 @@ binary_encoding:
             if (codepage)
                 *codepage = CP_UTF8;
             if (encoding_name)
-                encoding_name->Set(L"UTF8");
+                encoding_name->Set(L"Unicode (UTF-8)");
             return FileDataType::Text;
         }
     }
@@ -668,9 +670,9 @@ std::unique_ptr<IDecoder> CreateDecoder(UINT codepage)
     return decoder;
 }
 
-void SetMultiByteEnabled()
+void SetMultiByteEnabled(bool enabled)
 {
-    s_multibyte_enabled = true;
+    s_multibyte_enabled = enabled;
 }
 
 #pragma endregion // Decoders
