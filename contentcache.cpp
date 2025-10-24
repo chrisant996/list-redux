@@ -1192,7 +1192,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         }
         if (c > 0 && c < ' ')
         {
-            const bool hilite_newline = (!highlighting_found_text && c == '\n');
+            const bool hilite_newline = (!highlighting_found_text && c == '\n' && !marked_color);
             if (hilite_newline)
                 s.AppendColor(GetColor(ColorElement::CtrlCode));
             s.Append(c_oem437[c], 1);
@@ -1200,8 +1200,10 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         }
         else if (!c || wcwidth(tmp.Text()[ii]) != 1)
         {
-            // TODO:  Maybe apply color?
+            if (!marked_color)
+                s.AppendColor(GetColor(ColorElement::Divider));
             s.Append(L".", 1);
+            s.AppendNormalIf(!marked_color);
         }
         else
         {

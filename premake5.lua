@@ -19,6 +19,7 @@ local function define_exe(name, exekind)
     project(name)
     flags("fatalwarnings")
     language("c++")
+    cppdialect("c++17")
     kind(exekind or "consoleapp")
 end
 

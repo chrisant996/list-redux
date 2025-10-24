@@ -102,7 +102,7 @@ public:
     unsigned            Length() const;
     unsigned            Capacity() const { return m_capacity; }
 
-    bool                Empty() const { return !m_p[0]; }
+    bool                Empty() const { assert(!m_p[0] == !m_length); return !m_p[0]; }
     void                Clear();
     void                Free();
     WCHAR*              Detach();

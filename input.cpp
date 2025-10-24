@@ -320,7 +320,7 @@ InputRecord SelectInput(DWORD timeout)
     return input;
 }
 
-bool ReadInput(StrW& out, DWORD max_width)
+bool ReadInput(StrW& out, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
 {
     out.Clear();
 
@@ -350,6 +350,15 @@ bool ReadInput(StrW& out, DWORD max_width)
         case InputType::Error:
         case InputType::Resize:
             continue;
+        }
+
+        if (input_callback)
+        {
+            const int32 result = (*input_callback)(input);
+            if (result < 0)
+                return false;
+            if (result > 0)
+                continue;
         }
 
         if (input.type == InputType::Key)

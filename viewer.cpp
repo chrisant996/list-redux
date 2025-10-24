@@ -1254,23 +1254,85 @@ static bool wcstonum(const WCHAR* text, unsigned radix, unsigned __int64& out)
 void Viewer::GoTo()
 {
     StrW s;
-    s.AppendColor(GetColor(ColorElement::Command));
-    s.Printf(L"\r%s> ", m_hex_mode ? L"Offset" : L"Line #");
-    OutputConsole(m_hout, s.Text(), s.Length());
+    bool lineno = !m_hex_mode;
+    bool done = false;
 
-    ReadInput(s);
+    auto callback = [&](const InputRecord& input)
+    {
+        if (input.type != InputType::Char)
+            return 0; // Accept.
+        if ((input.modifier & ~Modifier::SHIFT) != Modifier::None)
+            return 1; // Eat.
 
-    OutputConsole(m_hout, c_norm);
-    m_force_update = true;
+        if (input.key_char >= '0' && input.key_char <= '9')
+            return 0; // Accept decimal digits for both line number and offset.
+        if ((input.key_char >= 'A' && input.key_char <= 'F') || (input.key_char >= 'a' && input.key_char <= 'f'))
+            return lineno ? 1 : 0; // Accept hexadecimal digits only for offset.
+        if (input.key_char == 'x' || input.key_char == 'X')
+            return s.Equal(L"0") ? 0 : 1; // Accept '0x' or '0X' prefix.
+        if (input.key_char == '$' || input.key_char == '#')
+            return s.Empty() ? 0 : 1; // Accept '$' or '#' prefix.
+
+        if (input.key_char == 'g')
+        {
+            // 'G' toggles between line number and offset.
+            lineno = !lineno;
+            done = false;
+            s.Clear();
+            return -1;
+        }
+
+        return 1; // Eat other characters.
+    };
+
+    StrW right;
+    while (!done)
+    {
+        if (lineno)
+            right = L"Base 10 (use $ or 0x prefix for base 16)";
+        else
+            right = L"Base 16 (use # prefix for base 10)";
+
+        s.Clear();
+        s.AppendColor(GetColor(ColorElement::Command));
+        s.Printf(L"\r%s\x1b[%uG%s\r%s> ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), !lineno ? L"Offset" : L"Line #");
+        OutputConsole(m_hout, s.Text(), s.Length());
+
+        done = true;
+        ReadInput(s, 32, callback);
+
+        OutputConsole(m_hout, c_norm);
+        if (done)
+            m_force_update = true;
+    }
 
     if (s.Length())
     {
-        if (m_hex_mode)
+        unsigned radix = lineno ? 10 : 16;
+        const WCHAR* p = s.Text();
+        if (p[0] == '$')
+        {
+            radix = 16;
+            ++p;
+        }
+        else if (p[0] == '#')
+        {
+            radix = 10;
+            ++p;
+        }
+        else if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
+        {
+            radix = 16;
+            p += 2;
+        }
+
+        if (!lineno)
         {
             FileOffset offset;
-            if (wcstonum(s.Text(), 16, offset))
+            if (wcstonum(p, radix, offset))
             {
-                offset &= ~FileOffset(m_hex_width - 1);
+                if (m_hex_mode)
+                    offset &= ~FileOffset(m_hex_width - 1);
                 m_found_line.MarkOffset(offset);
                 Center(m_found_line);
                 m_force_update = true;
@@ -1279,7 +1341,7 @@ void Viewer::GoTo()
         else
         {
             unsigned __int64 line;
-            if (wcstonum(s.Text(), 10, line) && line > 0)
+            if (wcstonum(p, radix, line) && line > 0)
             {
                 line = m_context.FriendlyLineNumberToIndex(line);
                 m_found_line.MarkLine(line - 1);
