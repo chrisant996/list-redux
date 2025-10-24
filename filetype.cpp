@@ -8,8 +8,6 @@
 
 #include <MLang.h>
 
-#define USE_CUSTOM_UTF8_DECODER
-
 static bool s_multibyte_enabled = true;
 static HRESULT s_hr_coinit = E_UNEXPECTED;
 static IMultiLanguage* s_mlang1 = nullptr;
@@ -426,19 +424,19 @@ binary_encoding:
     {
         if (!memcmp(bytes, c_tag_Intel, sizeof(c_tag_Intel)))
         {
-            // FUTURE:  Handle UTF16-LE.  Also maybe try to get localized
-            // codepage name for 1200?
+            if (codepage)
+                *codepage = CP_WINUNICODE;
             if (encoding_name)
-                encoding_name->Set(L"Binary File (UTF-16)");
-            goto binary_file;
+                GetCodePageName(CP_WINUNICODE, *encoding_name);
+            return FileDataType::Text;
         }
         if (!memcmp(bytes, c_tag_Motorola, sizeof(c_tag_Motorola)))
         {
-            // FUTURE:  Handle UTF16-BE.  Also maybe try to get localized
-            // codepage name for 1201?
+            if (codepage)
+                *codepage = 1201;
             if (encoding_name)
-                encoding_name->Set(L"Binary File (UTF-16 Big Endian)");
-            goto binary_file;
+                GetCodePageName(1201, *encoding_name);
+            return FileDataType::Text;
         }
     }
 
@@ -464,7 +462,6 @@ binary_encoding:
         {
             if (encoding_name)
                 encoding_name->Clear();
-binary_file:
             StrW tmp;
             if (codepage)
             {
@@ -564,7 +561,7 @@ public:
     bool            Valid() const override;
     uint32          Decode(const BYTE* p, uint32 available, uint32& num_bytes) override;
 private:
-    UINT            m_codepage = 0;
+    const UINT      m_codepage;
     CPINFOEXW       m_info;
     IMLangConvertCharset* m_converter = nullptr;
 };
@@ -572,10 +569,8 @@ private:
 MultiByteDecoder::MultiByteDecoder(UINT codepage)
 : m_codepage(codepage)
 {
-#ifdef USE_CUSTOM_UTF8_DECODER
     assert(codepage != CP_UTF7); // UTF7 has special rules for resync after invalid input.
     assert(codepage != CP_UTF8); // UTF8 has special rules for resync after invalid input.
-#endif
     EnsureMLang();
     if (!s_mlang ||
         FAILED(s_mlang->CreateConvertCharset(codepage, CP_WINUNICODE, 0/*MLCONVCHARF_NONE*/, &m_converter)) ||
@@ -662,23 +657,105 @@ fallback:
     return *p;
 }
 
+class Utf16Decoder : public IDecoder
+{
+public:
+                    Utf16Decoder(UINT codepage);
+                    ~Utf16Decoder() = default;
+    bool            Valid() const override;
+    uint32          Decode(const BYTE* p, uint32 available, uint32& num_bytes) override;
+    uint32          CharSize() const override;
+    uint32          NextChar(const BYTE* p) const override;
+private:
+    WCHAR           Next(const BYTE* p) const;
+private:
+    const bool      m_byte_swap;
+};
+
+Utf16Decoder::Utf16Decoder(UINT codepage)
+: m_byte_swap(codepage == 1201)
+{
+    assert(codepage == 1200 || codepage == 1201);
+}
+
+bool Utf16Decoder::Valid() const
+{
+    return true;
+}
+
+uint32 Utf16Decoder::Decode(const BYTE* p, uint32 available, uint32& num_bytes)
+{
+    assert(available > 0);
+    assert(Valid());
+
+    if (available < 2)
+    {
+invalid_truncated:
+        num_bytes = available;
+        return 0xFFFD;
+    }
+
+    const WCHAR wch = Next(p);
+    if (wch < 0xD800 || wch > 0xDFFF)
+    {
+        num_bytes = 2;
+        return wch;
+    }
+    if (wch >= 0xDC00 && wch <= 0xDFFF)
+    {
+invalid_one_wchar:
+        num_bytes = 2;
+        return 0xFFFD;
+    }
+
+    assert(wch >= 0xD800 && wch <= 0xDBFF);
+
+    if (available < 4)
+        goto invalid_truncated;
+
+    p += 2;
+    const WCHAR wch2 = Next(p);
+    if (wch < 0xDC00 || wch > 0xDFFF)
+        goto invalid_one_wchar;
+
+    uint32 c = wch;
+    c <<= 10;
+    c += wch2;
+    c -= 0x35fdc00;
+    num_bytes = 4;
+    return c;
+}
+
+uint32 Utf16Decoder::CharSize() const
+{
+    return 2;
+}
+
+uint32 Utf16Decoder::NextChar(const BYTE* p) const
+{
+    return Next(p);
+}
+
+WCHAR Utf16Decoder::Next(const BYTE* p) const
+{
+    if (m_byte_swap)
+        return WCHAR(p[1]) | (WCHAR(p[0]) << 8);
+    else
+        return WCHAR(p[0]) | (WCHAR(p[1]) << 8);
+}
+
 std::unique_ptr<IDecoder> CreateDecoder(UINT codepage)
 {
     if (s_multibyte_enabled)
     {
         switch (codepage)
         {
-        case CP_WINUNICODE:
-            // FUTURE:  UTF16 requires special handling; for now treat it like
-            // binary data.
-            return std::make_unique<SingleByteDecoder>();
+        case CP_WINUNICODE:     // Unicode (UTF-16 Little Endian)
+        case 1201:              // Unicode (UTF-16 Big Endian)
+            return std::make_unique<Utf16Decoder>(codepage);
         case CP_UTF7:
         case CP_UTF8:
-#ifdef USE_CUSTOM_UTF8_DECODER
             return std::make_unique<Utf8Decoder>();
-#else
-            return std::make_unique<MultiByteDecoder>(codepage);
-#endif
         }
 
         const UINT sbcp = EnsureSingleByteCP(codepage);

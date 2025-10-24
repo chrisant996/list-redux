@@ -252,24 +252,54 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
     // worth caching and reusing the can_consume length?
     assert(m_options.max_line_length > m_pending_length);
     const size_t max_consume = min<size_t>(m_count, m_options.max_line_length - m_pending_length);
-    for (const BYTE* walk = m_bytes; can_consume < max_consume; ++walk)
+    if (m_decoder->CharSize() == 1)
     {
-        const BYTE c = walk[0];
-        if (c == '\r' && can_consume + 1 <= m_available && walk[1] == '\n')
+        for (const BYTE* walk = m_bytes; can_consume < max_consume; ++walk)
         {
-            can_consume += 2;
-            newline = true;
-            break;
+            const BYTE c = walk[0];
+            if (c == '\r' && can_consume + 1 <= m_available && walk[1] == '\n')
+            {
+                can_consume += 2;
+                newline = true;
+                break;
+            }
+            else if (c == '\n')
+            {
+                ++can_consume;
+                newline = true;
+                break;
+            }
+            else
+            {
+                ++can_consume;
+            }
         }
-        else if (c == '\n')
+    }
+    else
+    {
+        assert(m_decoder->CharSize() == 2);
+        for (const BYTE* walk = m_bytes; can_consume < max_consume;)
         {
-            ++can_consume;
-            newline = true;
-            break;
-        }
-        else
-        {
-            ++can_consume;
+            if (can_consume + 2 > m_available)
+                break;
+            const WCHAR c = m_decoder->NextChar(walk);
+            if (c == '\r' && can_consume + 4 <= m_available && m_decoder->NextChar(walk + 2) == '\n')
+            {
+                can_consume += 4;
+                newline = true;
+                break;
+            }
+            else if (c == '\n')
+            {
+                can_consume += 2;
+                newline = true;
+                break;
+            }
+            else
+            {
+                can_consume += 2;
+                walk += 2;
+            }
         }
     }
 
@@ -659,6 +689,41 @@ size_t FileLineMap::GetLineNumber(size_t index) const
     return m_line_numbers[index];
 }
 
+void FileLineMap::GetLineText(const BYTE* p, size_t num_bytes, StrW& out) const
+{
+    const UINT cp = GetCodePage();
+    switch (cp)
+    {
+    case CP_WINUNICODE:
+    case 1201:
+        {
+            const size_t num_chars = (num_bytes + 1) / 2;
+            BYTE* o = reinterpret_cast<BYTE*>(out.Reserve(num_chars + 1));
+            memcpy(o, p, num_bytes);
+            if (num_bytes & 1)
+            {
+                o[num_bytes - 1] = 0xFD;
+                o[num_bytes] = 0xFF;
+            }
+            if (cp == 1201)
+            {
+                for (size_t i = num_bytes & ~1; i;)
+                {
+                    i -= 2;
+                    const BYTE t = o[i];
+                    o[i] = o[i+1];
+                    o[i+1] = t;
+                }
+            }
+            out.OverrideLength(num_chars);
+        }
+        break;
+    default:
+        out.SetFromCodepage(cp, reinterpret_cast<const char*>(p), num_bytes);
+        break;
+    }
+}
+
 size_t FileLineMap::FriendlyLineNumberToIndex(size_t line) const
 {
     if (m_wrap)
@@ -880,7 +945,7 @@ unsigned ContentCache::FormatLineData(size_t line, unsigned left_offset, StrW& s
     assert(ptr + len <= m_data + m_data_length);
 
     StrW tmp;
-    tmp.SetFromCodepage(m_map.GetCodePage(), reinterpret_cast<const char*>(ptr), len);
+    m_map.GetLineText(ptr, len, tmp);
 
     unsigned visible_len = 0;
     unsigned total_cells = 0;
@@ -1101,8 +1166,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     assert(ptr + len <= m_data + m_data_length);
 
     StrW tmp;
-    const UINT sbcp = m_map.GetCodePage(true/*hex_mode*/);
-    tmp.SetFromCodepage(sbcp, reinterpret_cast<const char*>(ptr), len);
+    m_map.GetLineText(ptr, len, tmp);
     assert(tmp.Length() == len);
     if (tmp.Length() != len)
     {
@@ -1365,7 +1429,7 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
         }
 
         StrW tmp;
-        tmp.SetFromCodepage(m_map.GetCodePage(), reinterpret_cast<const char*>(ptr), len);
+        m_map.GetLineText(ptr, len, tmp);
 
 // TODO:  Optional regex search.
 // TODO:  Boyer-Moore search.
@@ -1446,7 +1510,7 @@ bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, Foun
 // TODO:  Encodings.  But what does that even mean for hex mode?  Really it should have a hex entry mode.
 // TODO:  Non-convertible characters will make conversion go haywire.
         StrW tmp;
-        tmp.SetFromCodepage(m_map.GetCodePage(), reinterpret_cast<const char*>(ptr), len);
+        m_map.GetLineText(ptr, len, tmp);
 
 // TODO:  Optional regex search.
 // TODO:  Boyer-Moore search.

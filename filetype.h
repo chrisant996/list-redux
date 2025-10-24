@@ -19,6 +19,11 @@ struct IDecoder
     virtual bool Valid() const = 0;
     // Returns a UTF32 codepoint -- *NOT* a UTF16 codepoint!
     virtual uint32 Decode(const BYTE* p, uint32 available, uint32& num_bytes) = 0;
+    // Returns the native character size (1 for char, 2 for WCHAR).
+    virtual uint32 CharSize() const { return 1; }
+    // Returns the next native character from the input pointer (caller is
+    // responsible for preventing overread by not calling).
+    virtual uint32 NextChar(const BYTE* p) const { return *p; }
 };
 std::unique_ptr<IDecoder> CreateDecoder(UINT codepage);
 

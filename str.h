@@ -126,6 +126,7 @@ public:
 
     T*                  ReserveMaxPath();
     void                ResyncLength();
+    void                OverrideLength(size_t len);
 
     void                SetAt(const T* p, T ch);
 
@@ -446,6 +447,17 @@ template <class T>
 void Str<T>::ResyncLength()
 {
     m_length = unsigned(-1);
+}
+
+template <class T>
+void Str<T>::OverrideLength(size_t len)
+{
+    assert(len < Capacity());
+    if (len < Capacity())
+    {
+        m_length = unsigned(len);
+        m_p[len] = '\0';
+    }
 }
 
 int __vsnprintf(char* buffer, size_t len, const char* format, va_list args);

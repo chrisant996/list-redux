@@ -113,6 +113,7 @@ public:
     size_t          Count() const { return m_lines.size(); }
     FileOffset      GetOffset(size_t index) const;
     size_t          GetLineNumber(size_t index) const;
+    void            GetLineText(const BYTE* p, size_t num_bytes, StrW& out) const;
     size_t          FriendlyLineNumberToIndex(size_t line) const;
     bool            IsBinaryFile() const { return m_line_iter.IsBinaryFile(); }
     bool            IsUTF8Compatible() const;

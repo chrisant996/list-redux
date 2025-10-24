@@ -67,7 +67,8 @@
   - [x] Detect codepages via MLang.
   - [x] Decode individual codepoints from single-byte and multibyte encodings.
   - [x] Calculate grapheme widths of sequences of Unicode codepoints.
-  - [ ] Decode UTF16 encoding.
+  - [x] Decode UTF16 encoding.
+  - [x] Handle UTF16-BE encoding (1201).
   - [x] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
 
 ### Future
@@ -76,10 +77,6 @@
   - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
   - [ ] how/why is mouse wheel getting translated into UP/DOWN keys?
   - [ ] mouse wheel should scroll by _N_ lines
-- [ ] `Alt-W` for split screen display (again to unsplit)
-  - [ ] a separate pair of chooser and viewer operate in each split screen
-  - [ ] a key to switch between split screens
-  - [ ] a key (or modifier) to scroll both split screens
 - [ ] `S` configure sort order
 - [ ] option to sort horizontally instead of vertically
 - detect certain file types and render with formatting/color
@@ -107,8 +104,10 @@
 - archive files
   - view archive file contents and select files for viewing or extracting
   - add to archive files
-- what would it take to support other 8-bit encodings?
-- handle UTF16-BE encoding (1201)?
+- `Alt-W` for split screen display (again to unsplit)
+  - a separate pair of chooser and viewer operate in each split screen
+  - a key to switch between split screens
+  - a key (or modifier) to scroll both split screens
 
 
 
