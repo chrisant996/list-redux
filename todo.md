@@ -59,7 +59,7 @@
   - [x] go to offset
   - [x] highlight newline characters in hex mode
   - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
-  - [ ] go to line
+  - [x] go to line
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
   - [x] Binary files **_and hex mode_** use OEM CP.
@@ -74,6 +74,8 @@
 
 - [ ] mouse input
   - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
+  - [ ] how/why is mouse wheel getting translated into UP/DOWN keys?
+  - [ ] mouse wheel should scroll by _N_ lines
 - [ ] `Alt-W` for split screen display (again to unsplit)
   - [ ] a separate pair of chooser and viewer operate in each split screen
   - [ ] a key to switch between split screens
