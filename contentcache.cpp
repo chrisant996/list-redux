@@ -683,10 +683,33 @@ bool FileLineMap::IsUTF8Compatible() const
     return false;
 }
 
-const WCHAR* FileLineMap::GetEncodingName() const
+UINT FileLineMap::GetCodePage(bool hex_mode) const
 {
-    if (m_codepage && !m_encoding_name.Empty())
-        return m_encoding_name.Text();
+    if (hex_mode)
+        return EnsureSingleByteCP(m_codepage);
+    return m_codepage;
+}
+
+const WCHAR* FileLineMap::GetEncodingName(bool hex_mode) const
+{
+    if (m_codepage)
+    {
+        if (hex_mode)
+        {
+            static StrW s_hexmode_encoding_name;
+            StrW tmp;
+            if (GetCodePageName(GetCodePage(hex_mode), tmp))
+            {
+                s_hexmode_encoding_name.Clear();
+                s_hexmode_encoding_name.Printf(L"Hex Mode (%s)", tmp.Text());
+                return s_hexmode_encoding_name.Text();
+            }
+        }
+        else if (!m_encoding_name.Empty())
+        {
+            return m_encoding_name.Text();
+        }
+    }
     return IsBinaryFile() ? L"Binary" : L"Text";
 }
 
@@ -1078,7 +1101,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     assert(ptr + len <= m_data + m_data_length);
 
     StrW tmp;
-    const UINT sbcp = EnsureSingleByteCP(m_map.GetCodePage());
+    const UINT sbcp = m_map.GetCodePage(true/*hex_mode*/);
     tmp.SetFromCodepage(sbcp, reinterpret_cast<const char*>(ptr), len);
     assert(tmp.Length() == len);
     if (tmp.Length() != len)

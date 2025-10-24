@@ -268,6 +268,43 @@ static HRESULT EnsureMLang()
     return s_hr_ensure;
 }
 
+bool GetCodePageName(UINT cp, StrW& encoding_name)
+{
+    // First try MLang.
+    MIMECPINFO codepageinfo;
+    EnsureMLang();
+    if (s_mlang1 && SUCCEEDED(s_mlang1->GetCodePageInfo(cp, &codepageinfo)))
+    {
+        encoding_name.Set(codepageinfo.wszDescription);
+        return true;
+    }
+
+    // Then try the system.
+    CPINFOEXW info;
+    if (GetCPInfoExW(cp, 0/*reserved*/, &info))
+    {
+        const WCHAR* p = StrChr(info.CodePageName, '(');
+        const WCHAR* p2 = p ? StrChr(p, ')') : nullptr;
+        if (p && p2)
+            encoding_name.Set(p + 1, p2 - (p + 1));
+        else
+            encoding_name.Set(info.CodePageName);
+        return true;
+    }
+
+    // Special case for 437 if neither MLang nor the system could identify it.
+    if (cp == 437)
+    {
+        encoding_name.Set(L"OEM-US");
+        return true;
+    }
+
+    // Synthesize a name.
+    encoding_name.Clear();
+    encoding_name.Printf(L"CP %u", cp);
+    return true;
+}
+
 UINT GetSingleByteOEMCP(StrW* encoding_name)
 {
     UINT cp = GetOEMCP();
@@ -279,22 +316,13 @@ UINT GetSingleByteOEMCP(StrW* encoding_name)
     case 950:
         // These are multibyte OEM codepages.  Fall back to a single-byte
         // codepage, i.e. 437 which is the US OEM codepage.
-        if (encoding_name)
-            encoding_name->Set(L"OEM-US");
-        return 437;
+        cp = 437;
+        break;
     }
 
     if (encoding_name)
-    {
-        EnsureMLang();
-        encoding_name->Clear();
-        if (s_mlang1)
-        {
-            MIMECPINFO codepageinfo;
-            if (SUCCEEDED(s_mlang1->GetCodePageInfo(cp, &codepageinfo)))
-                encoding_name->Set(codepageinfo.wszDescription);
-        }
-    }
+        GetCodePageName(cp, *encoding_name);
+
     return cp;
 }
 
@@ -302,28 +330,28 @@ UINT EnsureSingleByteCP(UINT cp)
 {
     switch (cp)
     {
-    case 437:                   // OEM-US
-    case 708:                   // Arabic (ASMO 708)
-    case 720:                   // Arabic (box drawing characters in "usual locations")
-    case 737:                   // MS-DOS Greek
-    case 775:                   // MS-DOS Baltic Rim
-    case 850:                   // MS-DOS Latin 1
-    case 852:                   // MS-DOS Latin 2
-    case 855:                   // MS-DOS Cyrillic
-    case 857:                   // MS-DOS Turkish
-    case 858:                   // Western European with Euro sign
-    case 860:                   // MS-DOS Portuguese
-    case 861:                   // MS-DOS Icelandic
-    case 862:                   // MS-DOS Hebrew
-    case 863:                   // MS-DOS French Canada
-    case 864:                   // Arabic
-    case 865:                   // MS-DOS Nordic
-    case 866:                   // MS-DOS Cyrillic Russian
-    case 869:                   // MS-DOS Greek 2
-    case 874:                   // Thai
+    case 437:   // OEM - United States                  or OEM-US
+    case 708:   // Arabic (ASMO 708)
+    case 720:   // Arabic (DOS)
+    case 737:   // OEM - Greek 437G                     or MS-DOS Greek
+    case 775:   // OEM - Baltic                         or MS-DOS Baltic Rim
+    case 850:   // OEM - Multilingual Latin I           or MS-DOS Latin 1
+    case 852:   // Central European (DOS)               or MS-DOS Latin 2
+    case 855:   // OEM - Cyrillic                       or MS-DOS Cyrillic
+    case 857:   // OEM - Turkish                        or MS-DOS Turkish
+    case 858:   // OEM - Multilingual Latin I + Euro    or Western European with Euro sign
+    case 860:   // OEM - Portuguese                     or MS-DOS Portuguese
+    case 861:   // OEM - Icelandic                      or MS-DOS Icelandic
+    case 862:   // Hebrew (DOS)
+    case 863:   // OEM - Canadian French                or MS-DOS French Canada
+    case 864:   // OEM - Arabic
+    case 865:   // OEM - Nordic                         or MS-DOS Nordic
+    case 866:   // Cyrillic (DOS)                       or MS-DOS Cyrillic Russian
+    case 869:   // OEM - Modern Greek                   or MS-DOS Greek 2
+    case 874:   // Thai (Windows)
         return cp;
-    default:
-        return 437;             // Fall back to OEM-US.
+    default:    // Fall back to OEM-US.
+        return 437;
     }
 }
 
@@ -537,7 +565,7 @@ public:
     uint32          Decode(const BYTE* p, uint32 available, uint32& num_bytes) override;
 private:
     UINT            m_codepage = 0;
-    uint32          m_max_decode_bytes = 0;
+    CPINFOEXW       m_info;
     IMLangConvertCharset* m_converter = nullptr;
 };
 
@@ -549,24 +577,15 @@ MultiByteDecoder::MultiByteDecoder(UINT codepage)
     assert(codepage != CP_UTF8); // UTF8 has special rules for resync after invalid input.
 #endif
     EnsureMLang();
-    if (s_mlang && SUCCEEDED(s_mlang->CreateConvertCharset(codepage, CP_WINUNICODE, 0/*MLCONVCHARF_NONE*/, &m_converter)))
+    if (!s_mlang ||
+        FAILED(s_mlang->CreateConvertCharset(codepage, CP_WINUNICODE, 0/*MLCONVCHARF_NONE*/, &m_converter)) ||
+        !m_converter ||
+        !GetCPInfoExW(codepage, 0/*reserved*/, &m_info))
     {
-        switch (m_codepage)
+        if (m_converter)
         {
-        case CP_WINUNICODE:
-            m_max_decode_bytes = 4;
-            break;
-        case CP_UTF7:
-        case CP_UTF8:
-            m_max_decode_bytes = 8;
-            break;
-        case 1252:
-            m_max_decode_bytes = 2;
-            break;
-        // PERF:  Other known maximums for codepages...
-        default:
-            m_max_decode_bytes = 16;
-            break;
+            m_converter->Release();
+            m_converter = nullptr;
         }
     }
 }
@@ -590,50 +609,55 @@ uint32 MultiByteDecoder::Decode(const BYTE* p, uint32 available, uint32& num_byt
     assert(available > 0);
     assert(Valid());
 
-// PERF:  For common codepages, optimize decoding by looking up whether a byte
-// is a lead byte, and avoid using interactive mlang calls when a byte is
-// known to not be part of a multibyte encoding?
-
-// TODO:  Be careful not to sever any UTF8 byte sequence...
-
-    CHAR* src = const_cast<CHAR*>(reinterpret_cast<const CHAR*>(p));
-    UINT src_size;
-    WCHAR dst[8];
-    UINT dst_size;
-
-    if (available > m_max_decode_bytes)
-        available = m_max_decode_bytes;
-
-    for (uint32 num = 1; num < available; ++num)
+    // If the input is a lead byte, then ask the MLang converter to decode the
+    // input.
+    for (const BYTE* range = m_info.LeadByte; range[0] || range[1]; range += 2)
     {
-        src_size = num;
-        dst_size = _countof(dst);
-        switch (m_converter->DoConversionToUnicode(src, &src_size, dst, &dst_size))
+        if (range[0] <= *p && *p <= range[1])
         {
-        case S_OK:
+            CHAR* src = const_cast<CHAR*>(reinterpret_cast<const CHAR*>(p));
+            UINT src_size;
+            WCHAR dst[8];
+            UINT dst_size;
+
+            if (available > m_info.MaxCharSize)
+                available = m_info.MaxCharSize;
+
+            for (uint32 num = 1; num < available; ++num)
             {
-                assert(dst_size == 1 || dst_size == 2);
-                uint32 c = dst[0];
-                if (dst_size == 2)
+                src_size = num;
+                dst_size = _countof(dst);
+                switch (m_converter->DoConversionToUnicode(src, &src_size, dst, &dst_size))
                 {
-                    c <<= 10;
-                    c += dst[1];
-                    c -= 0x35fdc00;
+                case S_OK:
+                    {
+                        assert(dst_size == 1 || dst_size == 2);
+                        uint32 c = dst[0];
+                        if (dst_size == 2)
+                        {
+                            c <<= 10;
+                            c += dst[1];
+                            c -= 0x35fdc00;
+                        }
+                        num_bytes = num;
+                        return c;
+                    }
+                    break;
+                case S_FALSE:
+                    assert(false);
+                    // Is S_FALSE reserved for certain cases that can maybe use
+                    // special handling logic?
+                    __fallthrough;
+                default:
+                    goto fallback;
                 }
-                num_bytes = num;
-                return c;
             }
-            break;
-        case S_FALSE:
-            assert(false);
-            // Is S_FALSE reserved for certain cases that can maybe use
-            // special handling logic?
-            __fallthrough;
-        default:
-            break;
         }
     }
 
+fallback:
+    // Upon failure or if the input wasn't a lead byte, then return the
+    // literal input byte.
     num_bytes = 1;
     return *p;
 }

@@ -24,6 +24,7 @@ std::unique_ptr<IDecoder> CreateDecoder(UINT codepage);
 
 bool TryCoInitialize();
 bool IsCoInitialized();
+bool GetCodePageName(UINT cp, StrW& encoding_name);
 UINT GetSingleByteOEMCP(StrW* encoding_name=nullptr);
 UINT EnsureSingleByteCP(UINT cp);
 

@@ -117,8 +117,8 @@ public:
     bool            IsBinaryFile() const { return m_line_iter.IsBinaryFile(); }
     bool            IsUTF8Compatible() const;
     bool            IsUnicodeEncoding() const { return m_is_unicode_encoding; }
-    UINT            GetCodePage() const { return m_codepage; }
-    const WCHAR*    GetEncodingName() const;
+    UINT            GetCodePage(bool hex_mode=false) const;
+    const WCHAR*    GetEncodingName(bool hex_mode=false) const;
 
 #ifdef USE_SMALL_DATA_BUFFER
     void            SetFileType(FileDataType type, UINT codepage, const WCHAR* encoding_name);
@@ -155,8 +155,8 @@ public:
     bool            IsOpen() const { return m_file != INVALID_HANDLE_VALUE; }
     bool            IsPipe() const { return m_redirected; }
     bool            IsBinaryFile() const { return m_map.IsBinaryFile(); }
-    UINT            GetCodePage() const { return m_map.GetCodePage(); }
-    const WCHAR*    GetEncodingName() const { return m_map.GetEncodingName(); }
+    UINT            GetCodePage(bool hex_mode=false) const { return m_map.GetCodePage(hex_mode); }
+    const WCHAR*    GetEncodingName(bool hex_mode=false) const { return m_map.GetEncodingName(hex_mode); }
     bool            SetTextContent(const char* text, Error& e);
     bool            Open(const WCHAR* name, Error& e);
     void            Close();

@@ -675,7 +675,7 @@ LAutoFitContentWidth:
         const unsigned offset = s.Length();
         StrW left;
         StrW right;
-        right.Printf(L"    %-6s", m_context.GetEncodingName());
+        right.Printf(L"    %-6s", m_context.GetEncodingName(m_hex_mode));
         right.Append(L"    Options: ");
 #ifdef DEBUG
         right.Append(s_options.show_debug_info ? L"D" : L"d");

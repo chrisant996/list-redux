@@ -74,8 +74,10 @@
 
 - [ ] mouse input
   - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
-- [ ] split screen display (view two files in two sizable windows in the terminal)
-  - view any selected file in either window
+- [ ] `Alt-W` for split screen display (again to unsplit)
+  - [ ] a separate pair of chooser and viewer operate in each split screen
+  - [ ] a key to switch between split screens
+  - [ ] a key (or modifier) to scroll both split screens
 - [ ] `S` configure sort order
 - [ ] option to sort horizontally instead of vertically
 - detect certain file types and render with formatting/color
