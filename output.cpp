@@ -827,7 +827,7 @@ void Interactive::Begin()
 
     if (!m_inverted)
     {
-        m_begin_mode_in = ENABLE_WINDOW_INPUT | (m_end_mode_in & ~(ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT|ENABLE_ECHO_INPUT|ENABLE_VIRTUAL_TERMINAL_INPUT));
+        m_begin_mode_in = ENABLE_WINDOW_INPUT | (m_end_mode_in & ~(ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT|ENABLE_ECHO_INPUT|ENABLE_MOUSE_INPUT|ENABLE_VIRTUAL_TERMINAL_INPUT));
         m_begin_mode_out = ENABLE_PROCESSED_OUTPUT|ENABLE_VIRTUAL_TERMINAL_PROCESSING | m_end_mode_out;
     }
 
