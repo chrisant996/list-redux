@@ -31,12 +31,13 @@
 #include "colors.h"
 #include "usage.h"
 #include "wcwidth.h"
-#include "filetype.h"   // For TryCoInitialize.
+#include "filetype.h"
+#include "os.h"
 
 #include <memory>
 #include <algorithm>
 
-static const WCHAR c_opts[] = L"/:+?V";
+static const WCHAR c_opts[] = L"/:+?@:V";
 
 static const WCHAR* get_env_prio(const WCHAR* a, const WCHAR* b=nullptr, const WCHAR* c=nullptr, const WCHAR** which=nullptr)
 {
@@ -163,11 +164,51 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     InitLocale();
 
     const LongOption<WCHAR>* long_opt;
+    std::vector<StrW> files;
 
     for (unsigned ii = 0; opts.GetValue(ii, ch, opt_value, &long_opt); ii++)
     {
         switch (ch)
         {
+        case '@':
+            {
+                StrA line;
+                StrW name;
+                line.ReserveMaxPath();
+                bool first = true;
+                bool utf8 = false;
+                FILE* f = _wfopen(opt_value, L"r");
+                if (f)
+                {
+                    while (!feof(f))
+                    {
+                        line.Clear();
+                        fgets(line.Reserve(), line.Capacity(), f);
+                        line.ResyncLength();
+                        line.TrimRight();
+
+                        const char* p = line.Text();
+                        size_t len = line.Length();
+                        if (first)
+                        {
+                            utf8 = (p[0] == 0xef && p[1] == 0xbb && p[2] == 0xbf);
+                            len -= (utf8 ? 3 : 0);
+                            first = false;
+                        }
+
+                        if (len)
+                        {
+                            Error e2;
+                            name.SetFromCodepage(utf8 ? CP_UTF8 : CP_ACP, p, len);
+                            if (OS::GetFullPathName(name.Text(), s, e2))
+                                files.emplace_back(std::move(s));
+                        }
+                    }
+                    fclose(f);
+                }
+            }
+            break;
+
         case 'X':
             // TODO:  Etc.
             break;
@@ -193,7 +234,6 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     TryCoInitialize();
 
     StrW dir;
-    std::vector<StrW> files;
     std::vector<FileInfo> fileinfos;
     bool navigate = false;
     bool done = false;
@@ -202,18 +242,18 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     if (piped)
     {
         done = true;
-        files.emplace_back(L"<stdin>");
+        files.insert(files.begin(), L"<stdin>");
         SetPipedInput();
     }
     else
     {
-        navigate = !ScanFiles(argc, argv, fileinfos, dir, e, true/*cmdline*/);
+        navigate = (argc || files.empty()) && !ScanFiles(argc, argv, fileinfos, dir, e, true/*cmdline*/);
         if (e.Test())
             return e.Report();
 
         std::stable_sort(fileinfos.begin(), fileinfos.end(), CmpFileInfo);
 
-        if (!navigate)
+        if (!navigate || !files.empty())
         {
             for (const auto& info : fileinfos)
             {

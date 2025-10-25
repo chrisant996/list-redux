@@ -15,7 +15,7 @@ const char c_usage[] = "%s -? for help.";
 enum FlagSection
 {
     USAGE,
-    TBD,
+    FLAGS,
     MAX
 };
 
@@ -42,10 +42,8 @@ static const FlagUsageInfo c_usage_info[] =
     { USAGE,    "-?, --help",               "Display this help text.\n" },
     { USAGE,    "-V, --version",            "Display version information.\n" },
 
-    // TBD -------------------------------------------------------------------
-#if 0
-    { TBD,      "-X",                       "Something.\n" },
-#endif
+    // FLAGS -----------------------------------------------------------------
+    { FLAGS,    "-@ file",                  "Read file names from 'file' and load them into a file viewer.\n" },
 };
 
 static const char c_usage_prolog[] =
@@ -189,7 +187,7 @@ StrA MakeUsageString(unsigned flag_col_width)
             section = info.section;
             switch (section)
             {
-            case TBD:   u.Append("\nTBD:\n"); break;
+            case FLAGS: u.Append("\nFLAGS:\n\n"); break;
             }
         }
 
