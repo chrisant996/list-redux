@@ -71,6 +71,8 @@ public:
 
                     FileLineIter(const ViewerOptions& options);
                     ~FileLineIter();
+    FileLineIter&   operator=(FileLineIter&& other);
+
     void            Reset();
     void            SetEncoding(FileDataType type, UINT codepage);
     void            SetWrapWidth(uint32 wrap_width);
@@ -102,6 +104,7 @@ class FileLineMap
 public:
                     FileLineMap(const ViewerOptions& options);
                     ~FileLineMap() = default;
+    FileLineMap&    operator=(FileLineMap&& other);
 
     bool            SetWrapWidth(unsigned wrap);
     unsigned        GetWrapWidth() const { return m_wrap; }
@@ -126,7 +129,6 @@ public:
 #endif
 
 private:
-    // const ViewerOptions& m_options;
     unsigned        m_wrap = 0;
 
     std::vector<FileOffset> m_lines;
@@ -151,6 +153,7 @@ class ContentCache
 public:
                     ContentCache(const ViewerOptions& options);
                     ~ContentCache() { Close(); }
+    ContentCache&   operator=(ContentCache&& other);
 
     bool            HasContent() const;
     bool            IsOpen() const { return m_file != INVALID_HANDLE_VALUE; }

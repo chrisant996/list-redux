@@ -192,15 +192,38 @@ FileLineIter::~FileLineIter()
 {
 }
 
+FileLineIter& FileLineIter::operator=(FileLineIter&& other)
+{
+    // m_options can't be updated, and it doesn't need to be.
+    m_wrap = other.m_wrap;
+    m_codepage = other.m_codepage;
+    m_binary_file = other.m_binary_file;
+    m_offset = other.m_offset;
+    m_bytes = other.m_bytes;
+    m_count = other.m_count;
+    m_available = other.m_available;
+    m_decoder = std::move(other.m_decoder);
+    m_width_state.reset(); // Does not carry over.
+    m_pending_length = other.m_pending_length;
+    m_pending_width = other.m_pending_width;
+    m_pending_wrap_length = other.m_pending_wrap_length;
+    m_pending_wrap_width = other.m_pending_wrap_width;
+
+    other.Reset();
+
+    return *this;
+}
+
 void FileLineIter::Reset()
 {
-    // m_wrap_width carries over.
+    // m_wrap carries over.
     // m_codepage carries over.
     m_binary_file = true;
     m_offset = 0;
     m_bytes = nullptr;
     m_count = 0;
     m_available = 0;
+    // m_decoder carries over.
     m_width_state.reset();
     m_pending_length = 0;
     m_pending_width = 0;
@@ -526,6 +549,29 @@ FileLineMap::FileLineMap(const ViewerOptions& options)
 {
 }
 
+FileLineMap& FileLineMap::operator=(FileLineMap&& other)
+{
+    m_wrap = other.m_wrap;
+    m_lines = std::move(other.m_lines);
+    m_line_numbers = std::move(other.m_line_numbers);
+    m_codepage = other.m_codepage;
+    m_encoding_name = std::move(other.m_encoding_name);
+    m_current_line_number = other.m_current_line_number;
+    m_processed = other.m_processed;
+    m_pending_begin = other.m_pending_begin;
+    m_line_iter = std::move(other.m_line_iter);
+    m_skip_whitespace = other.m_skip_whitespace;
+    m_wrapped_current_line = other.m_wrapped_current_line;
+    m_is_unicode_encoding = other.m_is_unicode_encoding;
+#ifdef USE_SMALL_DATA_BUFFER
+    m_need_type = other.m_need_type;
+#endif
+
+    other.Clear();
+
+    return *this;
+}
+
 bool FileLineMap::SetWrapWidth(unsigned wrap)
 {
     if (m_wrap != wrap)
@@ -539,6 +585,7 @@ bool FileLineMap::SetWrapWidth(unsigned wrap)
 
 void FileLineMap::Clear()
 {
+    // m_wrap carries over
     m_lines.clear();
     m_line_numbers.clear();
     m_codepage = 0;
@@ -787,6 +834,28 @@ ContentCache::ContentCache(const ViewerOptions& options)
 {
 }
 
+ContentCache& ContentCache::operator=(ContentCache&& other)
+{
+    // m_options can't be updated, and it doesn't need to be.
+    m_file = other.m_file;
+    m_size = other.m_size;
+    m_redirected = other.m_redirected;
+    m_chunks = std::move(other.m_chunks);
+    m_text = other.m_text;
+    m_map = std::move(other.m_map);
+    m_completed = other.m_completed;
+    m_eof = other.m_eof;
+    m_data = other.m_data;
+    m_data_offset = other.m_data_offset;
+    m_data_length = other.m_data_length;
+
+    other.m_file = INVALID_HANDLE_VALUE;
+    other.m_data = nullptr;
+    other.Close();
+
+    return *this;
+}
+
 bool ContentCache::EnsureDataBuffer(Error& e)
 {
     if (!m_data)
@@ -899,7 +968,7 @@ void ContentCache::Close()
     if (m_file != INVALID_HANDLE_VALUE)
     {
         CloseHandle(m_file);
-        m_file = 0;
+        m_file = INVALID_HANDLE_VALUE;
     }
 
     m_size = 0;

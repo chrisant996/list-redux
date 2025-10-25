@@ -35,9 +35,6 @@ private:
 
 enum class ChooserOutcome { CONTINUE, VIEWONE, VIEWTAGGED, EXITAPP };
 
-enum class ReportErrorFlags { NONE, CANABORT, INLINE };
-DEFINE_ENUM_FLAG_OPERATORS(ReportErrorFlags);
-
 class Chooser
 {
 public:
@@ -63,7 +60,6 @@ private:
     void            RefreshDirectoryListing(Error& e);
 
     bool            AskForConfirmation(const WCHAR* msg);
-    bool            ReportError(Error& e, ReportErrorFlags flags=ReportErrorFlags::NONE);
     void            WaitToContinue(bool erase_after=false, bool new_line=false);
 
     void            NewFileMask(Error& e);

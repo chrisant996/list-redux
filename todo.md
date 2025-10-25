@@ -52,7 +52,8 @@
 - [x] `U` clear marked line (unmark)
 - [x] `Alt-O` open a new file
 - [x] `Alt-C` close current file
-- [ ] toggle multi-file search (next/prev cross file boundaries)
+- [x] `F4` toggle multi-file search (next/prev cross file boundaries)
+  - [ ] make search interruptible with `ESC`
 - [x] `/@` to supply a file with a list of names to view
 - [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
 - hex mode
@@ -83,8 +84,9 @@
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
   - [ ] detect C++, Lua, etc and render syntax coloring
-- [ ] Allow toggling between Binary and detected Text codepage.
-- [ ] Allow manual override for Text encoding.
+- [ ] allow toggling between Binary and detected Text codepage
+- [ ] allow manual override for Text encoding
+- [ ] toggle hanging indent (up to half the terminal width) (a third? a quarter? configurable maximum?)
 
 ### Maybe
 

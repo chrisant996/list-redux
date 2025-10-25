@@ -7,6 +7,9 @@
 
 #include <memory>
 
+enum class ColorElement;
+class Error;
+
 bool IsConsole(HANDLE h);
 
 void SetUtf8Output(bool utf8);
@@ -24,6 +27,11 @@ void OutputConsole(HANDLE h, const WCHAR* p, unsigned len=unsigned(-1), const WC
 
 void PrintfV(const WCHAR* format, va_list args);
 void Printf(const WCHAR* format, ...);
+
+enum class ReportErrorFlags { NONE, CANABORT, INLINE };
+DEFINE_ENUM_FLAG_OPERATORS(ReportErrorFlags);
+StrW MakeMsgBoxText(const WCHAR* message, const WCHAR* directive, ColorElement color_elm);
+bool ReportError(Error& e, ReportErrorFlags flags=ReportErrorFlags::NONE);
 
 #ifdef DEBUG
 void dbgprintf(const WCHAR* format, ...);

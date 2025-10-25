@@ -60,7 +60,7 @@ private:
     unsigned        LinePercent(size_t line) const;
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
     void            EnsureAltFiles();
-    void            SetFile(intptr_t index);
+    void            SetFile(intptr_t index, ContentCache* context=nullptr);
     size_t          CountForDisplay() const;
     void            DoSearch(bool next, bool caseless);
     void            FindNext(bool next=true);
@@ -107,9 +107,11 @@ private:
     FileOffset      m_last_processed = FileOffset(-1);
     bool            m_last_completed = false;
     bool            m_force_update = false;
+    bool            m_force_update_footer = false;
 
     StrW            m_find;
     bool            m_caseless = false;
+    bool            m_multifile_search = false;
     FoundLine       m_found_line;
 };
 
@@ -219,7 +221,7 @@ void Viewer::UpdateDisplay()
     const bool update_header = (m_force_update || file_changed || offset_changed || processed_changed);
     const bool update_content = (m_force_update || offset_changed);
     const bool update_debug_row = (s_options.show_debug_info);
-    const bool update_command_line = (m_force_update || feedback_changed);
+    const bool update_command_line = (m_force_update || m_force_update_footer || feedback_changed);
 
     if (!update_header && !update_content && !update_debug_row && !update_command_line)
         return;
@@ -235,6 +237,7 @@ void Viewer::UpdateDisplay()
     m_last_processed = m_context.Processed();
     m_last_completed = m_context.Completed();
     m_force_update = false;
+    m_force_update_footer = false;
 
     // Decide terminal dimensions and content height.  Content width can't be
     // decided yet because it may depend on the margin width (which depends on
@@ -675,6 +678,8 @@ LAutoFitContentWidth:
         const unsigned offset = s.Length();
         StrW left;
         StrW right;
+        if (m_multifile_search)
+            right.Append(L"    MultiFile");
         right.Printf(L"    %-6s", m_context.GetEncodingName(m_hex_mode));
         right.Append(L"    Options: ");
 #ifdef DEBUG
@@ -896,6 +901,10 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
                 }
             }
             break;
+        case Key::F4:
+            m_multifile_search = !m_multifile_search;
+            m_force_update_footer = true;
+            break;
         }
     }
     else if (input.type == InputType::Char)
@@ -1108,8 +1117,11 @@ StrW Viewer::GetCurrentFile() const
     return s;
 }
 
-void Viewer::SetFile(intptr_t index)
+void Viewer::SetFile(intptr_t index, ContentCache* context)
 {
+    assert(context != &m_context);
+    assert(implies(context, context->IsOpen()));
+
     if (m_text)
         return;
 
@@ -1136,16 +1148,23 @@ void Viewer::SetFile(intptr_t index)
 
     if (m_files && size_t(m_index) < m_files->size())
     {
-        Error e;
-        m_context.Open((*m_files)[m_index].Text(), e);
-
-        if (e.Test())
+        if (context)
         {
-            e.Format(m_errmsg);
-            m_errmsg.TrimRight();
+            m_context = std::move(*context);
+        }
+        else
+        {
+            Error e;
+            m_context.Open((*m_files)[m_index].Text(), e);
+
+            if (e.Test())
+            {
+                e.Format(m_errmsg);
+                m_errmsg.TrimRight();
+            }
         }
 
-        if (!m_context.IsPipe() && !m_text)
+        if (!m_context.IsPipe())
         {
             SHFind sh = FindFirstFileW((*m_files)[m_index].Text(), &m_fd);
             if (sh.Empty())
@@ -1187,9 +1206,54 @@ void Viewer::FindNext(bool next)
     // TODO:  Print feedback saying it's searching.
     // TODO:  When should a search start over at the top of the file?
 
-    if (!(m_hex_mode ?
-          m_context.Find(next, m_find.Text(), m_hex_width, m_found_line, m_caseless) :
-          m_context.Find(next, m_find.Text(), m_found_line, m_caseless)))
+    bool found = (m_hex_mode ?
+            m_context.Find(next, m_find.Text(), m_hex_width, m_found_line, m_caseless) :
+            m_context.Find(next, m_find.Text(), m_found_line, m_caseless));
+
+    if (!found && !m_text && m_multifile_search && !m_hex_mode && m_files)
+    {
+        m_feedback.Set(L"...SEARCHING...");
+        UpdateDisplay();
+
+        // PERF:  Remember if it already searched all files in 'next' direction?
+
+        size_t index = m_index;
+        ContentCache ctx(s_options);
+        while (!found)
+        {
+            if (next)
+                ++index;
+            else
+                --index;
+            if (index >= m_files->size())
+                break;
+
+            Error e;
+            ctx.Open((*m_files)[index].Text(), e);
+
+            if (e.Test())
+            {
+                ReportError(e);
+                m_force_update = true;
+                break;
+            }
+
+            // TODO:  Make both the loop and Find() interruptible.
+            FoundLine found_line;
+            found = ctx.Find(next, m_find.Text(), found_line, m_caseless);
+
+            if (found)
+            {
+                SetFile(index, &ctx);
+                m_found_line = found_line;
+            }
+        }
+
+        m_feedback.Clear();
+        UpdateDisplay();
+    }
+
+    if (!found)
     {
         m_feedback.Set(c_text_not_found);
     }

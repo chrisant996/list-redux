@@ -24,66 +24,6 @@ static const WCHAR c_clreol[] = L"\x1b[K";
 
 static const WCHAR c_no_files_tagged[] = L"*** No Files Tagged ***";
 
-static StrW MakeMsgBoxText(const WCHAR* message, const WCHAR* directive, ColorElement color_elm)
-{
-// TODO:  Make a string to display an error box.  The implementation below is
-// a cheesy minimal placeholder.
-
-    assert(message && *message);
-    assert(directive && *directive);
-
-    const DWORD colsrows = GetConsoleColsRows(GetStdHandle(STD_OUTPUT_HANDLE));
-    const unsigned terminal_width = LOWORD(colsrows);
-    const unsigned terminal_height = HIWORD(colsrows);
-
-    StrW first;
-    StrW second;
-    WrapText(message, first);
-    WrapText(directive, second);
-    first.TrimRight();
-    second.TrimRight();
-
-    StrW msg;
-    msg.Printf(L"%s\r\n\n%s", first.Text(), second.Text());
-
-    size_t lines = 1;
-    for (const WCHAR* walk = msg.Text(); *walk;)
-    {
-        walk = wcschr(walk, '\n');
-        if (!walk)
-            break;
-        ++walk;
-        ++lines;
-    }
-
-    StrW s;
-    s.Printf(L"\x1b[%uH", (terminal_height - (2+lines+2 + 1)) / 2);
-
-    // Top border and blank line.
-    s.AppendColor(GetColor(ColorElement::Divider));
-    for (size_t cols = terminal_width; cols--;)
-        s.Append(L"\u2500");
-    s.Append(L"\r\n");
-
-    // Clear each line before printing text.
-    s.AppendColor(GetColor(color_elm));
-    for (size_t n = 1+lines+1; n--;)
-        s.Append(L"\r\x1b[K\n");
-
-    // Blank line and bottom border.
-    s.AppendColor(GetColor(ColorElement::Divider));
-    for (size_t cols = terminal_width; cols--;)
-        s.Append(L"\u2500");
-    s.Append(L"\r");
-
-    // Overlay the wrapped message text (the cursor lands at the end of it).
-    s.Printf(L"\x1b[%uA", lines+1);
-    s.AppendColor(GetColor(color_elm));
-    s.Append(msg);
-
-    return s;
-}
-
 static void ApplyAttr(DWORD& mask, DWORD& attr, bool& minus, DWORD flag)
 {
     mask |= flag;
@@ -824,8 +764,8 @@ LNext:
                 {
                     m_tagged.Mark(m_index, 0);      // Toggle.
                     m_dirty.Mark(m_index % m_num_rows, 1);
-                    goto LNext;
                 }
+                goto LNext;
             }
             break;
         case 't':
@@ -835,8 +775,8 @@ LNext:
                 {
                     m_tagged.Mark(m_index, 1);      // Mark.
                     m_dirty.Mark(m_index % m_num_rows, 1);
-                    goto LNext;
                 }
+                goto LNext;
             }
             break;
         case 'u':
@@ -846,8 +786,8 @@ LNext:
                 {
                     m_tagged.Mark(m_index, -1);     // Unmark.
                     m_dirty.Mark(m_index % m_num_rows, 1);
-                    goto LNext;
                 }
+                goto LNext;
             }
             break;
         case '\x01':    // CTRL-A
@@ -1001,75 +941,6 @@ bool Chooser::AskForConfirmation(const WCHAR* msg)
 LDone:
     ForceUpdateAll();
     return confirmed;
-}
-
-bool Chooser::ReportError(Error& e, ReportErrorFlags flags)
-{
-    bool ret = true;
-
-    assert(e.Test());
-    if (!e.Test())
-        return ret;
-
-    StrW tmp;
-    e.Format(tmp);
-
-    const WCHAR* const directive = (
-        ((flags & ReportErrorFlags::CANABORT) == ReportErrorFlags::CANABORT) ?
-        L"Press SPACE or ENTER to continue, or ESC to cancel..." :
-        L"Press SPACE or ENTER or ESC to continue...");
-
-    StrW s;
-    if ((flags & ReportErrorFlags::INLINE) == ReportErrorFlags::INLINE)
-    {
-        e.Report();
-        s.Set(directive);
-        s.AppendNormalIf(true);
-    }
-    else
-    {
-        s = MakeMsgBoxText(tmp.Text(), directive, ColorElement::Error);
-    }
-
-    OutputConsole(m_hout, s.Text(), s.Length());
-
-    while (true)
-    {
-        const InputRecord input = SelectInput();
-        switch (input.type)
-        {
-        case InputType::None:
-        case InputType::Error:
-        case InputType::Resize:
-            continue;
-        }
-
-        if (input.type == InputType::Key)
-        {
-            switch (input.key)
-            {
-            case Key::ENTER:
-                goto LDone;
-            case Key::ESC:
-                if ((flags & ReportErrorFlags::CANABORT) == ReportErrorFlags::CANABORT)
-                    ret = false;
-                goto LDone;
-            }
-        }
-        else if (input.type == InputType::Char)
-        {
-            switch (input.key_char)
-            {
-            case ' ':
-                goto LDone;
-            }
-        }
-    }
-
-LDone:
-    ForceUpdateAll();
-    e.Clear();
-    return ret;
 }
 
 void Chooser::WaitToContinue(bool erase_after, bool new_line)

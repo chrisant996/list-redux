@@ -4,6 +4,7 @@
 // vim: set et ts=4 sw=4 cino={0s:
 
 #include "pch.h"
+#include "input.h"
 #include "output.h"
 #include "colors.h"
 #include "ecma48.h"
@@ -790,6 +791,139 @@ void dbgprintf(const WCHAR* format, ...)
     va_end(args);
 }
 #endif
+
+/*
+ * Message Box style of output.
+ */
+
+StrW MakeMsgBoxText(const WCHAR* message, const WCHAR* directive, ColorElement color_elm)
+{
+// TODO:  Make a string to display an error box.  The implementation below is
+// a cheesy minimal placeholder.
+
+    assert(message && *message);
+    assert(directive && *directive);
+
+    const DWORD colsrows = GetConsoleColsRows(GetStdHandle(STD_OUTPUT_HANDLE));
+    const unsigned terminal_width = LOWORD(colsrows);
+    const unsigned terminal_height = HIWORD(colsrows);
+
+    StrW first;
+    StrW second;
+    WrapText(message, first);
+    WrapText(directive, second);
+    first.TrimRight();
+    second.TrimRight();
+
+    StrW msg;
+    msg.Printf(L"%s\r\n\n%s", first.Text(), second.Text());
+
+    size_t lines = 1;
+    for (const WCHAR* walk = msg.Text(); *walk;)
+    {
+        walk = wcschr(walk, '\n');
+        if (!walk)
+            break;
+        ++walk;
+        ++lines;
+    }
+
+    StrW s;
+    s.Printf(L"\x1b[%uH", (terminal_height - (2+lines+2 + 1)) / 2);
+
+    // Top border and blank line.
+    s.AppendColor(GetColor(ColorElement::Divider));
+    for (size_t cols = terminal_width; cols--;)
+        s.Append(L"\u2500");
+    s.Append(L"\r\n");
+
+    // Clear each line before printing text.
+    s.AppendColor(GetColor(color_elm));
+    for (size_t n = 1+lines+1; n--;)
+        s.Append(L"\r\x1b[K\n");
+
+    // Blank line and bottom border.
+    s.AppendColor(GetColor(ColorElement::Divider));
+    for (size_t cols = terminal_width; cols--;)
+        s.Append(L"\u2500");
+    s.Append(L"\r");
+
+    // Overlay the wrapped message text (the cursor lands at the end of it).
+    s.Printf(L"\x1b[%uA", lines+1);
+    s.AppendColor(GetColor(color_elm));
+    s.Append(msg);
+
+    return s;
+}
+
+bool ReportError(Error& e, ReportErrorFlags flags)
+{
+    bool ret = true;
+
+    assert(e.Test());
+    if (!e.Test())
+        return ret;
+
+    StrW tmp;
+    e.Format(tmp);
+
+    const WCHAR* const directive = (
+        ((flags & ReportErrorFlags::CANABORT) == ReportErrorFlags::CANABORT) ?
+        L"Press SPACE or ENTER to continue, or ESC to cancel..." :
+        L"Press SPACE or ENTER or ESC to continue...");
+
+    StrW s;
+    if ((flags & ReportErrorFlags::INLINE) == ReportErrorFlags::INLINE)
+    {
+        e.Report();
+        s.Set(directive);
+        s.AppendNormalIf(true);
+    }
+    else
+    {
+        s = MakeMsgBoxText(tmp.Text(), directive, ColorElement::Error);
+    }
+
+    HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
+    OutputConsole(hout, s.Text(), s.Length());
+
+    while (true)
+    {
+        const InputRecord input = SelectInput();
+        switch (input.type)
+        {
+        case InputType::None:
+        case InputType::Error:
+        case InputType::Resize:
+            continue;
+        }
+
+        if (input.type == InputType::Key)
+        {
+            switch (input.key)
+            {
+            case Key::ENTER:
+                goto LDone;
+            case Key::ESC:
+                if ((flags & ReportErrorFlags::CANABORT) == ReportErrorFlags::CANABORT)
+                    ret = false;
+                goto LDone;
+            }
+        }
+        else if (input.type == InputType::Char)
+        {
+            switch (input.key_char)
+            {
+            case ' ':
+                goto LDone;
+            }
+        }
+    }
+
+LDone:
+    e.Clear();
+    return ret;
+}
 
 /*
  * Interactive.
