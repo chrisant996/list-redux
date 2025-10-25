@@ -712,7 +712,7 @@ LAutoFitContentWidth:
         OutputConsole(m_hout, c_hide_cursor);
         s.Printf(L"\x1b[%uH", m_terminal_height);
         s.AppendColor(GetColor(ColorElement::Command));
-        s.Append(L"Command: ");
+        s.Printf(L"Command%s ", c_prompt_char);
         s.Append(c_norm);
         s.Append(c_show_cursor);
         OutputConsole(m_hout, s.Text(), s.Length());
@@ -1163,7 +1163,7 @@ void Viewer::DoSearch(bool next, bool caseless)
 {
     StrW s;
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\rSearch> ");
+    s.Printf(L"\rSearch%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
     ReadInput(s);
@@ -1295,7 +1295,7 @@ void Viewer::GoTo()
 
         s.Clear();
         s.AppendColor(GetColor(ColorElement::Command));
-        s.Printf(L"\r%s\x1b[%uG%s\r%s> ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), !lineno ? L"Offset" : L"Line #");
+        s.Printf(L"\r%s\x1b[%uG%s\r%s%s ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), !lineno ? L"Offset" : L"Line #", c_prompt_char);
         OutputConsole(m_hout, s.Text(), s.Length());
 
         done = true;
@@ -1409,7 +1409,7 @@ void Viewer::OpenNewFile(Error& e)
 {
     StrW s;
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\rEnter file to open> ");
+    s.Printf(L"\rEnter file to open%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
     ReadInput(s);

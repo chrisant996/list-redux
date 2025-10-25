@@ -14,6 +14,8 @@ static bool s_sending_terminal_request = false;
 static const int32 CTRL_PRESSED = LEFT_CTRL_PRESSED|RIGHT_CTRL_PRESSED;
 static const int32 ALT_PRESSED = LEFT_ALT_PRESSED|RIGHT_ALT_PRESSED;
 
+const WCHAR c_prompt_char[] = L":";
+
 bool InputRecord::operator!=(const InputRecord& other) const
 {
     if (type != other.type)

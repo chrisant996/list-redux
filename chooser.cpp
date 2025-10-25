@@ -1132,7 +1132,7 @@ void Chooser::NewFileMask(Error& e)
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\r\x1b[KEnter new file mask or path: ");
+    s.Printf(L"\r\x1b[KEnter new file mask or path%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
     ReadInput(s);
@@ -1179,7 +1179,7 @@ void Chooser::ChangeAttributes(Error& e)
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\r\x1b[KChange attributes ('ashr' to set or '-a-s-h-r' to clear): ");
+    s.Printf(L"\r\x1b[KChange attributes ('ashr' to set or '-a-s-h-r' to clear)%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
     ReadInput(s);
@@ -1248,7 +1248,7 @@ void Chooser::NewDirectory(Error& e)
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\rEnter new directory name: ");
+    s.Printf(L"\rEnter new directory name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
     ReadInput(s);
@@ -1285,7 +1285,7 @@ void Chooser::RenameEntry(Error& e)
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\rEnter new name: ");
+    s.Printf(L"\rEnter new name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
     ReadInput(s);
@@ -1495,7 +1495,7 @@ void Chooser::SweepFiles(Error& e)
     s.Clear();
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\rEnter program to run: ");
+    s.Printf(L"\rEnter program to run%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
     ReadInput(program);
     OutputConsole(m_hout, c_norm);
@@ -1510,7 +1510,7 @@ void Chooser::SweepFiles(Error& e)
     s.Clear();
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\rArguments before file name: ");
+    s.Printf(L"\rArguments before file name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
     ok = ReadInput(args_before);
     OutputConsole(m_hout, c_norm);
@@ -1523,7 +1523,7 @@ void Chooser::SweepFiles(Error& e)
     s.Clear();
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Append(L"\rArguments after file name: ");
+    s.Printf(L"\rArguments after file name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
     ok = ReadInput(args_after);
     OutputConsole(m_hout, c_norm);
