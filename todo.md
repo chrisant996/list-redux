@@ -26,7 +26,7 @@
 - [x] `E` edit file (`%EDITOR%` or `notepad.exe` or maybe `edit.exe`)
 - [x] `F` new file mask (wildcard) or path
 - [x] ~~`P` change drive/path~~
-- [ ] some way to incrementally search the list of file names
+- [x] some way to incrementally search the list of file names
 - [ ] show used and free space in footer
 
 ### File Viewer (list file content)

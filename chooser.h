@@ -73,6 +73,7 @@ private:
     void            DeleteEntries(Error& e);
     void            RunFile(bool edit, Error& e);
     void            SweepFiles(Error& e);
+    void            ShowFileList();
 
 private:
     const HANDLE    m_hout;

@@ -391,7 +391,7 @@ void FormatFilename(StrW& s, const FileInfo* pfi, unsigned max_width, const WCHA
     if (max_width)
         s.AppendSpaces(max_width - name_width);
 
-        const WCHAR* nolines = StripLineStyles(color);
+    const WCHAR* nolines = StripLineStyles(color);
     if (nolines != color)
     {
         unsigned spaces = 0;
@@ -991,6 +991,27 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
 
     return cell_count(s.Text() + orig_len);
 }
+
+#if 0
+void FormatFileInfoForPopupList(StrW& s, const FileInfo* pfi, unsigned max_width, int size_width)
+{
+    s.Clear();
+
+    const int details = 4;
+    const unsigned details_width = WidthForFileInfoDetails(pfi, details, size_width);
+    const unsigned filename_width = (max_width > details_width ? max_width - details_width : 0);
+    assert(filename_width > 0);
+    FormatFilename(s, pfi, filename_width);
+    assert(filename_width == cell_count(s.Text()));
+
+    s.AppendSpaces(1);
+    FormatTime(s, pfi, s_time_style);
+    s.AppendSpaces(1);
+    FormatFileSize(s, pfi, SizeStyleForDetails(details), nullptr, size_width);
+    s.AppendSpaces(1);
+    FormatAttributes(s, pfi->GetAttributes());
+}
+#endif
 
 unsigned FormatFileData(StrW& s, const WIN32_FIND_DATAW& fd)
 {

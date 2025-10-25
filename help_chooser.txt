@@ -22,6 +22,7 @@ LEFT/RIGHT  Move selection left/right one file.
 ACTION KEYS:
 
          .  Navigate to parent directory.
+   F2 or @  Incremental file name search, jump to selected file.
          F  New file mask or path.
 
          A  Change file or directory attributes.

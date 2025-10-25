@@ -9,6 +9,7 @@
 #include "list_format.h"
 #include "input.h"
 #include "output.h"
+#include "popuplist.h"
 #include "colors.h"
 #include "ellipsify.h"
 #include "ecma48.h"
@@ -549,6 +550,12 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
                 ForceUpdateAll();
             }
             break;
+        case Key::F2:
+            if (input.modifier == Modifier::None)
+            {
+                ShowFileList();
+            }
+            break;
 
         case Key::ESC:
             return ChooserOutcome::EXITAPP;
@@ -726,6 +733,15 @@ LNext:
             {
                 m_details = input.key_char - '1';
                 Relayout();
+            }
+            break;
+
+        case '@':
+        case '/':
+        case '\\':
+            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            {
+                ShowFileList();
             }
             break;
 
@@ -1610,3 +1626,18 @@ void Chooser::SweepFiles(Error& e)
     e.Clear();
 }
 
+void Chooser::ShowFileList()
+{
+    StrW tmp;
+    std::vector<StrW> files;
+    for (const auto& file : m_files)
+    {
+        FormatFilename(tmp, &file, 0);
+        files.emplace_back(std::move(tmp));
+    }
+
+    const PopupResult result = ShowPopupList(files, L"Jump to Chosen File", m_index);
+    ForceUpdateAll();
+    if (!result.canceled)
+        SetIndex(result.selected);
+}

@@ -20,7 +20,7 @@ LEFT/RIGHT  Scroll file contents left/right.
          M  Mark line (or file offset in hex mode).
          U  Clear marked line (unmark).
 
-   F2 or @  Show list of files, go to selected file.
+   F2 or @  Show list of files, jump to selected file.
     Ctrl-N  Next file.
     Ctrl-P  Previous file.
      Alt-C  Close the current file.

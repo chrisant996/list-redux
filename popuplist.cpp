@@ -152,7 +152,7 @@ cancel:
     else
     {
         m_index = index;
-        m_top = int32(max<intptr_t>(0, min<intptr_t>(m_index - (m_visible_rows / 2), m_count - m_visible_rows)));
+        m_top = int32(max<intptr_t>(0, min<intptr_t>(m_index - (m_visible_rows / 3), m_count - m_visible_rows)));
     }
 
     while (true)

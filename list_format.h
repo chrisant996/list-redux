@@ -14,6 +14,9 @@ unsigned WidthForFileInfo(const FileInfo* pfi, int details, int size_width=0);
 unsigned WidthForFileInfoSize(const FileInfo* pfi, int details, int size_width=0);
 unsigned WidthForDirectorySize(int details);
 unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int details, bool selected, bool tagged, int size_width=0);
+#if 0
+void FormatFileInfoForPopupList(StrW& s, const FileInfo* pfi, unsigned max_width, int size_width=0);
+#endif
 unsigned FormatFileData(StrW& s, const WIN32_FIND_DATAW& fd);
 
 void InitLocale();

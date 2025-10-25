@@ -1399,7 +1399,7 @@ FileOffset Viewer::GetFoundOffset(const FoundLine& found_line)
 
 void Viewer::ShowFileList()
 {
-    const PopupResult result = ShowPopupList(*m_files, L"Choose File", m_index, PopupListFlags::DimPaths);
+    const PopupResult result = ShowPopupList(*m_files, L"Jump to Chosen File", m_index, PopupListFlags::DimPaths);
     m_force_update = true;
     if (!result.canceled)
         SetFile(result.selected);
