@@ -12,6 +12,7 @@ LEFT/RIGHT  Scroll file contents left/right.
 
     \ or F  Search for text (any case).
     / or S  Search for text (case sensitive).
+Ctrl-Break  Cancel search.
         F3  Find Next.
   Shift-F3  Find Prev.
         F4  Toggle multi-file search.

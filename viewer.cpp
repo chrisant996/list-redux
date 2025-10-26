@@ -8,6 +8,7 @@
 #include "contentcache.h"
 #include "input.h"
 #include "output.h"
+#include "signaled.h"
 #include "popuplist.h"
 #include "list_format.h"
 #include "colors.h"
@@ -23,6 +24,7 @@ static const WCHAR c_clreol[] = L"\x1b[K";
 static const WCHAR c_no_file_open[] = L"*** No File Open ***";
 static const WCHAR c_endoffile_marker[] = L"*** End Of File ***";
 static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
+static const WCHAR c_canceled[] = L"*** Canceled ***";
 static const WCHAR c_div_char[] = L":"; //L"\u2590"; //L"\u2595"; //L":";
 
 const DWORD c_max_needle = 32;
@@ -108,6 +110,7 @@ private:
     bool            m_last_completed = false;
     bool            m_force_update = false;
     bool            m_force_update_footer = false;
+    bool            m_searching = false;
 
     StrW            m_find;
     bool            m_caseless = false;
@@ -463,21 +466,34 @@ LAutoFitContentWidth:
         if (m_errmsg.Length() || !m_context.HasContent())
         {
             msg_text = m_errmsg.Length() ? m_errmsg.Text() : c_no_file_open;
+            WrapText(msg_text, s2, m_terminal_width);
+            msg_text = s2.Text();
             msg_color = GetColor(ColorElement::EndOfFileLine);
             for (size_t row = 0; row < m_content_height; ++row)
             {
                 if (*msg_text)
                 {
-                    s2.Clear();
-                    const unsigned cells = ellipsify_ex(msg_text, m_content_width, ellipsify_mode::RIGHT, s2, L"");
+                    const WCHAR* end = StrChr(msg_text, '\n');
+                    if (end)
+                        ++end;
+                    else
+                        end = msg_text + StrLen(msg_text);
+                    uint32 len_row = uint32(end - msg_text);
+                    while (len_row)
+                    {
+                        if (!IsSpace(msg_text[len_row - 1]))
+                            break;
+                        --len_row;
+                    }
+                    const uint32 cells = __wcswidth(msg_text, len_row);
                     if (msg_color)
                         s.AppendColor(msg_color);
-                    s.Append(s2);
-                    if (msg_color)
-                        s.Append(c_norm);
-                    if (cells < m_content_width)
+                    s.Append(msg_text, len_row);
+                    s.AppendNormalIf(msg_color && !*end);
+                    if (cells < m_terminal_width)
                         s.Append(c_clreol);
-                    msg_text += s2.Length();
+                    s.AppendNormalIf(msg_color && *end);
+                    msg_text = end;
                 }
                 else
                 {
@@ -706,9 +722,6 @@ LAutoFitContentWidth:
         s.AppendSpaces(m_terminal_width - (left.Length() + cell_count(right.Text())));
         s.Append(right);
 
-        if (m_feedback.Length())
-            s.Printf(L"\x1b[10G%s", m_feedback.Text());
-
         s.Append(c_norm);
     }
 
@@ -717,7 +730,10 @@ LAutoFitContentWidth:
         OutputConsole(m_hout, c_hide_cursor);
         s.Printf(L"\x1b[%uH", m_terminal_height);
         s.AppendColor(GetColor(ColorElement::Command));
-        s.Printf(L"Command%s ", c_prompt_char);
+        if (m_searching)
+            s.Append(L"Searching... (Ctrl-Break to cancel)");
+        else
+            s.Printf(L"Command%s %s", c_prompt_char, m_feedback.Text());
         s.Append(c_norm);
         s.Append(c_show_cursor);
         OutputConsole(m_hout, s.Text(), s.Length());
@@ -1120,7 +1136,6 @@ StrW Viewer::GetCurrentFile() const
 void Viewer::SetFile(intptr_t index, ContentCache* context)
 {
     assert(context != &m_context);
-    assert(implies(context, context->IsOpen()));
 
     if (m_text)
         return;
@@ -1206,17 +1221,21 @@ void Viewer::FindNext(bool next)
     // TODO:  Print feedback saying it's searching.
     // TODO:  When should a search start over at the top of the file?
 
+    ClearSignaled();
+
+    assert(!m_searching);
+    m_searching = true;
+    m_force_update_footer = true;
+    UpdateDisplay();
+
+    Error e;
     bool found = (m_hex_mode ?
-            m_context.Find(next, m_find.Text(), m_hex_width, m_found_line, m_caseless) :
-            m_context.Find(next, m_find.Text(), m_found_line, m_caseless));
+            m_context.Find(next, m_find.Text(), m_hex_width, m_found_line, m_caseless, e) :
+            m_context.Find(next, m_find.Text(), m_found_line, m_caseless, e));
+    bool canceled = (e.Code() == E_ABORT);
 
-    if (!found && !m_text && m_multifile_search && !m_hex_mode && m_files)
+    if (!found && !canceled && !m_text && m_multifile_search && !m_hex_mode && m_files)
     {
-        m_feedback.Set(L"...SEARCHING...");
-        UpdateDisplay();
-
-        // PERF:  Remember if it already searched all files in 'next' direction?
-
         size_t index = m_index;
         ContentCache ctx(s_options);
         while (!found)
@@ -1233,14 +1252,22 @@ void Viewer::FindNext(bool next)
 
             if (e.Test())
             {
+                SetFile(index, &ctx);
+                e.Format(m_errmsg);
                 ReportError(e);
                 m_force_update = true;
                 break;
             }
 
-            // TODO:  Make both the loop and Find() interruptible.
             FoundLine found_line;
-            found = ctx.Find(next, m_find.Text(), found_line, m_caseless);
+            found = ctx.Find(next, m_find.Text(), found_line, m_caseless, e);
+            if (e.Code() == E_ABORT)
+            {
+                SetFile(index, &ctx);
+                Center(found_line);
+                canceled = true;
+                break;
+            }
 
             if (found)
             {
@@ -1248,14 +1275,15 @@ void Viewer::FindNext(bool next)
                 m_found_line = found_line;
             }
         }
-
-        m_feedback.Clear();
-        UpdateDisplay();
     }
+
+    m_searching = false;
+    m_force_update_footer = true;
+    m_feedback.Clear();
 
     if (!found)
     {
-        m_feedback.Set(c_text_not_found);
+        m_feedback.Set(canceled ? c_canceled : c_text_not_found);
     }
     else
     {

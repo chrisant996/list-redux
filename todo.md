@@ -53,7 +53,7 @@
 - [x] `Alt-O` open a new file
 - [x] `Alt-C` close current file
 - [x] `F4` toggle multi-file search (next/prev cross file boundaries)
-  - [ ] make search interruptible with `ESC`
+  - [x] make search interruptible with `Ctrl-Break`
 - [x] `/@` to supply a file with a list of names to view
 - [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
 - hex mode

@@ -17,7 +17,6 @@ void SetRedirectedStdOut(bool redirected);
 
 bool SetUseEscapeCodes(const WCHAR* s);
 bool CanUseEscapeCodes();
-void SetGracefulExit();
 
 DWORD GetConsoleColsRows(HANDLE hout);
 

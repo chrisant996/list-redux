@@ -10,6 +10,7 @@
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
 #include "filetype.h"
+#include "signaled.h"
 
 #include <algorithm>
 
@@ -1353,7 +1354,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     return true;
 }
 
-bool ContentCache::ProcessThrough(size_t line, Error& e)
+bool ContentCache::ProcessThrough(size_t line, Error& e, bool cancelable)
 {
     assert(!e.Test());
 
@@ -1381,6 +1382,12 @@ bool ContentCache::ProcessThrough(size_t line, Error& e)
 
             if (m_size < m_map.Processed())
                 m_size = m_map.Processed();
+
+            if (cancelable && IsSignaled())
+            {
+                e.Set(E_ABORT);
+                return false;
+            }
         }
 
         if (m_map.Processed() >= m_size)
@@ -1397,12 +1404,12 @@ bool ContentCache::ProcessThrough(size_t line, Error& e)
     return ret;
 }
 
-bool ContentCache::ProcessToEnd(Error& e)
+bool ContentCache::ProcessToEnd(Error& e, bool cancelable)
 {
     assert(!e.Test());
     if (!m_completed)
     {
-        ProcessThrough(size_t(-1), e);
+        ProcessThrough(size_t(-1), e, cancelable);
         if (e.Code() == ERROR_HANDLE_EOF)
             e.Clear();
     }
@@ -1428,9 +1435,8 @@ unsigned ContentCache::GetLength(size_t line) const
     return 0;
 }
 
-bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, bool caseless)
+bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, bool caseless, Error& e)
 {
-    Error e;
     StrW tmp;
     const unsigned needle_len = unsigned(wcslen(needle));
     assert(needle_len);
@@ -1441,9 +1447,9 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
         found_line.Clear();
         if (!next)
         {
-            ProcessToEnd(e);
-            // TODO:  Do something with the error?
-            e.Clear();
+            ProcessToEnd(e, true/*cancelable*/);
+            if (e.Test())
+                return false;
             found_line.line = Count();
         }
     }
@@ -1451,13 +1457,24 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
     size_t index = found_line.line;
     while (true)
     {
+        if (IsSignaled())
+        {
+            found_line.Found(index, 0, 0);
+            e.Set(E_ABORT);
+            return false;
+        }
+
         if (next)
         {
             if (index + 1 >= Count())
             {
-                ProcessThrough(index + 1, e);
-                // TODO:  Do something with the error?
-                e.Clear();
+                ProcessThrough(index + 1, e, true/*cancelable*/);
+                if (e.Test())
+                {
+                    if (e.Code() == E_ABORT)
+                        found_line.Found(index, 0, 0);
+                    return false;
+                }
                 if (index + 1 >= Count())
                     return false;
             }
@@ -1515,9 +1532,8 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
     }
 }
 
-bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, FoundLine& found_line, bool caseless)
+bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, FoundLine& found_line, bool caseless, Error& e)
 {
-    Error e;
     StrW tmp;
     const unsigned needle_len = unsigned(wcslen(needle));
     assert(needle_len);
@@ -1534,6 +1550,13 @@ bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, Foun
     FileOffset offset = found_line.offset;
     while (true)
     {
+        if (IsSignaled())
+        {
+            found_line.Found(offset, 0);
+            e.Set(E_ABORT);
+            return false;
+        }
+
         if (next)
         {
             if (offset == FileOffset(-1))

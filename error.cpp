@@ -149,7 +149,6 @@ ErrorArgs& Error::Set(const WCHAR* message)
 ErrorArgs& Error::Set(HRESULT hrError, const WCHAR* message)
 {
     assert(hrError != S_OK);
-    assert(hrError != E_ABORT);
     assert(FAILED(hrError)); // Use Sys- methods instead for Win32 errors.
 
     if (!message)

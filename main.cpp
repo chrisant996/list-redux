@@ -25,6 +25,7 @@
 #include "viewer.h"
 #include "list_format.h"
 #include "output.h"
+#include "signaled.h"
 #include "filesys.h"
 #include "sorting.h"
 #include "scan.h"

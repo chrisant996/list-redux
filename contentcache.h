@@ -170,8 +170,8 @@ public:
     unsigned        FormatLineData(size_t line, unsigned left_offset, StrW& s, unsigned max_width, Error& e, const WCHAR* color=nullptr, const FoundLine* found_line=nullptr);
     bool            FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundLine* found_line=nullptr);
 
-    bool            ProcessThrough(size_t line, Error& e);
-    bool            ProcessToEnd(Error& e);
+    bool            ProcessThrough(size_t line, Error& e, bool cancelable=false);
+    bool            ProcessToEnd(Error& e, bool cancelable=false);
     FileOffset      Processed() const { return m_map.Processed(); }
     bool            Completed() const { return m_completed; }
     bool            Eof() const { return m_eof; }
@@ -184,8 +184,8 @@ public:
     size_t          FriendlyLineNumberToIndex(size_t index) const { return m_map.FriendlyLineNumberToIndex(index); }
     unsigned        GetLength(size_t index) const;
 
-    bool            Find(bool next, const WCHAR* needle, FoundLine& found, bool caseless);
-    bool            Find(bool next, const WCHAR* needle, unsigned hex_width, FoundLine& found, bool caseless);
+    bool            Find(bool next, const WCHAR* needle, FoundLine& found, bool caseless, Error& e);
+    bool            Find(bool next, const WCHAR* needle, unsigned hex_width, FoundLine& found, bool caseless, Error& e);
 
     FileOffset      GetBufferOffset() const { return m_data_offset; }
     unsigned        GetBufferLength() const { return m_data_length; }
