@@ -737,9 +737,9 @@ size_t FileLineMap::GetLineNumber(size_t index) const
     return m_line_numbers[index];
 }
 
-void FileLineMap::GetLineText(const BYTE* p, size_t num_bytes, StrW& out) const
+void FileLineMap::GetLineText(const BYTE* p, size_t num_bytes, StrW& out, bool hex_mode) const
 {
-    const UINT cp = GetCodePage();
+    const UINT cp = GetCodePage(hex_mode);
     switch (cp)
     {
     case CP_WINUNICODE:
@@ -1236,7 +1236,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     assert(ptr + len <= m_data + m_data_length);
 
     StrW tmp;
-    m_map.GetLineText(ptr, len, tmp);
+    m_map.GetLineText(ptr, len, tmp, true/*hex_mode*/);
     assert(tmp.Length() == len);
     if (tmp.Length() != len)
     {
@@ -1602,7 +1602,7 @@ bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, Foun
 // TODO:  Encodings.  But what does that even mean for hex mode?  Really it should have a hex entry mode.
 // TODO:  Non-convertible characters will make conversion go haywire.
         StrW tmp;
-        m_map.GetLineText(ptr, len, tmp);
+        m_map.GetLineText(ptr, len, tmp, true/*hex_mode*/);
 
 // TODO:  Optional regex search.
 // TODO:  Boyer-Moore search.
