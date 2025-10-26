@@ -50,6 +50,7 @@ struct ViewerOptions
     bool show_file_offsets = false;
     bool show_endoffile_line = true;
     bool show_ruler = false;
+    uint8 hex_grouping = 0;             // Power of 2.
 
 #ifdef DEBUG
     bool show_debug_info = true;

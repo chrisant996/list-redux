@@ -996,6 +996,16 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
                     m_force_update = true;
                 }
             }
+            else if (input.modifier == Modifier::ALT)
+            {
+                if (!m_text && m_hex_mode)
+                {
+                    ++s_options.hex_grouping;
+                    if (unsigned(1) << s_options.hex_grouping >= m_hex_width)
+                        s_options.hex_grouping = 0;
+                    m_force_update = true;
+                }
+            }
             break;
         case 'j':
             if (input.modifier == Modifier::None)

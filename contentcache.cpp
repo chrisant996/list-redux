@@ -1276,7 +1276,10 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             s.Append(c_norm), s.AppendColor(marked_color);
         }
         if (ii)
-            s.Append(L"  ", ((ii % 8) == 0) ? 2 : 1);
+        {
+            if (ii % (1 << m_options.hex_grouping) == 0)
+                s.Append(L"  ", ((ii % 8) == 0) ? 2 : 1);
+        }
         if (marked_color && found_line->len && offset + ii == found_line->offset)
         {
             highlighting_found_text = true;
