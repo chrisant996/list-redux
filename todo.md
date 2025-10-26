@@ -97,6 +97,7 @@
 - `/Nnn` lock the first `nn` lines of the file at the top of the display
 - `/Cnn` lock the first `nn` columns of each line on the left side of the display
 - search for hex bytes in hex mode
+- search for regex?
 - modify files in hex mode
 - search for text in multiple viewed files
 - search for text in files in file chooser

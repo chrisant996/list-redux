@@ -1520,8 +1520,8 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
         StrW tmp;
         m_map.GetLineText(ptr, len, tmp);
 
-// TODO:  Optional regex search.
-// TODO:  Boyer-Moore search.
+        // FUTURE:  Optional regex search?
+        // PERF:  Boyer-Moore search?
         const WCHAR* const end = tmp.Text() + tmp.Length() - (needle_len - 1);
         for (const WCHAR* p = tmp.Text(); p < end; ++p)
         {
