@@ -99,7 +99,6 @@
 - search for hex bytes in hex mode
 - search for regex?
 - modify files in hex mode
-- search for text in multiple viewed files
 - search for text in files in file chooser
 - view file at cursor (`Alt-I` "insert file" in list.com)
 - `\` present a directory tree of the selected drive; select a subdirectory to list by moving the cursor and pressing Enter
