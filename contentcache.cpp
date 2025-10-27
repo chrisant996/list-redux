@@ -725,7 +725,7 @@ do_skip_whitespace:
 FileOffset FileLineMap::GetOffset(size_t index) const
 {
     assert(!index || index < m_lines.size());
-    return index ? m_lines[index] : 0;
+    return index ? m_lines[index] : 0;  // Uses 0 when m_lines is empty.
 }
 
 size_t FileLineMap::GetLineNumber(size_t index) const
@@ -778,11 +778,25 @@ size_t FileLineMap::FriendlyLineNumberToIndex(size_t line) const
     {
         const auto iter = std::lower_bound(m_line_numbers.begin(), m_line_numbers.end(), line);
         if (iter == m_line_numbers.end())
-            line = size_t(-1);
+            line = m_lines.size();
         else
-            line = iter - m_line_numbers.begin() + 1;
+            line = iter - m_line_numbers.begin();
+    }
+    else
+    {
+        if (line)
+            --line;
     }
     return line;
+}
+
+size_t FileLineMap::OffsetToIndex(FileOffset offset) const
+{
+    auto iter = std::upper_bound(m_lines.begin(), m_lines.end(), offset);
+    size_t index = (iter == m_lines.end()) ? m_lines.size() : (iter - m_lines.begin());
+    if (index)
+        --index;
+    return index;
 }
 
 bool FileLineMap::IsUTF8Compatible() const
@@ -849,6 +863,7 @@ ContentCache& ContentCache::operator=(ContentCache&& other)
     m_data = other.m_data;
     m_data_offset = other.m_data_offset;
     m_data_length = other.m_data_length;
+    m_data_slop = other.m_data_slop;
 
     other.m_file = INVALID_HANDLE_VALUE;
     other.m_data = nullptr;
@@ -982,6 +997,7 @@ void ContentCache::Close()
 
     m_data_offset = 0;
     m_data_length = 0;
+    m_data_slop = 0;
 }
 
 void ContentCache::Reset()
@@ -999,7 +1015,7 @@ void ContentCache::SetWrapWidth(unsigned wrap)
     }
 }
 
-unsigned ContentCache::FormatLineData(size_t line, unsigned left_offset, StrW& s, unsigned max_width, Error& e, const WCHAR* color, const FoundLine* found_line)
+unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, StrW& s, const unsigned max_width, Error& e, const WCHAR* const color, const FoundLine* const found_line)
 {
     if (!EnsureFileData(line, e))
         return 0;
@@ -1232,7 +1248,12 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     assert(offset < GetFileSize());
     assert(offset >= m_data_offset);
     const BYTE* ptr = m_data + (offset - m_data_offset);
-    const unsigned len = unsigned(std::min<FileOffset>(hex_bytes, GetFileSize() - offset));
+    unsigned len = unsigned(std::min<FileOffset>(hex_bytes, GetFileSize() - offset));
+    if (offset + len > m_data_offset + m_data_length)
+    {
+        len = unsigned(m_data_offset + m_data_length - offset);
+        assert(len < 32); // ContentCache doesn't know m_hex_width, so use 32.
+    }
     assert(ptr + len <= m_data + m_data_length);
 
     StrW tmp;
@@ -1367,7 +1388,7 @@ bool ContentCache::ProcessThrough(size_t line, Error& e, bool cancelable)
         while (line >= m_map.Count() && !m_completed)
         {
             const FileOffset offset = m_map.Processed();
-            if (!LoadData(offset, e))
+            if (!LoadData(offset, m_data_slop, e))
             {
                 m_completed = true;
                 return false;
@@ -1446,17 +1467,30 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
 
     if (!found_line.is_line || found_line.Empty())
     {
-        // TODO-HEX:  Translate offset to line, instead of reseting?
-        found_line.Clear();
         if (!next)
         {
             ProcessToEnd(e, true/*cancelable*/);
             if (e.Test())
                 return false;
-            found_line.line = Count();
+        }
+
+        if (found_line.Empty())
+        {
+            if (next)
+                found_line.Found(0, 0, 0);
+            else
+                found_line.Found(Count(), 0, 0);
+        }
+        else
+        {
+            assert(!found_line.is_line);
+            const size_t index = m_map.OffsetToIndex(found_line.offset);
+            const unsigned offset = unsigned(found_line.offset - m_map.GetOffset(index));
+            found_line.Found(index, offset, 0);
         }
     }
 
+    assert(!found_line.Empty() && found_line.is_line);
     size_t index = found_line.line;
     while (true)
     {
@@ -1541,15 +1575,20 @@ bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, Foun
     const unsigned needle_len = unsigned(wcslen(needle));
     assert(needle_len);
 
-    if (found_line.is_line || found_line.Empty())
+    if (found_line.Empty())
     {
-        // TODO-HEX:  Translate line to offset, instead of reseting?
         if (next)
             found_line.Found(FileOffset(-1), 0);
         else
             found_line.Found(GetFileSize(), 0);
     }
+    else if (found_line.is_line)
+    {
+        size_t index = m_map.FriendlyLineNumberToIndex(found_line.line + 1);
+        found_line.Found(m_map.GetOffset(index) + found_line.offset, 0);
+    }
 
+    assert(!found_line.Empty() && !found_line.is_line);
     FileOffset offset = found_line.offset;
     while (true)
     {
@@ -1586,6 +1625,11 @@ bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, Foun
         const BYTE* const ptr = m_data + (offset - m_data_offset);
         unsigned len = hex_width;
         assert(len);
+        if (offset + len > m_data_offset + m_data_length)
+        {
+            len = unsigned(m_data_offset + m_data_length - offset);
+            assert(len < hex_width);
+        }
         assert(ptr + len <= m_data + m_data_length);
 
         // IMPORTANT:  This is how Find() handles searching across forced line
@@ -1649,9 +1693,9 @@ bool ContentCache::EnsureFileData(size_t line, Error& e)
     const FileOffset offset = GetOffset(line);
     const unsigned length = GetLength(line);
 
-    if (offset < m_data_offset || offset + length > m_data_offset + std::max<intptr_t>(0, intptr_t(m_data_length) - c_data_buffer_slop))
+    if (offset < m_data_offset || offset + length > m_data_offset + std::max<intptr_t>(0, intptr_t(m_data_length) - m_data_slop))
     {
-        if (!LoadData(offset, e))
+        if (!LoadData(offset, m_data_slop, e))
             return false;
     }
 
@@ -1681,9 +1725,9 @@ bool ContentCache::EnsureHexData(FileOffset offset, unsigned length, Error& e)
     if (offset + length > GetFileSize())
         length = unsigned(GetFileSize() - offset);
 
-    if (offset < m_data_offset || offset + length > m_data_offset + std::max<intptr_t>(0, intptr_t(m_data_length) - c_data_buffer_slop))
+    if (offset < m_data_offset || offset + length > m_data_offset + std::max<intptr_t>(0, intptr_t(m_data_length) - m_data_slop))
     {
-        if (!LoadData(offset, e))
+        if (!LoadData(offset, m_data_slop, e))
             return false;
     }
 
@@ -1700,7 +1744,7 @@ bool ContentCache::EnsureHexData(FileOffset offset, unsigned length, Error& e)
     return true;
 }
 
-bool ContentCache::LoadData(const FileOffset offset, Error& e)
+bool ContentCache::LoadData(const FileOffset offset, DWORD& end_slop, Error& e)
 {
     assert(HasContent());
 
@@ -1733,6 +1777,7 @@ bool ContentCache::LoadData(const FileOffset offset, Error& e)
         assert(begin <= end);
         m_data_offset = begin;
         m_data_length = to_read;
+        m_data_slop = 0;
         memmove(m_data, m_text + begin, to_read);
 #ifdef DEBUG
         g_last_load_type = LT_TEXT;
@@ -1764,6 +1809,10 @@ bool ContentCache::LoadData(const FileOffset offset, Error& e)
             ofs += len;
             ofs %= s_page_size;
         }
+        if (begin + c_data_buffer_main < end)
+            m_data_slop = DWORD(end - (begin + c_data_buffer_main));
+        else
+            m_data_slop = 0;
 #ifdef DEBUG
         g_last_load_type = LT_REDIRECT;
 #endif
@@ -1852,6 +1901,10 @@ bool ContentCache::LoadData(const FileOffset offset, Error& e)
 
     m_data_offset = begin;
     m_data_length = kept_at_head + bytes_read + kept_at_tail;
+    if (begin + c_data_buffer_main < end)
+        m_data_slop = DWORD(end - (begin + c_data_buffer_main));
+    else
+        m_data_slop = 0;
     if (bytes_read < to_read)
         m_eof = true;
     return true;

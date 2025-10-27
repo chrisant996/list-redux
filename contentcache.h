@@ -118,6 +118,7 @@ public:
     size_t          GetLineNumber(size_t index) const;
     void            GetLineText(const BYTE* p, size_t num_bytes, StrW& out, bool hex_mode=false) const;
     size_t          FriendlyLineNumberToIndex(size_t line) const;
+    size_t          OffsetToIndex(FileOffset offset) const;
     bool            IsBinaryFile() const { return m_line_iter.IsBinaryFile(); }
     bool            IsUTF8Compatible() const;
     bool            IsUnicodeEncoding() const { return m_is_unicode_encoding; }
@@ -192,7 +193,7 @@ public:
 
 private:
     bool            EnsureDataBuffer(Error& e);
-    bool            LoadData(FileOffset offset, Error& e);
+    bool            LoadData(FileOffset offset, DWORD& end_slop, Error& e);
     bool            EnsureFileData(size_t line, Error& e);
     bool            EnsureHexData(FileOffset offset, unsigned length, Error& e);
 
@@ -212,5 +213,6 @@ private:
     BYTE*           m_data = nullptr;
     FileOffset      m_data_offset = 0;
     DWORD           m_data_length = 0;
+    DWORD           m_data_slop = 0;
 };
 

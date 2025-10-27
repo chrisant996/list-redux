@@ -59,6 +59,7 @@ public:
 private:
     unsigned        CalcMarginWidth() const;
     void            UpdateDisplay();
+    void            InitHexWidth();
     unsigned        LinePercent(size_t line) const;
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
     void            EnsureAltFiles();
@@ -69,7 +70,7 @@ private:
     void            Center(const FoundLine& found_line);
     void            GoTo();
     size_t          GetFoundLine(const FoundLine& found_line);
-    FileOffset      GetFoundOffset(const FoundLine& found_line);
+    FileOffset      GetFoundOffset(const FoundLine& found_line, unsigned* offset_highlight=nullptr);
     void            ShowFileList();
     void            OpenNewFile(Error& e);
     ViewerOutcome   CloseCurrentFile();
@@ -255,19 +256,7 @@ void Viewer::UpdateDisplay()
         m_content_height = 0;
 
     // Decide how many hex bytes fit per line.
-    m_hex_width = 0;
-    if (m_hex_mode)
-    {
-        const unsigned available = (m_terminal_width - (8/*ofs*/ + 2/*spc*/ + 0/*bytes*/ + 2/*spc*/ + 1/*edge*/ + 0/*bytes*/ + 1/*edge*/ + 2/*margin*/));
-        if (available >= 32*3 + 3 + 32)
-            m_hex_width = 32;
-        else if (available >= 16*3 + 1 + 16)
-            m_hex_width = 16;
-        else if (available >= 8*3 + 0 + 8)
-            m_hex_width = 8;
-        else
-            m_hex_mode = false;
-    }
+    InitHexWidth();
 
     // Process enough lines to display the current screenful of lines.  If
     // processing lines causes the margin width to change, then wrapping and
@@ -513,8 +502,9 @@ LAutoFitContentWidth:
                     found_line = &m_found_line;
                 else
                 {
-                    const FileOffset tmp_file_offset = GetFoundOffset(m_found_line);
-                    __translated_found_line.Found(tmp_file_offset, m_found_line.len);
+                    unsigned offset_highlight;
+                    const FileOffset tmp_file_offset = GetFoundOffset(m_found_line, &offset_highlight);
+                    __translated_found_line.Found(tmp_file_offset + offset_highlight, m_found_line.len);
                     found_line = &__translated_found_line;
                 }
             }
@@ -740,6 +730,23 @@ LAutoFitContentWidth:
     }
 
     m_feedback.Clear();
+}
+
+void Viewer::InitHexWidth()
+{
+    m_hex_width = 0;
+    if (m_hex_mode)
+    {
+        const unsigned available = (m_terminal_width - (8/*ofs*/ + 2/*spc*/ + 0/*bytes*/ + 2/*spc*/ + 1/*edge*/ + 0/*bytes*/ + 1/*edge*/ + 2/*margin*/));
+        if (available >= 32*3 + 3 + 32)
+            m_hex_width = 32;
+        else if (available >= 16*3 + 1 + 16)
+            m_hex_width = 16;
+        else if (available >= 8*3 + 0 + 8)
+            m_hex_width = 8;
+        else
+            m_hex_mode = false;
+    }
 }
 
 unsigned Viewer::LinePercent(size_t line) const
@@ -992,7 +999,14 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
                 if (!m_text)
                 {
                     m_hex_mode = !m_hex_mode;
-                    m_hex_top = m_context.GetOffset(m_top) & ~FileOffset(0xf);
+                    InitHexWidth();
+                    if (m_hex_width)
+                    {
+                        if (m_found_line.Empty())
+                            m_hex_top = m_context.GetOffset(m_top) & ~FileOffset(m_hex_width - 1);
+                        else
+                            Center(m_found_line);
+                    }
                     m_force_update = true;
                 }
             }
@@ -1446,7 +1460,7 @@ void Viewer::GoTo()
             if (wcstonum(p, radix, line) && line > 0)
             {
                 line = m_context.FriendlyLineNumberToIndex(line);
-                m_found_line.MarkLine(line - 1);
+                m_found_line.MarkLine(line);
                 Center(m_found_line);
                 m_force_update = true;
             }
@@ -1481,8 +1495,9 @@ size_t Viewer::GetFoundLine(const FoundLine& found_line)
     return line;
 }
 
-FileOffset Viewer::GetFoundOffset(const FoundLine& found_line)
+FileOffset Viewer::GetFoundOffset(const FoundLine& found_line, unsigned* offset_highlight)
 {
+    assert(m_hex_mode);
     assert(!found_line.Empty());
     FileOffset offset = found_line.offset;
     if (found_line.is_line)
@@ -1491,11 +1506,26 @@ FileOffset Viewer::GetFoundOffset(const FoundLine& found_line)
         m_context.ProcessThrough(found_line.line, e);
         // TODO:  Do something with the error?
         if (found_line.line >= m_context.Count())
+        {
             offset = m_context.GetFileSize();
+            if (offset_highlight)
+                *offset_highlight = 0;
+        }
         else
-            offset = m_context.GetOffset(found_line.line);
+        {
+            const FileOffset highlight = m_context.GetOffset(found_line.line) + found_line.offset;
+            offset = highlight & ~FileOffset(m_hex_width - 1);
+            if (offset_highlight)
+                *offset_highlight = unsigned(highlight - offset);
+        }
     }
-    offset &= ~FileOffset(m_hex_width - 1);
+    else
+    {
+        const FileOffset highlight = found_line.offset;
+        offset = highlight & ~FileOffset(m_hex_width - 1);
+        if (offset_highlight)
+            *offset_highlight = unsigned(highlight - offset);
+    }
     return offset;
 }
 
