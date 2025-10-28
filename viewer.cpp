@@ -158,7 +158,11 @@ Viewer::Viewer(const char* text, const WCHAR* title)
 {
     Error e;
     m_context.SetTextContent(m_text, e);
-    // TODO:  Do something with the error?
+    if (e.Test())
+    {
+        e.Format(m_errmsg);
+        m_errmsg.TrimRight();
+    }
     m_force_update = true;
 }
 
