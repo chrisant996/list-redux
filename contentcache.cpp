@@ -690,7 +690,7 @@ do_skip_whitespace:
 
         assert(line_length);
         m_lines.emplace_back(m_pending_begin);
-        if (m_wrap)
+        if (m_wrap && !IsBinaryFile())
             m_line_numbers.emplace_back(m_current_line_number);
 #ifdef DEBUG_LINE_PARSING
         dbgprintf(L"finished line %lu; offset %lu (%lx), length %lu, width %lu", m_lines.size(), m_pending_begin, m_pending_begin, line_length, line_width);
@@ -722,6 +722,13 @@ do_skip_whitespace:
     m_processed = m_pending_begin + line_length;
 }
 
+size_t FileLineMap::CountFriendlyLines() const
+{
+    if (m_line_numbers.size())
+        return m_line_numbers.back();
+    return m_lines.size();
+}
+
 FileOffset FileLineMap::GetOffset(size_t index) const
 {
     assert(!index || index < m_lines.size());
@@ -731,10 +738,12 @@ FileOffset FileLineMap::GetOffset(size_t index) const
 size_t FileLineMap::GetLineNumber(size_t index) const
 {
     assert(!index || index < m_lines.size());
-    if (!m_wrap)
-        return index + 1;
-    assert(index < m_line_numbers.size());
-    return m_line_numbers[index];
+    if (m_line_numbers.size())
+    {
+        assert(m_line_numbers.size() == m_lines.size());
+        return m_line_numbers[index];
+    }
+    return index + 1;
 }
 
 void FileLineMap::GetLineText(const BYTE* p, size_t num_bytes, StrW& out, bool hex_mode) const
@@ -774,7 +783,7 @@ void FileLineMap::GetLineText(const BYTE* p, size_t num_bytes, StrW& out, bool h
 
 size_t FileLineMap::FriendlyLineNumberToIndex(size_t line) const
 {
-    if (m_wrap)
+    if (m_line_numbers.size())
     {
         const auto iter = std::lower_bound(m_line_numbers.begin(), m_line_numbers.end(), line);
         if (iter == m_line_numbers.end())

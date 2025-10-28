@@ -227,7 +227,7 @@ unsigned Viewer::CalcMarginWidth() const
         StrW s;
         if (s_options.show_line_numbers)
         {
-            s.Printf(L"%lu", m_context.Count());
+            s.Printf(L"%lu", m_context.CountFriendlyLines());
             margin = std::max<unsigned>(c_min_margin_width, s.Length() + 2);
         }
         else if (s_options.show_file_offsets)
@@ -677,7 +677,7 @@ LAutoFitContentWidth:
         if (!m_found_line.Empty())
         {
             if (m_found_line.is_line)
-                right.Printf(L"    Found: line %lu, len %u", m_found_line.line, m_found_line.len);
+                right.Printf(L"    Found: line %lu, len %u", m_found_line.line + 1, m_found_line.len);
             else
                 right.Printf(L"    Found: offset %06lx, len %u", m_found_line.offset, m_found_line.len);
         }

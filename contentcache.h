@@ -114,6 +114,7 @@ public:
     void            Next(const BYTE* bytes, size_t count);
 
     size_t          Count() const { return m_lines.size(); }
+    size_t          CountFriendlyLines() const;
     FileOffset      GetOffset(size_t index) const;
     size_t          GetLineNumber(size_t index) const;
     void            GetLineText(const BYTE* p, size_t num_bytes, StrW& out, bool hex_mode=false) const;
@@ -178,6 +179,7 @@ public:
     bool            Eof() const { return m_eof; }
 
     size_t          Count() const { return m_map.Count(); }
+    size_t          CountFriendlyLines() const { return m_map.CountFriendlyLines(); }
     FileOffset      GetFileSize() const { return m_size; }
     FileOffset      GetMaxHexOffset(unsigned hex_width) const;
     FileOffset      GetOffset(size_t index) const { return m_map.GetOffset(index); }
