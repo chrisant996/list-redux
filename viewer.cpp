@@ -1362,8 +1362,9 @@ void Viewer::DoSearch(bool next, bool caseless)
 {
     StrW s;
     StrW tmp;
-    tmp.Printf(L"\rSearch%s ", c_prompt_char);
+    tmp.Printf(L"Search%s ", c_prompt_char);
     MakeCommandLine(s, tmp.Text());
+    OutputConsole(m_hout, s.Text(), s.Length());
 
 // TODO:  make a variant of ReadInput that plays nicely with the Command line.
     ReadInput(s);
