@@ -46,8 +46,23 @@ void SetMaxLineLength(const WCHAR* arg)
     s_options.max_line_length = max_line_length;
 }
 
+class Viewer;
+class ScopedWorkingIndicator;
+
+class ScopedWorkingIndicator
+{
+public:
+                    ScopedWorkingIndicator() = default;
+    void            ShowFeedback(bool completed, unsigned __int64 processed, unsigned __int64 target, const Viewer* viewer, bool bytes);
+    bool            NeedsCleanup() const { return m_needs_cleanup; }
+private:
+    bool            m_needs_cleanup = false;
+};
+
 class Viewer
 {
+    friend class ScopedWorkingIndicator;
+
 public:
                     Viewer(const char* text, const WCHAR* title=L"Text");
                     Viewer(const std::vector<StrW>& files);
@@ -59,6 +74,7 @@ public:
 private:
     unsigned        CalcMarginWidth() const;
     void            UpdateDisplay();
+    void            MakeCommandLine(StrW& s, const WCHAR* msg=nullptr) const;
     void            InitHexWidth();
     unsigned        LinePercent(size_t line) const;
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
@@ -118,6 +134,21 @@ private:
     bool            m_multifile_search = false;
     FoundLine       m_found_line;
 };
+
+void ScopedWorkingIndicator::ShowFeedback(bool completed, unsigned __int64 processed, unsigned __int64 target, const Viewer* viewer, bool bytes)
+{
+    const size_t c_threshold = bytes ? 160000 : 5000; // Based on an average of 32 bytes per line.
+    if (!m_needs_cleanup && viewer && !completed && processed + c_threshold < target)
+    {
+        StrW msg;
+        HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
+        const DWORD colsrows = GetConsoleColsRows(hout);
+        msg.Printf(L"\x1b[%uH", HIWORD(colsrows));
+        viewer->MakeCommandLine(msg, L"Working...");
+        OutputConsole(hout, msg.Text(), msg.Length());
+        m_needs_cleanup = true;
+    }
+}
 
 Viewer::Viewer(const char* text, const WCHAR* title)
 : m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
@@ -225,7 +256,7 @@ void Viewer::UpdateDisplay()
     const bool update_header = (m_force_update || file_changed || offset_changed || processed_changed);
     const bool update_content = (m_force_update || offset_changed);
     const bool update_debug_row = (s_options.show_debug_info);
-    const bool update_command_line = (m_force_update || m_force_update_footer || feedback_changed);
+    bool update_command_line = (m_force_update || m_force_update_footer || feedback_changed);
 
     if (!update_header && !update_content && !update_debug_row && !update_command_line)
         return;
@@ -261,6 +292,7 @@ void Viewer::UpdateDisplay()
     // Process enough lines to display the current screenful of lines.  If
     // processing lines causes the margin width to change, then wrapping and
     // processing may need to be redone.
+    ScopedWorkingIndicator working;
     unsigned autofit_retries = 0;
 LAutoFitContentWidth:
     assert(autofit_retries != 2); // Should be impossible to occur...
@@ -269,6 +301,7 @@ LAutoFitContentWidth:
     {
         Error e;
         m_context.SetWrapWidth(m_wrap ? m_content_width : 0);
+        working.ShowFeedback(m_context.Completed(), m_context.Count(), m_top + m_content_height, this, false/*bytes*/);
         m_context.ProcessThrough(m_top + m_content_height, e);
         const unsigned new_margin_width = CalcMarginWidth();
         if (new_margin_width != m_margin_width)
@@ -279,6 +312,7 @@ LAutoFitContentWidth:
                 goto LAutoFitContentWidth;
         }
     }
+    update_command_line |= working.NeedsCleanup();
 
     // Fix the top offset.
     if (m_hex_mode)
@@ -655,81 +689,94 @@ LAutoFitContentWidth:
     }
 
     // Command line.
+    StrW left;
+    if (m_searching)
+        left.Append(L"Searching... (Ctrl-Break to cancel)");
+    else
+        left.Printf(L"Command%s %s", c_prompt_char, m_feedback.Text());
     if (update_command_line)
-    {
-        static const WCHAR* const c_ctrl_indicator[] =
-        {
-#ifdef INCLUDE_CTRLMODE_SPACE
-            L"C",                       // OEM437
-            L"\x1b[7mC\x1b[27m",        // EXPAND
-#ifdef INCLUDE_CTRLMODE_PERIOD
-            L".",                       // PERIOD
-#endif
-            L"c",                       // SPACE
-#else
-            L"c",                       // OEM437
-            L"C",                       // EXPAND
-#endif
-        };
-        static const WCHAR* const c_tab_indicator[] =
-        {
-            L"T",                       // EXPAND
-            L"\x1b[7mT\x1b[27m",        // HIGHLIGHT
-            L"t",                       // RAW
-        };
-
-        s.Printf(L"\x1b[%uH", m_terminal_height);
-        s.AppendColor(GetColor(ColorElement::Command));
-
-        const unsigned offset = s.Length();
-        StrW left;
-        StrW right;
-        if (m_multifile_search)
-            right.Append(L"    MultiFile");
-        right.Printf(L"    %-6s", m_context.GetEncodingName(m_hex_mode));
-        right.Append(L"    Options: ");
-#ifdef DEBUG
-        right.Append(s_options.show_debug_info ? L"D" : L"d");
-#endif
-        if (!m_text)
-            right.Append(m_hex_mode ? L"H" : L"h");
-        right.Append(s_options.show_line_numbers ? L"N" : L"n");
-        if (!m_text)
-        {
-            right.Append(s_options.show_file_offsets ? L"O" : L"o");
-            right.Append(s_options.show_ruler ? L"R" : L"r");
-        }
-        right.Append(m_wrap ? L"W" : L"w");
-        if (!m_text)
-        {
-            right.Append(c_tab_indicator[int(s_options.tab_mode)]);
-            right.Append(c_ctrl_indicator[int(s_options.ctrl_mode)]);
-        }
-        if (left.Length() + right.Length() > m_terminal_width)
-            right.Clear();
-
-        s.Append(left);
-        s.AppendSpaces(m_terminal_width - (left.Length() + cell_count(right.Text())));
-        s.Append(right);
-
-        s.Append(c_norm);
-    }
+        MakeCommandLine(s, left.Text());
 
     if (s.Length())
     {
         OutputConsole(m_hout, c_hide_cursor);
-        s.Printf(L"\x1b[%uH", m_terminal_height);
-        s.AppendColor(GetColor(ColorElement::Command));
-        if (m_searching)
-            s.Append(L"Searching... (Ctrl-Break to cancel)");
-        else
-            s.Printf(L"Command%s %s", c_prompt_char, m_feedback.Text());
+        s.Printf(L"\x1b[%u;%uH", m_terminal_height, cell_count(left.Text()) + 1);
         s.Append(c_norm);
         s.Append(c_show_cursor);
         OutputConsole(m_hout, s.Text(), s.Length());
     }
 
     m_feedback.Clear();
+}
+
+void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
+{
+    static const WCHAR* const c_ctrl_indicator[] =
+    {
+#ifdef INCLUDE_CTRLMODE_SPACE
+        L"C",                       // OEM437
+        L"\x1b[7mC\x1b[27m",        // EXPAND
+#ifdef INCLUDE_CTRLMODE_PERIOD
+        L".",                       // PERIOD
+#endif
+        L"c",                       // SPACE
+#else
+        L"c",                       // OEM437
+        L"C",                       // EXPAND
+#endif
+    };
+    static const WCHAR* const c_tab_indicator[] =
+    {
+        L"T",                       // EXPAND
+        L"\x1b[7mT\x1b[27m",        // HIGHLIGHT
+        L"t",                       // RAW
+    };
+
+    s.Printf(L"\x1b[%uH", m_terminal_height);
+    s.AppendColor(GetColor(ColorElement::Command));
+
+    const unsigned offset = s.Length();
+    StrW right;
+    if (m_multifile_search)
+        right.Append(L"    MultiFile");
+    right.Printf(L"    %-6s", m_context.GetEncodingName(m_hex_mode));
+    right.Append(L"    Options: ");
+#ifdef DEBUG
+    right.Append(s_options.show_debug_info ? L"D" : L"d");
+#endif
+    if (!m_text)
+        right.Append(m_hex_mode ? L"H" : L"h");
+    right.Append(s_options.show_line_numbers ? L"N" : L"n");
+    if (!m_text)
+    {
+        right.Append(s_options.show_file_offsets ? L"O" : L"o");
+        right.Append(s_options.show_ruler ? L"R" : L"r");
+    }
+    right.Append(m_wrap ? L"W" : L"w");
+    if (!m_text)
+    {
+        right.Append(c_tab_indicator[int(s_options.tab_mode)]);
+        right.Append(c_ctrl_indicator[int(s_options.ctrl_mode)]);
+    }
+
+    StrW tmp;
+    uint32 msg_width = cell_count(msg);
+    if (msg_width >= m_terminal_width)
+    {
+        bool truncated = false;
+        msg_width = ellipsify_ex(msg, m_terminal_width - 1, ellipsify_mode::LEFT, tmp, L"", false, &truncated);
+        if (truncated)
+            msg = tmp.Text();
+    }
+
+    if (msg_width + 3 + right.Length() > m_terminal_width)
+        right.Clear();
+
+    s.Append(msg);
+    s.AppendSpaces(m_terminal_width - (msg_width + right.Length()));
+    s.Append(right);
+
+    s.Printf(L"\x1b[%uG", msg_width + 1);
 }
 
 void Viewer::InitHexWidth()
@@ -796,6 +843,8 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             }
             else
             {
+                ScopedWorkingIndicator working;
+                working.ShowFeedback(m_context.Completed(), m_context.Processed(), m_context.GetFileSize(), this, true/*bytes*/);
                 if (m_context.ProcessToEnd(e))
                 {
                     m_top = CountForDisplay();
@@ -804,6 +853,7 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
                     else
                         m_top = 0;
                 }
+                m_force_update_footer |= working.NeedsCleanup();
             }
             break;
         case Key::UP:
@@ -1220,10 +1270,11 @@ size_t Viewer::CountForDisplay() const
 void Viewer::DoSearch(bool next, bool caseless)
 {
     StrW s;
-    s.AppendColor(GetColor(ColorElement::Command));
-    s.Printf(L"\rSearch%s ", c_prompt_char);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    StrW tmp;
+    tmp.Printf(L"\rSearch%s ", c_prompt_char);
+    MakeCommandLine(s, tmp.Text());
 
+// TODO:  make a variant of ReadInput that plays nicely with the Command line.
     ReadInput(s);
 
     OutputConsole(m_hout, c_norm);
@@ -1540,11 +1591,13 @@ void Viewer::ShowFileList()
 void Viewer::OpenNewFile(Error& e)
 {
     StrW s;
+    StrW tmp;
+    tmp.Printf(L"Enter file to open%s ", c_prompt_char);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Printf(L"\rEnter file to open%s ", c_prompt_char);
+    s.Printf(L"\r%s", tmp.Text());
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    ReadInput(s);
+    ReadInput(s, m_terminal_width - 1 - tmp.Length());
 
     OutputConsole(m_hout, c_norm);
 
