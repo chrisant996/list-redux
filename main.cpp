@@ -30,6 +30,7 @@
 #include "sorting.h"
 #include "scan.h"
 #include "colors.h"
+#include "config.h"
 #include "usage.h"
 #include "wcwidth.h"
 #include "filetype.h"
@@ -231,7 +232,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         }
     }
 
-    InitColors();
+    LoadConfig();
     TryCoInitialize();
 
     StrW dir;

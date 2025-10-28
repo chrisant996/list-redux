@@ -49,6 +49,11 @@ void SetMaxLineLength(const WCHAR* arg)
     s_options.max_line_length = max_line_length;
 }
 
+void SetViewerScrollbar(bool scrollbar)
+{
+    s_options.show_scrollbar = scrollbar;
+}
+
 class Viewer;
 class ScopedWorkingIndicator;
 
@@ -116,7 +121,6 @@ private:
     unsigned        m_left = 0;
     StrW            m_feedback;
     bool            m_wrap = false;
-    bool            m_show_scrollbar = true; // TODO: control via a toggle option.
 
     bool            m_hex_mode = false;
     unsigned        m_hex_width = 0;
@@ -293,7 +297,7 @@ void Viewer::UpdateDisplay()
         m_content_height = m_terminal_height - (2 + debug_row);
     else
         m_content_height = 0;
-    const bool show_scrollbar = (m_show_scrollbar &&
+    const bool show_scrollbar = (s_options.show_scrollbar &&
                                  m_content_height >= 4 &&
                                  !(m_errmsg.Length() || !m_context.HasContent()) &&
                                  m_context.GetFileSize() > 0);
@@ -326,29 +330,6 @@ LAutoFitContentWidth:
     }
     update_command_line |= working.NeedsCleanup();
 
-    // Compute scrollbar metrics.
-    scroll_car scroll_car;
-    if (show_scrollbar)
-    {
-        scroll_car.set_style(c_sbstyle);
-        if (m_context.Completed())
-        {
-            // Use line based metrics, if available.
-            scroll_car.set_extents(m_content_height, m_context.Count());
-            scroll_car.set_position(m_top);
-        }
-        else
-        {
-            // Otherwise approximate with percentage.
-            const double total = double(m_context.GetFileSize());
-            const intptr_t i_bottom = m_top + m_content_height - 1;
-            const FileOffset offset_bottom = m_context.GetOffset(i_bottom) + m_context.GetLength(i_bottom);
-            const FileOffset bytes_per_line = max<FileOffset>(1, offset_bottom / (i_bottom + 1));
-            scroll_car.set_extents(m_content_height, intptr_t(total / bytes_per_line));
-            scroll_car.set_position(m_top);
-        }
-    }
-
     // Fix the top offset.
     if (m_hex_mode)
     {
@@ -380,6 +361,35 @@ LAutoFitContentWidth:
                 else
                     m_top = CountForDisplay() - m_content_height;
             }
+        }
+    }
+
+    // Compute scrollbar metrics.
+    scroll_car scroll_car;
+    if (show_scrollbar)
+    {
+        scroll_car.set_style(c_sbstyle);
+        if (m_hex_mode)
+        {
+            // Use hex line based metrics.
+            scroll_car.set_extents(m_content_height, ((m_context.GetFileSize() - 1) / m_hex_width) + 1);
+            scroll_car.set_position(m_hex_top / m_hex_width);
+        }
+        else if (m_context.Completed())
+        {
+            // Use line based metrics.
+            scroll_car.set_extents(m_content_height, m_context.Count());
+            scroll_car.set_position(m_top);
+        }
+        else
+        {
+            // Otherwise approximate with percentage.
+            const double total = double(m_context.GetFileSize());
+            const intptr_t i_bottom = m_top + m_content_height - 1;
+            const FileOffset offset_bottom = m_context.GetOffset(i_bottom) + m_context.GetLength(i_bottom);
+            const FileOffset bytes_per_line = max<FileOffset>(1, offset_bottom / (i_bottom + 1));
+            scroll_car.set_extents(m_content_height, intptr_t(total / bytes_per_line));
+            scroll_car.set_position(m_top);
         }
     }
 
@@ -583,9 +593,31 @@ LAutoFitContentWidth:
 
             for (unsigned row = 0; row < m_content_height; ++row)
             {
+                const uint32 orig_length = s.Length();
                 m_context.FormatHexData(m_hex_top, row, m_hex_width, s, e, found_line);
-// TODO:  scrollbar...
-                s.Append(c_clreol);
+
+                if (scroll_car.has_car())
+                {
+                    s.AppendSpaces(m_content_width - cell_count(s.Text() + orig_length));
+                    const WCHAR* car = scroll_car.get_char(int32(row), c_floating);
+                    if (c_floating)
+                    {
+                        s.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                    }
+                    else
+                    {
+                        if (car)
+                            s.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
+                        s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                    }
+                    s.Append(car ? car : L" ");
+                    s.Append(c_norm);
+                }
+                else
+                {
+                    s.Append(c_clreol);
+                }
+
                 s.Append(L"\n");
             }
         }

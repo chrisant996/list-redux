@@ -13,6 +13,7 @@
 #include "os.h"
 #include "sorting.h"
 #include "output.h"
+#include "config.h"
 
 #include <math.h>
 #include <unordered_map>
@@ -767,36 +768,8 @@ static const WCHAR* const c_reg_color_name[] =
 static_assert(_countof(c_reg_color_name) == _countof(s_colors));
 static_assert(_countof(c_reg_color_name) == size_t(ColorElement::MAX));
 
-#ifdef USE_REGISTRY_FOR_COLORS
-void ReadColor(HKEY hkeyApp, uint32 index)
+static void InitColors()
 {
-    DWORD type;
-    WCHAR* data;
-    DWORD max_len;
-    DWORD len;
-
-    data = s_colors[index];
-    len = max_len = _countof(s_colors[index]);
-    if (RegGetValueW(hkeyApp, nullptr, c_reg_color_name[index], RRF_RT_REG_SZ, &type, &data, &len) != ERROR_SUCCESS ||
-        type != REG_SZ || !len || len >= max_len)
-    {
-        StringCchCopy(s_colors[index], _countof(s_colors[index]), c_default_colors[index]);
-    }
-}
-#else
-void ReadColor(const WCHAR* ini_filename, uint32 index)
-{
-    if (ini_filename && *ini_filename)
-        GetPrivateProfileStringW(L"Colors", c_reg_color_name[index], c_default_colors[index], s_colors[index], _countof(s_colors[index]), ini_filename);
-    else
-        StringCchCopy(s_colors[index], _countof(s_colors[index]), c_default_colors[index]);
-}
-#endif
-
-void InitColors()
-{
-    Error e;
-
     COLORREF rgbBack = RgbFromColor(L"49", RgbFromColorMode::Background);
     s_light_theme = (rgbBack != 0xffffffff && colorspace::Oklab(rgbBack).L > 0.6);
 
@@ -806,67 +779,22 @@ void InitColors()
         const int x = clamp(_wtoi(env), -100, 100);
         s_min_luminance = double(x) / 100;
     }
+}
 
-#if USE_REGISTRY_FOR_COLORS
-    HKEY hkeyUser = 0;
-    HKEY hkeyApp = 0;
-    if (RegOpenCurrentUser(KEY_READ, &hkeyUser))
-        RegOpenKeyA(hkeyUser, "Software\\ListRedux", &hkeyApp);
+#ifdef USE_REGISTRY_FOR_COLORS
+void ReadColors(HKEY hkeyApp)
+{
+    InitColors();
+
     for (uint32 i = 0; i < _countof(c_reg_color_name); ++i)
-        ReadColor(hkeyApp, i);
-    if (hkeyApp)
-        RegCloseKey(hkeyApp);
-    if (hkeyUser)
-        RegCloseKey(hkeyUser);
+        ReadConfigString(hkeyApp, c_reg_color_name[i], _countof(s_colors[i]), c_default_colors[i]);
+}
 #else
-    PathW ini_filename;
-    StrW userprofile;
-    if (OS::GetEnv(L"USERPROFILE", userprofile))
-        ini_filename.SetMaybeRooted(userprofile.Text(), L".listredux");
+void ReadColors(const WCHAR* ini_filename)
+{
+    InitColors();
+
     for (uint32 i = 0; i < _countof(c_reg_color_name); ++i)
-        ReadColor(ini_filename.Text(), i);
+        ReadConfigString(ini_filename, L"Colors", c_reg_color_name[i], s_colors[i], _countof(s_colors[i]), c_default_colors[i]);
+}
 #endif
-}
-
-inline BYTE BlendValue(BYTE a, BYTE b, BYTE alpha)
-{
-    return ((WORD(a) * alpha) + (WORD(b) * (255 - alpha))) / 255;
-}
-
-static const WCHAR* MaybeDim(const WCHAR* color)
-{
-    assert(s_hidden_opacity > 0);
-    if (color && s_hidden_opacity > 0)
-    {
-        COLORREF rgb = RgbFromColor(color);
-        COLORREF rgbBack = RgbFromColor(color, RgbFromColorMode::BackgroundNotDefault);
-        if (rgb != 0xffffffff)
-        {
-            colorspace::Oklab oklab(rgb);
-            if (rgbBack != 0xffffffff)
-            {
-                const BYTE alpha = BYTE(clamp<int>(int(s_hidden_opacity * 255), 0, 255));
-                rgb = RGB(BlendValue(GetRValue(rgb), GetRValue(rgbBack), alpha),
-                          BlendValue(GetGValue(rgb), GetGValue(rgbBack), alpha),
-                          BlendValue(GetBValue(rgb), GetBValue(rgbBack), alpha));
-            }
-            else
-            {
-                if (s_light_theme)
-                    oklab.L = float(clamp(oklab.L + ((1.0 - oklab.L) * (1.0 - s_hidden_opacity)), 0.0, 1.0));
-                else
-                    oklab.L = float(clamp(oklab.L * s_hidden_opacity, 0.0, 1.0));
-                rgb = oklab.to_rgb();
-            }
-
-            static StrW s_color;
-            s_color.Set(color);
-            if (*color)
-                s_color.Append(';');
-            s_color.Printf(L"38;2;%u;%u;%u", GetRValue(rgb), GetGValue(rgb), GetBValue(rgb));
-            return s_color.Text();
-        }
-    }
-    return color;
-}
-

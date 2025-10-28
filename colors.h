@@ -14,7 +14,8 @@ class FileInfo;
 int HasBackgroundColor(const WCHAR* p);
 void ReportColorlessError(Error& e);
 
-void InitColors();
+void ReadColors(const WCHAR* ini_filename);
+
 const WCHAR* ApplyGradient(const WCHAR* color, ULONGLONG value, ULONGLONG min, ULONGLONG max);
 const WCHAR* StripLineStyles(const WCHAR* color);
 
