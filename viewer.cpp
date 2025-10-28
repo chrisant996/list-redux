@@ -848,6 +848,7 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
         right.Append(c_tab_indicator[int(s_options.tab_mode)]);
         right.Append(c_ctrl_indicator[int(s_options.ctrl_mode)]);
     }
+    const uint32 right_width = cell_count(right.Text());
 
     StrW tmp;
     uint32 msg_width = cell_count(msg);
@@ -859,11 +860,11 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
             msg = tmp.Text();
     }
 
-    if (msg_width + 3 + right.Length() > m_terminal_width)
+    if (msg_width + 3 + right_width > m_terminal_width)
         right.Clear();
 
     s.Append(msg);
-    s.AppendSpaces(m_terminal_width - (msg_width + right.Length()));
+    s.AppendSpaces(m_terminal_width - (msg_width + right_width));
     s.Append(right);
 
     s.Printf(L"\x1b[%uG", msg_width + 1);
