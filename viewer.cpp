@@ -655,16 +655,17 @@ LAutoFitContentWidth:
                 if (msg_text)
                 {
                     s2.Clear();
-                    const unsigned cells = ellipsify_ex(msg_text, m_content_width, ellipsify_mode::RIGHT, s2, L"");
+                    const uint32 content_width = m_terminal_width - 1;
+                    const unsigned cells = ellipsify_ex(msg_text, content_width, ellipsify_mode::RIGHT, s2, L"");
                     if (msg_color)
                         s.AppendColor(msg_color);
                     s.Append(s2);
                     if (msg_color)
                         s.Append(c_norm);
-                    if (cells < m_content_width)
+                    if (cells < content_width)
                     {
                         if (scroll_car.has_car())
-                            s.AppendSpaces(m_content_width - cells);
+                            s.AppendSpaces(content_width - cells);
                         else
                             s.Append(c_clreol);
                     }
