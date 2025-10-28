@@ -20,6 +20,9 @@
 #include "help.h"
 #include "os.h"
 
+constexpr bool c_floating = false;
+constexpr scroll_bar_style c_sbstyle = scroll_bar_style::eighths_block_chars;
+
 static const WCHAR c_clreol[] = L"\x1b[K";
 static const WCHAR c_no_file_open[] = L"*** No File Open ***";
 static const WCHAR c_endoffile_marker[] = L"*** End Of File ***";
@@ -113,6 +116,7 @@ private:
     unsigned        m_left = 0;
     StrW            m_feedback;
     bool            m_wrap = false;
+    bool            m_show_scrollbar = true; // TODO: control via a toggle option.
 
     bool            m_hex_mode = false;
     unsigned        m_hex_width = 0;
@@ -289,6 +293,10 @@ void Viewer::UpdateDisplay()
         m_content_height = m_terminal_height - (2 + debug_row);
     else
         m_content_height = 0;
+    const bool show_scrollbar = (m_show_scrollbar &&
+                                 m_content_height >= 4 &&
+                                 !(m_errmsg.Length() || !m_context.HasContent()) &&
+                                 m_context.GetFileSize() > 0);
 
     // Decide how many hex bytes fit per line.
     InitHexWidth();
@@ -301,7 +309,7 @@ void Viewer::UpdateDisplay()
 LAutoFitContentWidth:
     assert(autofit_retries != 2); // Should be impossible to occur...
     m_margin_width = CalcMarginWidth();
-    m_content_width = m_terminal_width - m_margin_width;
+    m_content_width = m_terminal_width - m_margin_width - show_scrollbar;
     {
         Error e;
         m_context.SetWrapWidth(m_wrap ? m_content_width : 0);
@@ -317,6 +325,29 @@ LAutoFitContentWidth:
         }
     }
     update_command_line |= working.NeedsCleanup();
+
+    // Compute scrollbar metrics.
+    scroll_car scroll_car;
+    if (show_scrollbar)
+    {
+        scroll_car.set_style(c_sbstyle);
+        if (m_context.Completed())
+        {
+            // Use line based metrics, if available.
+            scroll_car.set_extents(m_content_height, m_context.Count());
+            scroll_car.set_position(m_top);
+        }
+        else
+        {
+            // Otherwise approximate with percentage.
+            const double total = double(m_context.GetFileSize());
+            const intptr_t i_bottom = m_top + m_content_height - 1;
+            const FileOffset offset_bottom = m_context.GetOffset(i_bottom) + m_context.GetLength(i_bottom);
+            const FileOffset bytes_per_line = max<FileOffset>(1, offset_bottom / (i_bottom + 1));
+            scroll_car.set_extents(m_content_height, intptr_t(total / bytes_per_line));
+            scroll_car.set_position(m_top);
+        }
+    }
 
     // Fix the top offset.
     if (m_hex_mode)
@@ -492,6 +523,9 @@ LAutoFitContentWidth:
 
         if (m_errmsg.Length() || !m_context.HasContent())
         {
+            // There's no scrollbar when showing an error message.
+            scroll_car.set_extents(0, 0);
+
             msg_text = m_errmsg.Length() ? m_errmsg.Text() : c_no_file_open;
             WrapText(msg_text, s2, m_terminal_width);
             msg_text = s2.Text();
@@ -550,6 +584,7 @@ LAutoFitContentWidth:
             for (unsigned row = 0; row < m_content_height; ++row)
             {
                 m_context.FormatHexData(m_hex_top, row, m_hex_width, s, e, found_line);
+// TODO:  scrollbar...
                 s.Append(c_clreol);
                 s.Append(L"\n");
             }
@@ -594,16 +629,15 @@ LAutoFitContentWidth:
                     s.Append(s2);
                     if (msg_color)
                         s.Append(c_norm);
-                    s.Append(c_clreol);
                     if (cells < m_content_width)
                     {
-                        msg_text = nullptr;
-                        msg_color = nullptr;
+                        if (scroll_car.has_car())
+                            s.AppendSpaces(m_content_width - cells);
+                        else
+                            s.Append(c_clreol);
                     }
-                    else
-                    {
-                        msg_text += s2.Length();
-                    }
+                    msg_text = nullptr;
+                    msg_color = nullptr;
                 }
                 else if (m_top + row < m_context.Count())
                 {
@@ -632,17 +666,38 @@ LAutoFitContentWidth:
                     const unsigned width = m_context.FormatLineData(m_top + row, m_left, s, m_content_width, e, color, found_line);
                     if (width < m_content_width)
                     {
-                        if (!color)
+                        if (!color && !scroll_car.has_car())
                             s.Append(c_clreol);
-                        if (color && width + 1 < m_content_width)
+                        else if (width < m_content_width)
                             s.AppendSpaces(m_content_width - width);
                     }
                     if (color)
                         s.Append(c_norm);
                 }
+                else if (scroll_car.has_car())
+                {
+                    s.AppendSpaces(m_content_width);
+                }
                 else
                 {
                     s.Append(c_clreol);
+                }
+
+                if (scroll_car.has_car())
+                {
+                    const WCHAR* car = scroll_car.get_char(int32(row), c_floating);
+                    if (c_floating)
+                    {
+                        s.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                    }
+                    else
+                    {
+                        if (car)
+                            s.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
+                        s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                    }
+                    s.Append(car ? car : L" ");
+                    s.Append(c_norm);
                 }
 
                 s.Append(L"\n");
@@ -659,8 +714,6 @@ LAutoFitContentWidth:
             }
         }
     }
-
-// TODO:  Scroll bar.
 
     // Debug row.
     if (s_options.show_debug_info && update_debug_row)
@@ -1297,7 +1350,6 @@ void Viewer::FindNext(bool next)
 {
     assert(m_find.Length());
 
-    // TODO:  Print feedback saying it's searching.
     // TODO:  When should a search start over at the top of the file?
 
     ClearSignaled();

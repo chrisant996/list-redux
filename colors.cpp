@@ -46,9 +46,7 @@ static const WCHAR* c_default_colors[] =
     L"96",              // SweepFile
     L"90",              // FloatingScrollBar
     L"90",              // PopupBorder
-#ifndef USE_HALF_CHARS
     L"38;5;247",        // PopupScrollCar
-#endif
     L"93;1",            // PopupHeader
     L"38;5;247",        // PopupFooter
     L"",                // PopupContent
@@ -59,7 +57,7 @@ static_assert(_countof(c_default_colors) == size_t(ColorElement::MAX));
 
 static WCHAR s_colors[_countof(c_default_colors)][48];
 
-const WCHAR* GetTextColorParams(ColorElement element)
+const WCHAR* ConvertColorParams(ColorElement element, ColorConversion convert)
 {
     static StrW s_color;
 
@@ -108,21 +106,66 @@ const WCHAR* GetTextColorParams(ColorElement element)
                     value = 39;
                     break;
                 case 1:  case 2:  case 22:
+                    if (convert == ColorConversion::TextOnly)
+                        value = num;
+                    // REVIEW:  Bold/intense/faint gets lost in all other
+                    // conversion modes.  The user must compensate through
+                    // color definition choices.
+                    break;
                 case 3:  case 23:
                 case 4:  case 24:
                 case 9:  case 29:
                 case 53: case 55:
-                case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97:
+                    if (convert == ColorConversion::TextOnly)
+                        value = num;
+                    break;
                 case 30: case 31: case 32: case 33: case 34: case 35: case 36: case 37:
+                case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97:
                 case 39:
-                    value = num;
+                    switch (convert)
+                    {
+                    case ColorConversion::TextOnly:
+                        value = num;
+                        break;
+                    case ColorConversion::TextAsBack:
+                    case ColorConversion::SwapTextAndBack:
+                        value = num + 10;
+                        break;
+                    }
+                    break;
+                case 40: case 41: case 42: case 43: case 44: case 45: case 46: case 47:
+                case 100: case 101: case 102: case 103: case 104: case 105: case 106: case 107:
+                case 49:
+                    switch (convert)
+                    {
+                    case ColorConversion::BackAsText:
+                    case ColorConversion::SwapTextAndBack:
+                        value = num - 10;
+                        break;
+                    }
                     break;
                 case 38:
-                    value = num;
+                    switch (convert)
+                    {
+                    case ColorConversion::TextOnly:
+                        value = num;
+                        break;
+                    case ColorConversion::TextAsBack:
+                    case ColorConversion::SwapTextAndBack:
+                        value = 48;
+                        break;
+                    }
                     select_format = true;
                     keep_eaten = true;
                     break;
                 case 48:
+                    switch (convert)
+                    {
+                    case ColorConversion::BackAsText:
+                    case ColorConversion::SwapTextAndBack:
+                        value = 38;
+                        break;
+                    }
                     select_format = true;
                     assert(!keep_eaten);
                     break;
@@ -714,9 +757,7 @@ static const WCHAR* const c_reg_color_name[] =
     L"SweepFile",
     L"FloatingScrollBar",
     L"PopupBorder",
-#ifndef USE_HALF_CHARS
     L"PopupScrollCar",
-#endif
     L"PopupHeader",
     L"PopupFooter",
     L"PopupContent",

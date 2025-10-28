@@ -39,9 +39,7 @@ enum class ColorElement
     SweepFile,
     FloatingScrollBar,
     PopupBorder,
-#ifndef USE_HALF_CHARS
     PopupScrollCar,
-#endif
     PopupHeader,
     PopupFooter,
     PopupContent,
@@ -50,7 +48,9 @@ enum class ColorElement
     MAX
 };
 
-const WCHAR* GetTextColorParams(ColorElement element);
+enum class ColorConversion { TextOnly, TextAsBack, BackAsText, SwapTextAndBack };
+
+const WCHAR* ConvertColorParams(ColorElement element, ColorConversion convert=ColorConversion::TextOnly);
 const WCHAR* GetColor(ColorElement element);
 StrW MakeColor(ColorElement element);
 

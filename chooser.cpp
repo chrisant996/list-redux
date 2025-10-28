@@ -20,6 +20,9 @@
 
 #include <algorithm>
 
+constexpr bool c_floating = true;
+constexpr scroll_bar_style c_sbstyle = scroll_bar_style::half_line_chars;
+
 static const WCHAR c_clreol[] = L"\x1b[K";
 
 static const WCHAR c_no_files_tagged[] = L"*** No Files Tagged ***";
@@ -180,7 +183,6 @@ void Chooser::Reset()
     m_num_rows = 0;
     m_num_per_row = 0;
     m_visible_rows = 0;
-    m_vert_scroll_car = 0;
     m_vert_scroll_column = 0;
     m_feedback.Clear();
 
@@ -219,11 +221,12 @@ void Chooser::UpdateDisplay()
 
     EnsureColumnWidths();
 
+    scroll_car scroll_car;
     const int32 rows = int32(min<intptr_t>(m_visible_rows, m_num_rows));
-    m_vert_scroll_car = (m_terminal_width >= 8) ? calc_scroll_car_size(rows, m_num_rows) : 0;
-    if (m_vert_scroll_car)
-        m_vert_scroll_column = m_terminal_width - 2;
-    const int32 car_top = calc_scroll_car_offset(m_top, rows, m_num_rows, m_vert_scroll_car);
+    scroll_car.set_style(c_sbstyle);
+    scroll_car.set_extents(rows, m_num_rows);
+    scroll_car.set_position(m_top);
+    m_vert_scroll_column = scroll_car.has_car() ? m_terminal_width - 2 : 0;
 
     // Header.
     if (m_dirty_header)
@@ -288,18 +291,30 @@ void Chooser::UpdateDisplay()
                     row_width += FormatFileInfo(s2, pfi, m_col_widths[jj], m_details, selected, tagged, m_max_size_width);
                 }
 
-                if (m_vert_scroll_car)
+                if (scroll_car.has_car())
                 {
-                    const WCHAR* car = get_scroll_car_char(ii, car_top, m_vert_scroll_car, true/*floating*/);
-                    if (car)
+                    const WCHAR* car = scroll_car.get_char(int32(ii), c_floating);
+                    if (!c_floating || car)
                     {
                         // Space was reserved by update_layout() or col_max.
                         const uint32 pad_to = m_terminal_width - 2;
                         if (pad_to >= row_width)
                         {
                             s2.AppendSpaces(pad_to - row_width);
-                            s2.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                            if (c_floating)
+                            {
+                                s2.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                            }
+                            else
+                            {
+                                if (car)
+                                    s2.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
+                                else
+                                    car = L" ";
+                                s2.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                            }
                             s2.Append(car);                     // ┃ or etc
+                            s2.Append(c_norm);
                         }
                         row_width = pad_to + 1;
                     }
@@ -383,7 +398,6 @@ void Chooser::Relayout()
 {
     m_terminal_width = 0;
     m_terminal_height = 0;
-    m_vert_scroll_car = 0;
     m_vert_scroll_column = 0;
     ForceUpdateAll();
 }

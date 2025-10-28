@@ -5,32 +5,41 @@
 #include "scroll_car.h"
 
 //------------------------------------------------------------------------------
-#ifdef USE_HALF_CHARS
-constexpr int32 c_min_car_size = 2;
-constexpr int32 c_scale_positions = 2;
-template<typename T> inline T round(T pos) { return (pos & ~1); }
-#else
-constexpr int32 c_min_car_size = 1;
-constexpr int32 c_scale_positions = 1;
-#endif
+static int32 get_scale_positions(scroll_bar_style style)
+{
+    switch (style)
+    {
+    default:
+    case scroll_bar_style::whole_line_chars:    return 1;
+    case scroll_bar_style::whole_block_chars:   return 1;
+    case scroll_bar_style::half_line_chars:     return 2;
+    case scroll_bar_style::eighths_block_chars: return 8;
+    }
+}
 
 //------------------------------------------------------------------------------
-int32 calc_scroll_car_size(intptr_t rows, intptr_t total)
+template<typename T> inline T round_two(T pos) { return (pos & ~1); }
+template<typename T> inline T round_eight(T pos) { return (pos & ~7); }
+
+//------------------------------------------------------------------------------
+int32 calc_scroll_car_size(intptr_t rows, intptr_t total, scroll_bar_style style)
 {
     if (rows <= 0 || rows >= total)
         return 0;
 
-    const int32 car_size = int32(max<intptr_t>(c_min_car_size, min(c_scale_positions * rows, (c_scale_positions * rows * rows + (total / 2)) / total)));
+    const int32 scale_positions = get_scale_positions(style);
+    const int32 car_size = int32(max<intptr_t>(scale_positions, min(scale_positions * rows, (scale_positions * rows * rows + (total / 2)) / total)));
     return car_size;
 }
 
 //------------------------------------------------------------------------------
-int32 calc_scroll_car_offset(intptr_t top, int32 rows, intptr_t total, int32 car_size)
+int32 calc_scroll_car_offset(intptr_t top, int32 rows, intptr_t total, int32 car_size, scroll_bar_style style)
 {
     if (car_size <= 0)
         return 0;
 
-    const intptr_t car_positions = ((rows * c_scale_positions) + 1 - car_size);
+    const int32 scale_positions = get_scale_positions(style);
+    const intptr_t car_positions = ((rows * scale_positions) + 1 - car_size);
     if (car_positions <= 0)
         return 0;
 
@@ -38,68 +47,127 @@ int32 calc_scroll_car_offset(intptr_t top, int32 rows, intptr_t total, int32 car
     if (per_car_position <= 0)
         return 0;
 
-    const int32 car_offset = min<int32>((rows * c_scale_positions) - car_size, int32(double(top) / per_car_position));
+    const int32 car_offset = min<int32>((rows * scale_positions) - car_size, int32(double(top) / per_car_position));
     return car_offset;
 }
 
 //------------------------------------------------------------------------------
-const WCHAR* get_scroll_car_char(intptr_t row, intptr_t car_offset, int32 car_size, bool floating)
+const WCHAR* get_scroll_car_char(intptr_t row, intptr_t car_offset, int32 car_size, bool floating, scroll_bar_style style)
 {
     if (car_size <= 0)
         return nullptr;
 
-    row *= c_scale_positions;
+    const int32 scale_positions = get_scale_positions(style);
+    row *= scale_positions;
 
-#ifdef USE_HALF_CHARS
-    int32 full_car_size = car_size;
-    if (car_offset != round(car_offset))
-        ++full_car_size;
-    if (car_offset + car_size != round(car_offset + car_size))
-        ++full_car_size;
-    full_car_size = round(full_car_size + 1);
-
-    if (row >= round(car_offset) && row < round(car_offset) + full_car_size)
+    switch (style)
     {
-        static const WCHAR* const c_car_chars[] = {
-            L"\u257d",                                                   // ╽
-            L"\u2503",                                                   // ┃
-            L"\u257f",                                                   // ╿
-            L"\u2577",                                                   // ╷
-            L"\u2502",                                                   // │
-            L"\u2575",                                                   // ╵
-        };
-
-        int32 index;
-        if (row == round(car_offset) && // This is the first cell of the scroll car...
-            row != car_offset)          // ...and the first half is not part of the car.
+    default:
+    case scroll_bar_style::whole_line_chars:
         {
-            index = 0;
+            static const WCHAR* const c_car_chars[] = {
+                L"\u2503",                                               // ┃
+                L"\u2502",                                               // │
+            };
+            if (row >= car_offset && row < car_offset + car_size)
+                return c_car_chars[floating];
         }
-        else if (row == round(car_offset + car_size) && // This is the last cell of the scroll car...
-                 row != car_offset + car_size)          // ...and the second half is not part of the car.
+        break;
+    case scroll_bar_style::whole_block_chars:
         {
-            index = 2;
+            static const WCHAR* const c_car_chars[] = {
+                L"\u2588",                                               // █
+                //L"\u2592",                                               // ▒
+            };
+            if (row >= car_offset && row < car_offset + car_size)
+                return c_car_chars[0];
         }
-        else
+        break;
+    case scroll_bar_style::half_line_chars:
         {
-            index = 1;
+            int32 full_car_size = car_size;
+            if (car_offset != round_two(car_offset))
+                ++full_car_size;
+            if (car_offset + car_size != round_two(car_offset + car_size))
+                ++full_car_size;
+            full_car_size = round_two(full_car_size + 1);
+
+            static const WCHAR* const c_car_chars[] = {
+                L"\u257d",                                               // ╽
+                L"\u2503",                                               // ┃
+                L"\u257f",                                               // ╿
+                L"\u2577",                                               // ╷
+                L"\u2502",                                               // │
+                L"\u2575",                                               // ╵
+            };
+
+            if (row >= round_two(car_offset) && row < round_two(car_offset) + full_car_size)
+            {
+                int32 index;
+                if (row == round_two(car_offset) && // This is the first cell of the scroll car...
+                    row != car_offset)          // ...and the first half is not part of the car.
+                {
+                    index = 0;
+                }
+                else if (row == round_two(car_offset + car_size) && // This is the last cell of the scroll car...
+                         row != car_offset + car_size)        // ...and the second half is not part of the car.
+                {
+                    index = 2;
+                }
+                else
+                {
+                    index = 1;
+                }
+
+                if (floating)
+                    index += 3;
+
+                return c_car_chars[index];
+            }
         }
+        break;
+    case scroll_bar_style::eighths_block_chars:
+        {
+            static const WCHAR* const c_car_chars[] = {
+                L"\u2588",                                               // █
+                L"\u2587",                                               // ▇
+                L"\u2586",                                               // ▆
+                L"\u2585",                                               // ▅
+                L"\u2584",                                               // ▄
+                L"\u2583",                                               // ▃
+                L"\u2582",                                               // ▂
+                L"\u2581",                                               // ▁
+            };
 
-        if (floating)
-            index += 3;
+            int32 full_car_size = car_size;
+            full_car_size = round_eight(full_car_size + 7);
 
-        return c_car_chars[index];
+            // if (row >= round_eight(car_offset) && row < round_eight(car_offset) + full_car_size)
+            {
+                if (row == round_eight(car_offset) && // This is the first cell of the scroll car...
+                    row != car_offset)          // ...and the first eighth is not part of the car.
+                {
+                    const int32 index = (car_offset & 7);
+                    return c_car_chars[index];
+                }
+                else if (row == round_eight(car_offset + car_size) && // This is the last cell of the scroll car...
+                        row != car_offset + car_size)          // ...and the last eighth is not part of the car.
+                {
+                    static StrW s_bottom_char;
+                    const int32 index = (car_offset & 7);
+                    s_bottom_char.Clear();
+                    s_bottom_char.Printf(L"\x1b[7m%s\x1b[27m", c_car_chars[index]);
+                    return s_bottom_char.Text();
+                }
+                else if (row >= round_eight(car_offset) && row < round_eight(car_offset) + full_car_size)
+                {
+                    const int32 index = 0;
+                    return c_car_chars[index];
+                }
+            }
+        }
+        break;
     }
-#else
-    if (row >= car_offset && row < car_offset + car_size)
-    {
-        static const WCHAR* const c_car_chars[] = {
-            L"\u2503",                                                   // ┃
-            L"\u2502",                                                   // │
-        };
-        return c_car_chars[floating];
-    }
-#endif
 
     return nullptr;
 }
@@ -111,4 +179,54 @@ int32 hittest_scroll_car(intptr_t row, intptr_t rows, intptr_t total)
         return 0;
 
     return int32(row * (total - 1) / (rows - 1));
+}
+
+//------------------------------------------------------------------------------
+void scroll_car::set_style(scroll_bar_style style)
+{
+    m_style = style;
+}
+
+//------------------------------------------------------------------------------
+void scroll_car::set_extents(int32 rows, intptr_t total)
+{
+    if (rows < 0 || total < 0 || rows >= total)
+    {
+        rows = 0;
+        total = 0;
+    }
+    m_rows = rows;
+    m_total = total;
+    m_vert_scroll_car = (m_rows > 0) ? calc_scroll_car_size(m_rows, m_total, m_style) : 0;
+    m_car_top = -1;
+}
+
+//------------------------------------------------------------------------------
+void scroll_car::set_position(intptr_t top)
+{
+    if (m_rows > 0)
+        m_car_top = calc_scroll_car_offset(top, m_rows, m_total, m_vert_scroll_car, m_style);
+    else
+        assert(m_car_top <= 0);
+}
+
+//------------------------------------------------------------------------------
+int32 scroll_car::get_car_top() const
+{
+    return m_car_top;
+}
+
+//------------------------------------------------------------------------------
+int32 scroll_car::get_car_size() const
+{
+    return m_vert_scroll_car;
+}
+
+//------------------------------------------------------------------------------
+const WCHAR* scroll_car::get_char(int32 row, bool floating) const
+{
+    if (m_car_top < 0)
+        return nullptr;
+    assert(m_rows > 0 && m_total > 0);
+    return get_scroll_car_char(row, m_car_top, m_vert_scroll_car, floating, m_style);
 }

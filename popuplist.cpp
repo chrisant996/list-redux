@@ -14,6 +14,8 @@
 #include "scroll_car.h"
 #include "wcwidth_iter.h"
 
+constexpr scroll_bar_style c_sbstyle = scroll_bar_style::whole_line_chars;
+
 class PopupList
 {
 public:
@@ -355,7 +357,7 @@ void PopupList::update_layout()
     if (m_terminal_width <= min_screen_cols)
         m_visible_rows = 0;
 
-    m_vert_scroll_car = calc_scroll_car_size(m_visible_rows, m_count);
+    m_vert_scroll_car = calc_scroll_car_size(m_visible_rows, m_count, c_sbstyle);
 #if 0
     m_vert_scroll_column = 0;
 #endif
@@ -526,7 +528,7 @@ void PopupList::update_display()
             OutputConsole(m_hout, line.Text(), line.Length());
         }
 
-        const int32 car_top = calc_scroll_car_offset(m_top, content_height, count, m_vert_scroll_car);
+        const int32 car_top = calc_scroll_car_offset(m_top, content_height, count, m_vert_scroll_car, c_sbstyle);
 #if 0
         m_vert_scroll_column = m_mouse_left + m_mouse_width;
 #endif
@@ -570,7 +572,7 @@ void PopupList::update_display()
                 line.Append(tmp);                                   // main text
                 line.AppendSpaces(content_width + m_margin - cell_len);
 
-                const WCHAR* car = get_scroll_car_char(row, car_top, m_vert_scroll_car, false/*floating*/);
+                const WCHAR* car = get_scroll_car_char(row, car_top, m_vert_scroll_car, false/*floating*/, scroll_bar_style::whole_line_chars);
                 line.AppendNormalIf(true);
                 if (car)
                 {
@@ -672,7 +674,7 @@ void PopupList::clear_filter()
         m_index = m_filter_saved_index;
         m_ignore_scroll_offset = false;
         set_top(m_filter_saved_top);
-        m_vert_scroll_car = calc_scroll_car_size(m_visible_rows, m_count);
+        m_vert_scroll_car = calc_scroll_car_size(m_visible_rows, m_count, c_sbstyle);
     }
 }
 
@@ -769,7 +771,7 @@ bool PopupList::filter_items()
     update_top();
 
     // Update the size of the scroll bar, since m_count may have changed.
-    m_vert_scroll_car = calc_scroll_car_size(m_visible_rows, m_count);
+    m_vert_scroll_car = calc_scroll_car_size(m_visible_rows, m_count, c_sbstyle);
     return true;
 }
 

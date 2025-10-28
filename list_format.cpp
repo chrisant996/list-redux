@@ -979,7 +979,7 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
     {
         if (CanUseEscapeCodes())
         {
-            div_color = GetTextColorParams(ColorElement::Divider);
+            div_color = ConvertColorParams(ColorElement::Divider, ColorConversion::TextOnly);
             s.AppendColorOverlay(nullptr, div_color);
         }
         s.Append(c_div_char);

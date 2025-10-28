@@ -88,7 +88,6 @@ private:
     intptr_t        m_num_rows = 0;
     int32           m_num_per_row = 0;
     int32           m_visible_rows = 0;
-    int32           m_vert_scroll_car = 0;
     int32           m_vert_scroll_column = 0;
     StrW            m_feedback;
 
