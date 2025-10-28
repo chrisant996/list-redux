@@ -28,7 +28,7 @@ int32 calc_scroll_car_size(intptr_t rows, intptr_t total, scroll_bar_style style
         return 0;
 
     const int32 scale_positions = get_scale_positions(style);
-    const int32 car_size = int32(max<intptr_t>(scale_positions, min(scale_positions * rows, (scale_positions * rows * rows + (total / 2)) / total)));
+    const int32 car_size = int32(max<intptr_t>(scale_positions, min(scale_positions * rows, (intptr_t(scale_positions) * rows * rows + (total / 2)) / total)));
     return car_size;
 }
 
@@ -85,13 +85,6 @@ const WCHAR* get_scroll_car_char(intptr_t row, intptr_t car_offset, int32 car_si
         break;
     case scroll_bar_style::half_line_chars:
         {
-            int32 full_car_size = car_size;
-            if (car_offset != round_two(car_offset))
-                ++full_car_size;
-            if (car_offset + car_size != round_two(car_offset + car_size))
-                ++full_car_size;
-            full_car_size = round_two(full_car_size + 1);
-
             static const WCHAR* const c_car_chars[] = {
                 L"\u257d",                                               // ╽
                 L"\u2503",                                               // ┃
@@ -101,27 +94,21 @@ const WCHAR* get_scroll_car_char(intptr_t row, intptr_t car_offset, int32 car_si
                 L"\u2575",                                               // ╵
             };
 
-            if (row >= round_two(car_offset) && row < round_two(car_offset) + full_car_size)
+            if (row == round_two(car_offset) && // This is the first cell of the scroll car...
+                row != car_offset)          // ...and the first half is not part of the car.
             {
-                int32 index;
-                if (row == round_two(car_offset) && // This is the first cell of the scroll car...
-                    row != car_offset)          // ...and the first half is not part of the car.
-                {
-                    index = 0;
-                }
-                else if (row == round_two(car_offset + car_size) && // This is the last cell of the scroll car...
-                         row != car_offset + car_size)        // ...and the second half is not part of the car.
-                {
-                    index = 2;
-                }
-                else
-                {
-                    index = 1;
-                }
-
-                if (floating)
-                    index += 3;
-
+                const int32 index = 0 + (floating ? 3 : 0);
+                return c_car_chars[index];
+            }
+            else if (row == round_two(car_offset + car_size) && // This is the last cell of the scroll car...
+                     row != car_offset + car_size)        // ...and the second half is not part of the car.
+            {
+                const int32 index = 2 + (floating ? 3 : 0);
+                return c_car_chars[index];
+            }
+            else if (row >= round_two(car_offset) && row < round_two(car_offset + car_size))
+            {
+                const int32 index = 1 + (floating ? 3 : 0);
                 return c_car_chars[index];
             }
         }
@@ -139,31 +126,25 @@ const WCHAR* get_scroll_car_char(intptr_t row, intptr_t car_offset, int32 car_si
                 L"\u2581",                                               // ▁
             };
 
-            int32 full_car_size = car_size;
-            full_car_size = round_eight(full_car_size + 7);
-
-            // if (row >= round_eight(car_offset) && row < round_eight(car_offset) + full_car_size)
+            if (row == round_eight(car_offset) && // This is the first cell of the scroll car...
+                row != car_offset)          // ...and the first eighth is not part of the car.
             {
-                if (row == round_eight(car_offset) && // This is the first cell of the scroll car...
-                    row != car_offset)          // ...and the first eighth is not part of the car.
-                {
-                    const int32 index = (car_offset & 7);
-                    return c_car_chars[index];
-                }
-                else if (row == round_eight(car_offset + car_size) && // This is the last cell of the scroll car...
-                        row != car_offset + car_size)          // ...and the last eighth is not part of the car.
-                {
-                    static StrW s_bottom_char;
-                    const int32 index = (car_offset & 7);
-                    s_bottom_char.Clear();
-                    s_bottom_char.Printf(L"\x1b[7m%s\x1b[27m", c_car_chars[index]);
-                    return s_bottom_char.Text();
-                }
-                else if (row >= round_eight(car_offset) && row < round_eight(car_offset) + full_car_size)
-                {
-                    const int32 index = 0;
-                    return c_car_chars[index];
-                }
+                const int32 index = (car_offset & 7);
+                return c_car_chars[index];
+            }
+            else if (row == round_eight(car_offset + car_size) && // This is the last cell of the scroll car...
+                     row != car_offset + car_size)          // ...and the last eighth is not part of the car.
+            {
+                static StrW s_bottom_char;
+                const int32 index = ((car_offset + car_size) & 7);
+                s_bottom_char.Clear();
+                s_bottom_char.Printf(L"\x1b[7m%s\x1b[27m", c_car_chars[index]);
+                return s_bottom_char.Text();
+            }
+            else if (row >= round_eight(car_offset) && row < round_eight(car_offset + car_size))
+            {
+                const int32 index = 0;
+                return c_car_chars[index];
             }
         }
         break;

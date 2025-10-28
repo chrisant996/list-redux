@@ -1,7 +1,5 @@
 # BUGS
 
-- [ ] The scroll car height became jittery somehow.  Most easily seen in hex view.
-
 # FEATURES
 
 ### General
