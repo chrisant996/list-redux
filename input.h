@@ -12,6 +12,7 @@ enum class InputType
     None,
     Key,
     Char,
+    Mouse,
     Resize,
     Error,
 };
@@ -45,6 +46,12 @@ enum class Key
     F10,
     F11,
     F12,
+    MouseLeftClick,
+    MouseLeftDblClick,
+    MouseRightClick,
+    MouseDrag,
+    MouseWheel,
+    MouseHWheel,
 };
 
 enum class Modifier
@@ -64,6 +71,8 @@ struct InputRecord
     Key             key = Key::Invalid;
     WCHAR           key_char = 0;
     Modifier        modifier = Modifier::None;
+    COORD           mouse_pos = {0,0};
+    int32           mouse_wheel_amount = 0;
 };
 
 extern const WCHAR c_prompt_char[];
@@ -71,3 +80,14 @@ extern const WCHAR c_prompt_char[];
 InputRecord SelectInput(DWORD timeout=INFINITE);
 bool ReadInput(StrW& out, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&)>> input_callback=std::nullopt);
 
+class AutoMouseConsoleMode
+{
+public:
+                    AutoMouseConsoleMode(HANDLE hin=0);
+                    ~AutoMouseConsoleMode();
+    void            EnableMouseInput(bool enable);
+private:
+    HANDLE          m_hin = 0;
+    DWORD           m_orig_mode = 0;
+    DWORD           m_prev_mode = 0;
+};

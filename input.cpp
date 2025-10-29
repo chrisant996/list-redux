@@ -37,7 +37,7 @@ static Modifier ModifierFromKeyFlags(int32 key_flags)
     return mod;
 }
 
-InputRecord ProcessInput(KEY_EVENT_RECORD const& record)
+static InputRecord ProcessInput(KEY_EVENT_RECORD const& record)
 {
     InputRecord input;
 
@@ -264,6 +264,82 @@ InputRecord ProcessInput(KEY_EVENT_RECORD const& record)
     return input;
 }
 
+static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
+{
+    InputRecord input;
+
+    const COORD mouse_pos = record.dwMousePosition;
+    const DWORD key_state = record.dwControlKeyState;
+    const DWORD event_flags = record.dwEventFlags;
+
+    // Remember the button state, to differentiate press vs release.
+    static DWORD s_prev_button_state;
+    const auto prv = s_prev_button_state;
+    s_prev_button_state = record.dwButtonState;
+
+    // In a race condition, both left and right click may happen simultaneously.
+    // Only respond to one; left has priority over right.
+    const auto btn = record.dwButtonState;
+    const bool left_click = (!(prv & FROM_LEFT_1ST_BUTTON_PRESSED) && (btn & FROM_LEFT_1ST_BUTTON_PRESSED));
+    const bool right_click = !left_click && (!(prv & RIGHTMOST_BUTTON_PRESSED) && (btn & RIGHTMOST_BUTTON_PRESSED));
+    const bool double_click = left_click && (record.dwEventFlags & DOUBLE_CLICK);
+    const bool wheel = !left_click && !right_click && (record.dwEventFlags & MOUSE_WHEELED);
+    const bool hwheel = !left_click && !right_click && !wheel && (record.dwEventFlags & MOUSE_HWHEELED);
+    const bool drag = (btn & FROM_LEFT_1ST_BUTTON_PRESSED) && !left_click && !right_click && !wheel && !hwheel && (record.dwEventFlags & MOUSE_MOVED);
+
+    enum class mouse_input_type { none, left_click, right_click, double_click, wheel, hwheel, drag };
+    const mouse_input_type mask = (left_click ? mouse_input_type::left_click :
+                                   right_click ? mouse_input_type::right_click :
+                                   double_click ? mouse_input_type::double_click :
+                                   wheel ? mouse_input_type::wheel :
+                                   hwheel ? mouse_input_type::hwheel :
+                                   drag ? mouse_input_type::drag :
+                                   mouse_input_type::none);
+
+    if (mask == mouse_input_type::none)
+        return input;
+
+    input.mouse_pos = mouse_pos;
+
+    // Left or right click, or drag.
+    if (left_click || right_click || drag)
+    {
+        input.type = InputType::Mouse;
+        input.key = (drag ? Key::MouseDrag :
+                     right_click ? Key::MouseRightClick :
+                     double_click ? Key::MouseLeftDblClick :
+                     Key::MouseLeftClick);
+        return input;
+    }
+
+    // Mouse wheel.
+    if (wheel)
+    {
+        int32 direction = (0 - short(HIWORD(record.dwButtonState))) / 120;
+        UINT wheel_scroll_lines = 3;
+        SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &wheel_scroll_lines, false);
+
+        input.type = InputType::Mouse;
+        input.key = Key::MouseWheel;
+        input.mouse_wheel_amount = direction * int32(wheel_scroll_lines);
+        return input;
+    }
+
+    // Mouse horizontal wheel.
+    if (hwheel)
+    {
+        int32 direction = (short(HIWORD(record.dwButtonState))) / 32;
+        UINT hwheel_distance = 1;
+
+        input.type = InputType::Mouse;
+        input.key = Key::MouseHWheel;
+        input.mouse_wheel_amount = direction * int32(hwheel_distance);
+        return input;
+    }
+
+    return input;
+}
+
 InputRecord SelectInput(DWORD timeout)
 {
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
@@ -314,6 +390,9 @@ InputRecord SelectInput(DWORD timeout)
         case KEY_EVENT:
             input = ProcessInput(record.Event.KeyEvent);
             break;
+        case MOUSE_EVENT:
+            input = ProcessInput(record.Event.MouseEvent);
+            break;
         default:
             continue;
         }
@@ -357,10 +436,13 @@ bool ReadInput(StrW& out, DWORD max_width, std::optional<std::function<int32(con
         if (input_callback)
         {
             const int32 result = (*input_callback)(input);
+            // Negative means cancel (like ESC).
             if (result < 0)
                 return false;
+            // Positive means do not process (already handled).
             if (result > 0)
                 continue;
+            // Zero means allow normal processing.
         }
 
         if (input.type == InputType::Key)
@@ -386,3 +468,26 @@ bool ReadInput(StrW& out, DWORD max_width, std::optional<std::function<int32(con
     }
 }
 
+AutoMouseConsoleMode::AutoMouseConsoleMode(HANDLE hin)
+{
+    m_hin = hin ? hin : GetStdHandle(STD_INPUT_HANDLE);
+    if (m_hin && !GetConsoleMode(m_hin, &m_orig_mode))
+        m_hin = 0;
+}
+
+AutoMouseConsoleMode::~AutoMouseConsoleMode()
+{
+    if (m_hin)
+        SetConsoleMode(m_hin, m_orig_mode);
+}
+
+void AutoMouseConsoleMode::EnableMouseInput(bool enable)
+{
+    if (m_hin)
+    {
+        const DWORD new_mode = ((m_orig_mode & ~ENABLE_MOUSE_INPUT) |
+                                (enable ? ENABLE_MOUSE_INPUT : 0));
+        if (new_mode != m_prev_mode && SetConsoleMode(m_hin, new_mode))
+            m_prev_mode = new_mode;
+    }
+}

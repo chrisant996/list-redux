@@ -86,6 +86,7 @@ private:
     void            InitHexWidth();
     unsigned        LinePercent(size_t line) const;
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
+    void            OnLeftClick(const InputRecord& input, Error &e);
     void            EnsureAltFiles();
     void            SetFile(intptr_t index, ContentCache* context=nullptr);
     size_t          CountForDisplay() const;
@@ -141,6 +142,8 @@ private:
     bool            m_caseless = false;
     bool            m_multifile_search = false;
     FoundLine       m_found_line;
+
+    bool            m_allow_mouse = false;
 };
 
 void ScopedWorkingIndicator::ShowFeedback(bool completed, unsigned __int64 processed, unsigned __int64 target, const Viewer* viewer, bool bytes)
@@ -185,11 +188,15 @@ ViewerOutcome Viewer::Go(Error& e)
 {
     SetFile(0);
 
+    AutoMouseConsoleMode mouse_mode;
+
     while (true)
     {
         e.Clear();
 
         UpdateDisplay();
+
+        mouse_mode.EnableMouseInput(m_allow_mouse);
 
         const InputRecord input = SelectInput();
         switch (input.type)
@@ -204,6 +211,7 @@ ViewerOutcome Viewer::Go(Error& e)
 
         case InputType::Key:
         case InputType::Char:
+        case InputType::Mouse:
             {
                 const ViewerOutcome outcome = HandleInput(input, e);
                 if (outcome != ViewerOutcome::CONTINUE)
@@ -900,7 +908,7 @@ unsigned Viewer::LinePercent(size_t line) const
 
 ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
 {
-    if (input.type == InputType::Key)
+    if (input.type == InputType::Key || input.type == InputType::Mouse)
     {
         switch (input.key)
         {
@@ -948,6 +956,7 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             }
             break;
         case Key::UP:
+key_up:
             if (m_hex_mode)
             {
                 if (m_hex_top)
@@ -960,6 +969,7 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             }
             break;
         case Key::DOWN:
+key_down:
             if (m_hex_mode)
             {
                 if (m_hex_top + m_content_height * m_hex_width < m_context.GetFileSize())
@@ -1068,6 +1078,19 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
         case Key::F4:
             m_multifile_search = !m_multifile_search;
             m_force_update_footer = true;
+            break;
+
+        case Key::MouseWheel:
+            // FUTURE:  Respect the amount (in addition to the direction)?
+            // FUTURE:  Acceleration?
+            if (input.mouse_wheel_amount < 0)
+                goto key_up;
+            else if (input.mouse_wheel_amount > 0)
+                goto key_down;
+            break;
+        case Key::MouseLeftClick:
+        case Key::MouseLeftDblClick:
+            OnLeftClick(input, e);
             break;
         }
     }
@@ -1269,6 +1292,22 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
     }
 
     return ViewerOutcome::CONTINUE;
+}
+
+void Viewer::OnLeftClick(const InputRecord& input, Error& e)
+{
+    // TODO:  Mouse clicks...
+
+    // TODO:  Click on scrollbar.
+
+    // TODO:  Click on file path in header?
+    // TODO:  Click on line number (or offset) in header?
+    // TODO:  Click on content line?  (Maybe to mark/unmark?)
+    // TODO:  Click on Command in footer?
+    // TODO:  Click on encoding in footer?
+    // TODO:  Click on options in footer?
+
+    // TODO:  Could hover effects be feasible/useful?  (To show clickable spots and tooltips?)
 }
 
 void Viewer::EnsureAltFiles()
