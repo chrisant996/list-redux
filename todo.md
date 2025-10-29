@@ -75,8 +75,8 @@
 ### Future
 
 - [ ] mouse input
+  - Mouse wheel input is automatically converted to UP/DOWN keys even when ENABLE_MOUSE_INPUT is omitted, because of switching to the alternate screen.
   - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
-  - [ ] how/why is mouse wheel getting translated into UP/DOWN keys?
   - [ ] mouse wheel should scroll by _N_ lines
 - [ ] `S` configure sort order
 - [ ] option to sort horizontally instead of vertically
