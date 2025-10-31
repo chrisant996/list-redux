@@ -273,8 +273,8 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
     // PERF:  This can end up revisiting the same bytes multiple times if a
     // line wraps before the newline, up to max_line_length.  Could it be
     // worth caching and reusing the can_consume length?
-    assert(m_options.max_line_length > m_pending_length);
-    const size_t max_consume = min<size_t>(m_count, m_options.max_line_length - m_pending_length);
+    const size_t remaining = (m_options.max_line_length >= m_pending_length) ? m_options.max_line_length - m_pending_length : 0;
+    const size_t max_consume = min<size_t>(m_count, remaining);
     if (m_decoder->CharSize() == 1)
     {
         for (const BYTE* walk = m_bytes; can_consume < max_consume; ++walk)
@@ -343,18 +343,18 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
             assert(index <= m_count + !!newline);
             assert(index <= m_available);
 
+            if (m_pending_length >= m_options.max_line_length)
+            {
+                // Line reached max bytes.
+                outcome = BreakMax;
+                break;
+            }
+
             if (index >= can_consume)
             {
                 // Reached end of consumable range.
                 if (newline)
                     outcome = BreakNewline;
-                break;
-            }
-
-            if (m_pending_length + 1 >= m_options.max_line_length)
-            {
-                // Line exceeds max bytes.
-                outcome = BreakMax;
                 break;
             }
 
