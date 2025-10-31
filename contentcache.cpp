@@ -554,6 +554,7 @@ FileLineMap& FileLineMap::operator=(FileLineMap&& other)
     m_wrap = other.m_wrap;
     m_lines = std::move(other.m_lines);
     m_line_numbers = std::move(other.m_line_numbers);
+    m_detected_type = other.m_detected_type;
     m_detected_codepage = other.m_detected_codepage;
     m_codepage = other.m_codepage;
     m_detected_encoding_name = std::move(other.m_detected_encoding_name);
@@ -590,6 +591,7 @@ void FileLineMap::Clear()
     // m_wrap carries over
     m_lines.clear();
     m_line_numbers.clear();
+    m_detected_type = FileDataType::Binary;
     m_detected_codepage = 0;
     m_codepage = 0;
     m_detected_encoding_name.Clear();
@@ -623,6 +625,7 @@ void FileLineMap::OverrideEncoding(UINT codepage)
 
 void FileLineMap::SetFileType(FileDataType type, UINT codepage, const WCHAR* encoding_name)
 {
+    m_detected_type = type;
     m_detected_codepage = codepage;
     m_codepage = IsCodePageAllowed(codepage) ? codepage : GetSingleByteOEMCP();
     m_detected_encoding_name = encoding_name;
@@ -846,11 +849,6 @@ UINT FileLineMap::GetCodePage(bool hex_mode) const
     if (hex_mode)
         return EnsureSingleByteCP(m_codepage);
     return m_codepage;
-}
-
-UINT FileLineMap::GetDetectedCodePage() const
-{
-    return m_detected_codepage;
 }
 
 const WCHAR* FileLineMap::GetEncodingName(bool hex_mode) const
@@ -1219,6 +1217,8 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                         {
                             if (!color)
                                 s.AppendColor(GetColor(ColorElement::CtrlCode));
+                            // FUTURE:  Maybe '^' for ctrl codes and '?' for
+                            // the 0xfffd codepoint?
                             append_text(L"?", 1);
                             if (!color)
                                 s.Append(c_norm);

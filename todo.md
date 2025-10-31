@@ -1,7 +1,7 @@
 # BUGS
 
-- Why do "User Defined" and certain other codepages end up with completely empty file content?
-- Why do certain malformed Thai characters end up the wrong width?  (e.g. from dirx\icons.cpp)
+- Some exotic characters are calculated as the wrong width in Windows Terminal (e.g. from dirx\icons.cpp when choosing inaccurate encodings).
+- What if codepage 437 isn't installed?  It's our fallback, but if it's not installed then choose another?
 
 # FEATURES
 

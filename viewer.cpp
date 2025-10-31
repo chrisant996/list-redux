@@ -1732,14 +1732,17 @@ void Viewer::ChooseEncoding()
 
     intptr_t index = -1;
 
-    uint32 longest = c_min_popuplist_content_width - 9;
+    encodings.insert(encodings.begin(), { 0, L"Binary File" });
+
+    uint32 longest = c_min_popuplist_content_width - (2 + 2 + 7);
     for (size_t i = 0; i < encodings.size(); ++i)
     {
-        const auto& def = encodings[i];
-        if (index < 0 && def.codepage == m_context.GetDetectedCodePage())
+        const auto& enc = encodings[i];
+        if (index < 0 && (enc.codepage == m_context.GetCodePage() ||
+                          !enc.codepage && m_context.IsBinaryFile()))
             index = i;
-        names.emplace_back(def.encoding_name);
-        longest = max<>(longest, cell_count(def.encoding_name.Text()));
+        names.emplace_back(enc.encoding_name);
+        longest = max<>(longest, cell_count(enc.encoding_name.Text()));
     }
     assert(names.size() == encodings.size());
     if (names.size() == encodings.size())
@@ -1747,17 +1750,18 @@ void Viewer::ChooseEncoding()
         StrW tmp;
         for (size_t i = 0; i < names.size(); ++i)
         {
-            tmp.Clear();
-            tmp.Printf(L"(%u)", encodings[i].codepage);
-            names[i].AppendSpaces(longest - cell_count(names[i].Text()));
-            names[i].Printf(L"  %7s", tmp.Text());
+            const auto& enc = encodings[i];
+            auto& name = names[i];
+            const bool star = (enc.codepage == m_context.GetDetectedCodePage() ||
+                               !enc.codepage && m_context.IsDetectedBinaryFile());
+            tmp.Set(i == index ? L"> " : (star ? L"* " : L"  "));
+            tmp.Append(name);
+            tmp.AppendSpaces(2 + longest - cell_count(tmp.Text()));
+            name = std::move(tmp);
+            tmp.Printf(L"(%u)", enc.codepage);
+            name.Printf(L"%7s", tmp.Text());
         }
     }
-
-    encodings.insert(encodings.begin(), { 0, L"Binary File" });
-    names.insert(names.begin(), L"Binary File");
-    if (index >= 0)
-        ++index;
 
     const PopupResult result = ShowPopupList(names, L"Choose Encoding", index);
     m_force_update = true;

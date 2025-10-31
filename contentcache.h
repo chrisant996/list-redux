@@ -121,11 +121,12 @@ public:
     void            GetLineText(const BYTE* p, size_t num_bytes, StrW& out, bool hex_mode=false) const;
     size_t          FriendlyLineNumberToIndex(size_t line) const;
     size_t          OffsetToIndex(FileOffset offset) const;
+    bool            IsDetectedBinaryFile() const { return m_detected_type == FileDataType::Binary; }
     bool            IsBinaryFile() const { return m_line_iter.IsBinaryFile(); }
     bool            IsUTF8Compatible() const;
     bool            IsUnicodeEncoding() const { return m_is_unicode_encoding; }
     UINT            GetCodePage(bool hex_mode=false) const;
-    UINT            GetDetectedCodePage() const;
+    UINT            GetDetectedCodePage() const { return m_detected_codepage; }
     const WCHAR*    GetEncodingName(bool hex_mode=false) const;
     const WCHAR*    GetDetectedEncodingName() const;
 
@@ -136,6 +137,7 @@ private:
 
     std::vector<FileOffset> m_lines;
     std::vector<size_t> m_line_numbers;
+    FileDataType    m_detected_type = FileDataType::Binary;
     UINT            m_detected_codepage = 0;
     UINT            m_codepage = 0;
     StrW            m_detected_encoding_name;
@@ -163,6 +165,7 @@ public:
     bool            HasContent() const;
     bool            IsOpen() const { return m_file != INVALID_HANDLE_VALUE; }
     bool            IsPipe() const { return m_redirected; }
+    bool            IsDetectedBinaryFile() const { return m_map.IsDetectedBinaryFile(); }
     bool            IsBinaryFile() const { return m_map.IsBinaryFile(); }
     UINT            GetCodePage(bool hex_mode=false) const { return m_map.GetCodePage(hex_mode); }
     UINT            GetDetectedCodePage() const { return m_map.GetDetectedCodePage(); }
