@@ -567,6 +567,8 @@ public:
     bool            Valid() const override;
     uint32          Decode(const BYTE* p, uint32 available, uint32& num_bytes) override;
 private:
+    uint32          DecodeOneCodepoint(const CHAR* src, UINT src_size, WCHAR* dst, UINT dst_size);
+private:
     const UINT      m_codepage;
     CPINFOEXW       m_info;
     IMLangConvertCharset* m_converter = nullptr;
@@ -605,58 +607,65 @@ bool MultiByteDecoder::Valid() const
     return !!m_converter;
 }
 
+uint32 MultiByteDecoder::DecodeOneCodepoint(const CHAR* src, UINT src_size, WCHAR* dst, UINT dst_size)
+{
+#ifdef USE_MLANG_FOR_DECODE
+    switch (m_converter->DoConversionToUnicode(src, &src_size, dst, &dst_size))
+    {
+    case S_OK:
+        return dst_size;
+    case S_FALSE:
+        assert(false);
+        // Is S_FALSE reserved for certain cases that can maybe use special
+        // handling logic?
+        __fallthrough;
+    default:
+        return 0;
+    }
+#else
+    const int num = MultiByteToWideChar(m_codepage, MB_ERR_INVALID_CHARS, src, src_size, dst, dst_size);
+    return num > 0 ? num : 0;
+#endif
+}
+
 uint32 MultiByteDecoder::Decode(const BYTE* p, uint32 available, uint32& num_bytes)
 {
     assert(available > 0);
     assert(Valid());
 
-    // If the input is a lead byte, then ask the MLang converter to decode the
-    // input.
+    // If the input is a lead byte, then decode the input.
     for (const BYTE* range = m_info.LeadByte; range[0] || range[1]; range += 2)
     {
         if (range[0] <= *p && *p <= range[1])
         {
             CHAR* src = const_cast<CHAR*>(reinterpret_cast<const CHAR*>(p));
-            UINT src_size;
             WCHAR dst[8];
-            UINT dst_size;
 
             if (available > m_info.MaxCharSize)
                 available = m_info.MaxCharSize;
 
             for (uint32 num = 1; num < available; ++num)
             {
-                src_size = num;
-                dst_size = _countof(dst);
-                switch (m_converter->DoConversionToUnicode(src, &src_size, dst, &dst_size))
+                const uint32 dst_size = DecodeOneCodepoint(src, num, dst, _countof(dst));
+                if (dst_size)
                 {
-                case S_OK:
+                    assert(dst_size == 1 || dst_size == 2);
+                    uint32 c = dst[0];
+                    if (dst_size == 2)
                     {
-                        assert(dst_size == 1 || dst_size == 2);
-                        uint32 c = dst[0];
-                        if (dst_size == 2)
-                        {
-                            c <<= 10;
-                            c += dst[1];
-                            c -= 0x35fdc00;
-                        }
-                        num_bytes = num;
-                        return c;
+                        c <<= 10;
+                        c += dst[1];
+                        c -= 0x35fdc00;
                     }
-                    break;
-                case S_FALSE:
-                    assert(false);
-                    // Is S_FALSE reserved for certain cases that can maybe use
-                    // special handling logic?
-                    __fallthrough;
-                default:
-                    goto fallback;
+                    num_bytes = num;
+                    return c;
                 }
             }
+
+            break;
         }
     }
 
-fallback:
     // Upon failure or if the input wasn't a lead byte, then return the
     // literal input byte.
     num_bytes = 1;
