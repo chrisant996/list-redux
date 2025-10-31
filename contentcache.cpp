@@ -613,7 +613,7 @@ void FileLineMap::OverrideEncoding(UINT codepage)
     const FileDataType type = codepage ? FileDataType::Text : FileDataType::Binary;
     if (!codepage)
         codepage = GetSingleByteOEMCP();
-    if (GetCodePageName(codepage, tmp))
+    if (IsCodePageAllowed(codepage) && GetCodePageName(codepage, tmp))
     {
         m_codepage = codepage;
         m_encoding_name.Set(tmp);
@@ -624,7 +624,7 @@ void FileLineMap::OverrideEncoding(UINT codepage)
 void FileLineMap::SetFileType(FileDataType type, UINT codepage, const WCHAR* encoding_name)
 {
     m_detected_codepage = codepage;
-    m_codepage = codepage;
+    m_codepage = IsCodePageAllowed(codepage) ? codepage : GetSingleByteOEMCP();
     m_detected_encoding_name = encoding_name;
     m_encoding_name = encoding_name;
     m_line_iter.SetEncoding(type, m_codepage);

@@ -794,34 +794,49 @@ void SetMultiByteEnabled(bool enabled)
 #pragma endregion // Decoders
 #pragma region // Available Encodings
 
-#if 0
-static std::vector<EncodingDefinition>* s_enum_encodings = nullptr;
 static std::unordered_set<UINT>* s_enum_codepages = nullptr;
 
 static BOOL CALLBACK CodePageEnumProcW(LPWSTR lpCodePageString)
 {
     const UINT codepage = _wtoi(lpCodePageString);
-    if (codepage && s_enum_codepages->find(codepage) == s_enum_codepages->end())
+    s_enum_codepages->emplace(codepage);
+    return true;
+}
+
+bool IsCodePageAllowed(UINT cp)
+{
+    // TODO:  Change this to an inclusion list of supported codepages (e.g.
+    // the MIME codepages from ICU?).
+    if (cp == CP_UTF7)
     {
-        EncodingDefinition encoding;
-        encoding.codepage = codepage;
-        if (GetCodePageName(codepage, encoding.encoding_name))
-        {
-            s_enum_codepages->emplace(codepage);
-            s_enum_encodings->emplace_back(std::move(encoding));
-        }
+        // Disallowed because it's obsolete, it was never officially supported
+        // by the Unicode Consortium, it has security issues, and it has
+        // complexity issues because of its dependence on Base64.
+        return false;
     }
     return true;
 }
-#endif
 
 std::vector<EncodingDefinition> GetAvailableEncodings()
 {
-    std::vector<EncodingDefinition> encodings;
+    std::unordered_set<UINT> installed_codepages;
     std::unordered_set<UINT> codepages;
+    std::vector<EncodingDefinition> encodings;
 
+    // These codepages are always installed.
+    installed_codepages.emplace(CP_UTF8);
+    installed_codepages.emplace(CP_WINUNICODE);
+    installed_codepages.emplace(1201);
+    // BUGBUG:  What if codepage 437 (our fallback) isn't installed?
+
+    // First get installed codepages, to be able to filter MLang's codepages.
+    assert(!s_enum_codepages);
+    s_enum_codepages = &installed_codepages;
+    EnumSystemCodePagesW(CodePageEnumProcW, CP_INSTALLED);
+    s_enum_codepages = nullptr;
+
+    // Get the intersection of installed codepages and codepages from MLang.
     EnsureMLang();
-
     if (s_mlang)
     {
         IEnumCodePage* pecp = nullptr;
@@ -834,27 +849,23 @@ std::vector<EncodingDefinition> GetAvailableEncodings()
             {
                 for (ULONG i = 0; i < fetched; ++i)
                 {
-                    EncodingDefinition encoding;
-                    encoding.codepage = rg[i].uiCodePage;
-                    encoding.encoding_name = rg[i].wszDescription;
-                    codepages.emplace(encoding.codepage);
-                    encodings.emplace_back(std::move(encoding));
+                    const UINT cp = rg[i].uiCodePage;
+                    if (IsCodePageAllowed(cp) &&
+                        installed_codepages.find(cp) != installed_codepages.end() &&
+                        codepages.find(cp) == codepages.end())
+                    {
+                        EncodingDefinition encoding;
+                        encoding.codepage = cp;
+                        encoding.encoding_name = rg[i].wszDescription;
+                        codepages.emplace(cp);
+                        encodings.emplace_back(std::move(encoding));
+                    }
                 }
             }
             pecp->Release();
             pecp = nullptr;
         }
     }
-
-#if 0
-    assert(!s_enum_codepages);
-    assert(!s_enum_encodings);
-    s_enum_codepages = &codepages;
-    s_enum_encodings = &encodings;
-    EnumSystemCodePagesW(CodePageEnumProcW, CP_INSTALLED);
-    s_enum_codepages = nullptr;
-    s_enum_encodings = nullptr;
-#endif
 
     return encodings;
 }
