@@ -1,5 +1,8 @@
 # BUGS
 
+- Why do "User Defined" and certain other codepages end up with completely empty file content?
+- Why do certain malformed Thai characters end up the wrong width?  (e.g. from dirx\icons.cpp)
+
 # FEATURES
 
 ### General
@@ -71,6 +74,8 @@
   - [x] Decode UTF16 encoding.
   - [x] Handle UTF16-BE encoding (1201).
   - [x] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
+  - [x] allow toggling between Binary and detected Text codepage
+  - [x] allow manual override for Text encoding
 
 ### Future
 
@@ -84,8 +89,6 @@
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
   - [ ] detect C++, Lua, etc and render syntax coloring
-- [ ] allow toggling between Binary and detected Text codepage
-- [ ] allow manual override for Text encoding
 - [ ] toggle hanging indent (up to half the terminal width) (a third? a quarter? configurable maximum?)
 
 ### Maybe

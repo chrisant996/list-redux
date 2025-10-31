@@ -4,7 +4,7 @@
 // vim: set et ts=4 sw=4 cino={0s:
 
 #include "vieweroptions.h"
-#include "filetype.h"
+#include "encodings.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
 
@@ -106,6 +106,7 @@ public:
                     ~FileLineMap() = default;
     FileLineMap&    operator=(FileLineMap&& other);
 
+    void            OverrideEncoding(UINT codepage);
     bool            SetWrapWidth(unsigned wrap);
     unsigned        GetWrapWidth() const { return m_wrap; }
 
@@ -124,18 +125,20 @@ public:
     bool            IsUTF8Compatible() const;
     bool            IsUnicodeEncoding() const { return m_is_unicode_encoding; }
     UINT            GetCodePage(bool hex_mode=false) const;
+    UINT            GetDetectedCodePage() const;
     const WCHAR*    GetEncodingName(bool hex_mode=false) const;
+    const WCHAR*    GetDetectedEncodingName() const;
 
-#ifdef USE_SMALL_DATA_BUFFER
     void            SetFileType(FileDataType type, UINT codepage, const WCHAR* encoding_name);
-#endif
 
 private:
     unsigned        m_wrap = 0;
 
     std::vector<FileOffset> m_lines;
     std::vector<size_t> m_line_numbers;
+    UINT            m_detected_codepage = 0;
     UINT            m_codepage = 0;
+    StrW            m_detected_encoding_name;
     StrW            m_encoding_name;
     size_t          m_current_line_number = 1;
     FileOffset      m_processed = 0;
@@ -162,8 +165,11 @@ public:
     bool            IsPipe() const { return m_redirected; }
     bool            IsBinaryFile() const { return m_map.IsBinaryFile(); }
     UINT            GetCodePage(bool hex_mode=false) const { return m_map.GetCodePage(hex_mode); }
+    UINT            GetDetectedCodePage() const { return m_map.GetDetectedCodePage(); }
     const WCHAR*    GetEncodingName(bool hex_mode=false) const { return m_map.GetEncodingName(hex_mode); }
+    const WCHAR*    GetDetectedEncodingName() const { return m_map.GetDetectedEncodingName(); }
     bool            SetTextContent(const char* text, Error& e);
+    void            SetEncoding(UINT codepage) { m_map.OverrideEncoding(codepage); }
     bool            Open(const WCHAR* name, Error& e);
     void            Close();
 

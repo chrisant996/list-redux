@@ -16,7 +16,7 @@
 #include "ecma48.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
-#include "filetype.h"
+#include "encodings.h"
 #include "help.h"
 #include "os.h"
 
@@ -97,6 +97,7 @@ private:
     size_t          GetFoundLine(const FoundLine& found_line);
     FileOffset      GetFoundOffset(const FoundLine& found_line, unsigned* offset_highlight=nullptr);
     void            ShowFileList();
+    void            ChooseEncoding();
     void            OpenNewFile(Error& e);
     ViewerOutcome   CloseCurrentFile();
 
@@ -1107,6 +1108,12 @@ key_down:
             }
             break;
 
+        case 'E'-'@':
+            if (input.modifier == Modifier::CTRL)
+            {
+                ChooseEncoding();
+            }
+            break;
         case 'N'-'@':   // CTRL-N
             if (input.modifier == Modifier::CTRL)
             {
@@ -1716,6 +1723,46 @@ void Viewer::ShowFileList()
     m_force_update = true;
     if (!result.canceled)
         SetFile(result.selected);
+}
+
+void Viewer::ChooseEncoding()
+{
+    std::vector<EncodingDefinition> encodings = GetAvailableEncodings();
+    std::vector<StrW> names;
+
+    intptr_t index = -1;
+
+    uint32 longest = c_min_popuplist_content_width - 9;
+    for (size_t i = 0; i < encodings.size(); ++i)
+    {
+        const auto& def = encodings[i];
+        if (index < 0 && def.codepage == m_context.GetDetectedCodePage())
+            index = i;
+        names.emplace_back(def.encoding_name);
+        longest = max<>(longest, cell_count(def.encoding_name.Text()));
+    }
+    assert(names.size() == encodings.size());
+    if (names.size() == encodings.size())
+    {
+        StrW tmp;
+        for (size_t i = 0; i < names.size(); ++i)
+        {
+            tmp.Clear();
+            tmp.Printf(L"(%u)", encodings[i].codepage);
+            names[i].AppendSpaces(longest - cell_count(names[i].Text()));
+            names[i].Printf(L"  %7s", tmp.Text());
+        }
+    }
+
+    encodings.insert(encodings.begin(), { 0, L"Binary File" });
+    names.insert(names.begin(), L"Binary File");
+    if (index >= 0)
+        ++index;
+
+    const PopupResult result = ShowPopupList(names, L"Choose Encoding", index);
+    m_force_update = true;
+    if (!result.canceled)
+        m_context.SetEncoding(encodings[result.selected].codepage);
 }
 
 void Viewer::OpenNewFile(Error& e)

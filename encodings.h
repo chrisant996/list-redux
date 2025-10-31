@@ -6,6 +6,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 class StrW;
 
@@ -32,6 +33,14 @@ bool IsCoInitialized();
 bool GetCodePageName(UINT cp, StrW& encoding_name);
 UINT GetSingleByteOEMCP(StrW* encoding_name=nullptr);
 UINT EnsureSingleByteCP(UINT cp);
+
+struct EncodingDefinition
+{
+    UINT            codepage;
+    StrW            encoding_name;
+};
+
+std::vector<EncodingDefinition> GetAvailableEncodings();
 
 void SetMultiByteEnabled(bool enabled);
 

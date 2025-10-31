@@ -136,7 +136,7 @@ cancel:
         for (const auto& item : *m_items)
             m_longest = max(m_longest, cell_count(item.Text()));
     }
-    m_longest = max<uint32>(m_longest, 40);
+    m_longest = max<uint32>(m_longest, c_min_popuplist_content_width);
     if (m_title)
         m_longest = max(m_longest, cell_count(m_title) + 4);
 

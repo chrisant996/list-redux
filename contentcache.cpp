@@ -9,7 +9,6 @@
 #include "vieweroptions.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
-#include "filetype.h"
 #include "signaled.h"
 
 #include <algorithm>
@@ -555,7 +554,9 @@ FileLineMap& FileLineMap::operator=(FileLineMap&& other)
     m_wrap = other.m_wrap;
     m_lines = std::move(other.m_lines);
     m_line_numbers = std::move(other.m_line_numbers);
+    m_detected_codepage = other.m_detected_codepage;
     m_codepage = other.m_codepage;
+    m_detected_encoding_name = std::move(other.m_detected_encoding_name);
     m_encoding_name = std::move(other.m_encoding_name);
     m_current_line_number = other.m_current_line_number;
     m_processed = other.m_processed;
@@ -589,7 +590,9 @@ void FileLineMap::Clear()
     // m_wrap carries over
     m_lines.clear();
     m_line_numbers.clear();
+    m_detected_codepage = 0;
     m_codepage = 0;
+    m_detected_encoding_name.Clear();
     m_encoding_name.Clear();
     m_current_line_number = 1;
     m_processed = 0;
@@ -603,15 +606,32 @@ void FileLineMap::Clear()
 #endif
 }
 
-#ifdef USE_SMALL_DATA_BUFFER
+
+void FileLineMap::OverrideEncoding(UINT codepage)
+{
+    StrW tmp;
+    const FileDataType type = codepage ? FileDataType::Text : FileDataType::Binary;
+    if (!codepage)
+        codepage = GetSingleByteOEMCP();
+    if (GetCodePageName(codepage, tmp))
+    {
+        m_codepage = codepage;
+        m_encoding_name.Set(tmp);
+        m_line_iter.SetEncoding(type, codepage);
+    }
+}
+
 void FileLineMap::SetFileType(FileDataType type, UINT codepage, const WCHAR* encoding_name)
 {
+    m_detected_codepage = codepage;
     m_codepage = codepage;
+    m_detected_encoding_name = encoding_name;
     m_encoding_name = encoding_name;
     m_line_iter.SetEncoding(type, m_codepage);
+#ifdef USE_SMALL_DATA_BUFFER
     m_need_type = false;
-}
 #endif
+}
 
 void FileLineMap::Next(const BYTE* bytes, size_t available)
 {
@@ -621,8 +641,10 @@ void FileLineMap::Next(const BYTE* bytes, size_t available)
         if (m_need_type)
 #endif
         {
-            const FileDataType type = AnalyzeFileType(bytes, available, &m_codepage, &m_encoding_name);
-            m_line_iter.SetEncoding(type, m_codepage);
+            UINT codepage;
+            StrW encoding_name;
+            const FileDataType type = AnalyzeFileType(bytes, available, &codepage, &encoding_name);
+            SetFileType(type, codepage, encoding_name.Text());
         }
 
         switch (m_codepage)
@@ -826,6 +848,11 @@ UINT FileLineMap::GetCodePage(bool hex_mode) const
     return m_codepage;
 }
 
+UINT FileLineMap::GetDetectedCodePage() const
+{
+    return m_detected_codepage;
+}
+
 const WCHAR* FileLineMap::GetEncodingName(bool hex_mode) const
 {
     if (m_codepage)
@@ -846,6 +873,13 @@ const WCHAR* FileLineMap::GetEncodingName(bool hex_mode) const
             return m_encoding_name.Text();
         }
     }
+    return IsBinaryFile() ? L"Binary" : L"Text";
+}
+
+const WCHAR* FileLineMap::GetDetectedEncodingName() const
+{
+    if (m_detected_codepage && !m_detected_encoding_name.Empty())
+        return m_detected_encoding_name.Text();
     return IsBinaryFile() ? L"Binary" : L"Text";
 }
 

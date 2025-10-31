@@ -38,6 +38,7 @@ MODE KEYS:
          T  Toggle how tab characters are shown.
          W  Toggle wrapping to the terminal width.
 
+    Ctrl-E  Choose file encoding.
      Alt-H  Cycle through hex grouping widths in hex mode.
 
      Alt-D  Toggle showing debug info.

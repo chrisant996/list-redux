@@ -31,4 +31,6 @@ enum class PopupListFlags
 };
 DEFINE_ENUM_FLAG_OPERATORS(PopupListFlags);
 
+constexpr uint32 c_min_popuplist_content_width = 40;
+
 PopupResult ShowPopupList(const std::vector<StrW>& items, const WCHAR* title=nullptr, intptr_t index=0, PopupListFlags flags=PopupListFlags::None);

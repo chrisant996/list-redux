@@ -4,8 +4,9 @@
 // vim: set et ts=4 sw=4 cino={0s:
 
 #include "pch.h"
-#include "filetype.h"
+#include "encodings.h"
 
+#include <unordered_set>
 #include <MLang.h>
 
 static bool s_multibyte_enabled = true;
@@ -268,6 +269,11 @@ static HRESULT EnsureMLang()
 
 bool GetCodePageName(UINT cp, StrW& encoding_name)
 {
+// TODO:  Use predefined custom names, e.g. MIME names?  Take codepages and
+// names from the ICU support in Windows?  But list-redux can't directly use
+// the ICU support because it's only available in certain builds of Windows 10
+// and newer.
+
     // First try MLang.
     MIMECPINFO codepageinfo;
     EnsureMLang();
@@ -777,3 +783,71 @@ void SetMultiByteEnabled(bool enabled)
 }
 
 #pragma endregion // Decoders
+#pragma region // Available Encodings
+
+#if 0
+static std::vector<EncodingDefinition>* s_enum_encodings = nullptr;
+static std::unordered_set<UINT>* s_enum_codepages = nullptr;
+
+static BOOL CALLBACK CodePageEnumProcW(LPWSTR lpCodePageString)
+{
+    const UINT codepage = _wtoi(lpCodePageString);
+    if (codepage && s_enum_codepages->find(codepage) == s_enum_codepages->end())
+    {
+        EncodingDefinition encoding;
+        encoding.codepage = codepage;
+        if (GetCodePageName(codepage, encoding.encoding_name))
+        {
+            s_enum_codepages->emplace(codepage);
+            s_enum_encodings->emplace_back(std::move(encoding));
+        }
+    }
+    return true;
+}
+#endif
+
+std::vector<EncodingDefinition> GetAvailableEncodings()
+{
+    std::vector<EncodingDefinition> encodings;
+    std::unordered_set<UINT> codepages;
+
+    EnsureMLang();
+
+    if (s_mlang)
+    {
+        IEnumCodePage* pecp = nullptr;
+        if (SUCCEEDED(s_mlang1->EnumCodePages(MIMECONTF_VALID, &pecp)) && pecp)
+        {
+            StrA s;
+            MIMECPINFO rg[8];
+            ULONG fetched = 0;
+            while (pecp->Next(_countof(rg), rg, &fetched) == S_OK)
+            {
+                for (ULONG i = 0; i < fetched; ++i)
+                {
+                    EncodingDefinition encoding;
+                    encoding.codepage = rg[i].uiCodePage;
+                    encoding.encoding_name = rg[i].wszDescription;
+                    codepages.emplace(encoding.codepage);
+                    encodings.emplace_back(std::move(encoding));
+                }
+            }
+            pecp->Release();
+            pecp = nullptr;
+        }
+    }
+
+#if 0
+    assert(!s_enum_codepages);
+    assert(!s_enum_encodings);
+    s_enum_codepages = &codepages;
+    s_enum_encodings = &encodings;
+    EnumSystemCodePagesW(CodePageEnumProcW, CP_INSTALLED);
+    s_enum_codepages = nullptr;
+    s_enum_encodings = nullptr;
+#endif
+
+    return encodings;
+}
+
+#pragma endregion // Available Encodings

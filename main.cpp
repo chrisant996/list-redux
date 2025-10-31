@@ -33,7 +33,7 @@
 #include "config.h"
 #include "usage.h"
 #include "wcwidth.h"
-#include "filetype.h"
+#include "encodings.h"
 #include "os.h"
 
 #include <memory>
