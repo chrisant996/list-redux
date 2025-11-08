@@ -40,7 +40,7 @@ constexpr unsigned c_horiz_scroll_amount = 10;
 
 void SetMaxLineLength(const WCHAR* arg)
 {
-    const unsigned c_max_line_length = std::min<DWORD>(c_data_buffer_slop, 2048);
+    const unsigned c_max_line_length = std::min<DWORD>(c_data_buffer_slop, c_default_max_line_length);
     unsigned max_line_length = _wtoi(arg);
     if (max_line_length <= 16)
         max_line_length = 16;
@@ -92,10 +92,10 @@ private:
     size_t          CountForDisplay() const;
     void            DoSearch(bool next, bool caseless);
     void            FindNext(bool next=true);
-    void            Center(const FoundLine& found_line);
+    void            Center(const FoundOffset& found_line);
     void            GoTo();
-    size_t          GetFoundLine(const FoundLine& found_line);
-    FileOffset      GetFoundOffset(const FoundLine& found_line, unsigned* offset_highlight=nullptr);
+    size_t          GetFoundLineIndex(const FoundOffset& found_line);
+    FileOffset      GetFoundOffset(const FoundOffset& found_line, unsigned* offset_highlight=nullptr);
     void            ShowFileList();
     void            ChooseEncoding();
     void            OpenNewFile(Error& e);
@@ -138,11 +138,12 @@ private:
     bool            m_force_update = false;
     bool            m_force_update_footer = false;
     bool            m_searching = false;
+    StrW            m_searching_file;
 
     StrW            m_find;
     bool            m_caseless = false;
     bool            m_multifile_search = false;
-    FoundLine       m_found_line;
+    FoundOffset       m_found_line;
 
     bool            m_allow_mouse = false;
 };
@@ -325,7 +326,7 @@ LAutoFitContentWidth:
     m_content_width = m_terminal_width - m_margin_width - show_scrollbar;
     {
         Error e;
-        m_context.SetWrapWidth(m_wrap ? m_content_width : 0);
+        m_context.SetWrapWidth(m_wrap ? m_content_width : s_options.max_line_length);
         working.ShowFeedback(m_context.Completed(), m_context.Count(), m_top + m_content_height, this, false/*bytes*/);
         m_context.ProcessThrough(m_top + m_content_height, e);
         const unsigned new_margin_width = CalcMarginWidth();
@@ -584,22 +585,7 @@ LAutoFitContentWidth:
         }
         else if (m_hex_mode)
         {
-            // Ensure found_line which matches m_hex_mode.
-            const FoundLine* found_line = nullptr;
-            FoundLine __translated_found_line;
-            if (!m_found_line.Empty())
-            {
-                if (!m_found_line.is_line)
-                    found_line = &m_found_line;
-                else
-                {
-                    unsigned offset_highlight;
-                    const FileOffset tmp_file_offset = GetFoundOffset(m_found_line, &offset_highlight);
-                    __translated_found_line.Found(tmp_file_offset + offset_highlight, m_found_line.len);
-                    found_line = &__translated_found_line;
-                }
-            }
-
+            const FoundOffset* found_line = m_found_line.Empty() ? nullptr : &m_found_line;
             for (unsigned row = 0; row < m_content_height; ++row)
             {
                 const uint32 orig_length = s.Length();
@@ -632,27 +618,7 @@ LAutoFitContentWidth:
         }
         else
         {
-            // Ensure found_line which matches m_hex_mode.
-            const FoundLine* found_line = nullptr;
-            FoundLine __translated_found_line;
-            if (!m_found_line.Empty())
-            {
-                if (m_found_line.is_line)
-                    found_line = &m_found_line;
-                else
-                {
-                    size_t tmp_line = GetFoundLine(m_found_line);
-                    if (tmp_line < m_context.Count())
-                    {
-                        const FileOffset tmp_file_offset = m_context.GetOffset(tmp_line);
-                        const unsigned tmp_line_offset = unsigned(m_found_line.offset - tmp_file_offset);
-                        assert(tmp_line_offset < m_context.GetLength(tmp_line));
-                        __translated_found_line.Found(tmp_line, tmp_line_offset, m_found_line.len);
-                        found_line = &__translated_found_line;
-                    }
-                }
-            }
-
+            const FoundOffset* found_line = m_found_line.Empty() ? nullptr : &m_found_line;
             for (size_t row = 0; row < m_content_height; ++row)
             {
                 if (s_options.show_endoffile_line && m_top + row == m_context.Count())
@@ -673,7 +639,7 @@ LAutoFitContentWidth:
                         s.Append(c_norm);
                     if (cells < content_width)
                     {
-                        if (scroll_car.has_car())
+                        if (show_scrollbar)
                             s.AppendSpaces(content_width - cells);
                         else
                             s.Append(c_clreol);
@@ -683,7 +649,14 @@ LAutoFitContentWidth:
                 }
                 else if (m_top + row < m_context.Count())
                 {
-                    const WCHAR* color = found_line && (m_top + row == found_line->line) ? GetColor(ColorElement::MarkedLine) : nullptr;
+                    const WCHAR* color = nullptr;
+                    if (found_line)
+                    {
+                        const FileOffset row_offset = m_context.GetOffset(m_top + row);
+                        const size_t row_length = m_context.GetLength(m_top + row);
+                        if (row_offset <= found_line->offset && found_line->offset < row_offset + max<size_t>(1, row_length))
+                            color = GetColor(ColorElement::MarkedLine);
+                    }
                     if (m_margin_width)
                     {
                         s.AppendColor(GetColor(ColorElement::LineNumber));
@@ -708,7 +681,7 @@ LAutoFitContentWidth:
                     const unsigned width = m_context.FormatLineData(m_top + row, m_left, s, m_content_width, e, color, found_line);
                     if (width < m_content_width)
                     {
-                        if (!color && !scroll_car.has_car())
+                        if (!color && !show_scrollbar)
                             s.Append(c_clreol);
                         else if (width < m_content_width)
                             s.AppendSpaces(m_content_width - width);
@@ -716,27 +689,36 @@ LAutoFitContentWidth:
                     if (color)
                         s.Append(c_norm);
                 }
-                else if (scroll_car.has_car())
+                else if (show_scrollbar)
                 {
-                    s.AppendSpaces(m_content_width);
+                    s.AppendSpaces(m_margin_width + m_content_width);
                 }
                 else
                 {
                     s.Append(c_clreol);
                 }
 
-                if (scroll_car.has_car())
+                if (show_scrollbar)
                 {
-                    const WCHAR* car = scroll_car.get_char(int32(row), c_floating);
-                    if (c_floating)
+                    const WCHAR* car;
+                    if (scroll_car.has_car())
                     {
-                        s.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                        car = scroll_car.get_char(int32(row), c_floating);
+                        if (c_floating)
+                        {
+                            s.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                        }
+                        else
+                        {
+                            if (car)
+                                s.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
+                            s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                        }
                     }
                     else
                     {
-                        if (car)
-                            s.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
-                        s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                        car = c_floating ? L" " : L"\u2592";             // ▒
+                        s.AppendColor(ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextOnly));
                     }
                     s.Append(car ? car : L" ");
                     s.Append(c_norm);
@@ -771,10 +753,9 @@ LAutoFitContentWidth:
             left.Printf(L"Buffer: offset %lu, %u bytes", m_context.GetBufferOffset(), m_context.GetBufferLength());
         if (!m_found_line.Empty())
         {
-            if (m_found_line.is_line)
-                right.Printf(L"    Found: line %lu, len %u", m_found_line.line + 1, m_found_line.len);
-            else
-                right.Printf(L"    Found: offset %06lx, len %u", m_found_line.offset, m_found_line.len);
+            const size_t index = GetFoundLineIndex(m_found_line);
+            const size_t lineno = m_context.GetLineNunber(index);
+            right.Printf(L"    Found: ln %lu(%lu), offset %06lx, len %u", lineno, index, m_found_line.offset, m_found_line.len);
         }
         if (m_context.GetCodePage())
             right.Printf(L"    Encoding: %u, %s", m_context.GetCodePage(), m_context.GetEncodingName());
@@ -789,12 +770,23 @@ LAutoFitContentWidth:
 
     // Command line.
     StrW left;
-    if (m_searching)
-        left.Append(L"Searching... (Ctrl-Break to cancel)");
-    else
-        left.Printf(L"Command%s %s", c_prompt_char, m_feedback.Text());
     if (update_command_line)
+    {
+        if (m_searching)
+            left.Append(L"Searching... (Ctrl-Break to cancel)");
+        else
+            left.Printf(L"Command%s %s", c_prompt_char, m_feedback.Text());
+        if (m_searching && !m_searching_file.Empty())
+        {
+            StrW tmp;
+            left.AppendSpaces(4);
+            // -1 because of how MakeCommandLine works inside.
+            const int32 limit = m_terminal_width - 1 - left.Length();
+            ellipsify_ex(m_searching_file.Text(), limit, ellipsify_mode::PATH, tmp);
+            left.Append(tmp.Text());
+        }
         MakeCommandLine(s, left.Text());
+    }
 
     if (s.Length())
     {
@@ -857,7 +849,7 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
         right.Append(c_tab_indicator[int(s_options.tab_mode)]);
         right.Append(c_ctrl_indicator[int(s_options.ctrl_mode)]);
     }
-    const uint32 right_width = cell_count(right.Text());
+    uint32 right_width = cell_count(right.Text());
 
     StrW tmp;
     uint32 msg_width = cell_count(msg);
@@ -870,7 +862,10 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
     }
 
     if (msg_width + 3 + right_width > m_terminal_width)
+    {
         right.Clear();
+        right_width = 0;
+    }
 
     s.Append(msg);
     s.AppendSpaces(m_terminal_width - (msg_width + right_width));
@@ -1063,10 +1058,7 @@ key_down:
                     if (!next && m_found_line.Empty())
                     {
                         // Mark where to start searching.
-                        if (m_hex_mode)
-                            m_found_line.MarkOffset(m_context.GetFileSize());
-                        else
-                            m_found_line.MarkLine(m_context.Count());
+                        m_found_line.MarkOffset(m_context.GetFileSize());
                     }
                     DoSearch(next, true/*caseless*/);
                 }
@@ -1205,7 +1197,7 @@ key_down:
                 if (m_hex_mode)
                     m_found_line.MarkOffset(std::min<FileOffset>(m_hex_top + (m_content_height / 2) * m_hex_width, m_context.GetFileSize() / 2));
                 else
-                    m_found_line.MarkLine(m_top + (std::min<size_t>(m_content_height, m_context.Count()) / 2));
+                    m_found_line.MarkOffset(m_context.GetOffset(m_top + (std::min<size_t>(m_content_height, m_context.Count()) / 2)));
                 m_force_update = true;
             }
             break;
@@ -1437,16 +1429,18 @@ void Viewer::FindNext(bool next)
 
     assert(!m_searching);
     m_searching = true;
+    m_searching_file.Clear();
     m_force_update_footer = true;
     UpdateDisplay();
 
     Error e;
+    unsigned left_offset = m_left;
     bool found = (m_hex_mode ?
             m_context.Find(next, m_find.Text(), m_hex_width, m_found_line, m_caseless, e) :
-            m_context.Find(next, m_find.Text(), m_found_line, m_caseless, e));
+            m_context.Find(next, m_find.Text(), m_content_width, m_found_line, left_offset, m_caseless, e));
     bool canceled = (e.Code() == E_ABORT);
 
-    if (!found && !canceled && !m_text && m_multifile_search && !m_hex_mode && m_files)
+    if (!found && !canceled && !m_text && m_multifile_search && m_files)
     {
         size_t index = m_index;
         ContentCache ctx(s_options);
@@ -1458,6 +1452,10 @@ void Viewer::FindNext(bool next)
                 --index;
             if (index >= m_files->size())
                 break;
+
+            m_searching_file = (*m_files)[index].Text();
+            m_force_update_footer = true;
+            UpdateDisplay();
 
             Error e;
             ctx.Open((*m_files)[index].Text(), e);
@@ -1471,13 +1469,20 @@ void Viewer::FindNext(bool next)
                 break;
             }
 
-            FoundLine found_line;
-            found = ctx.Find(next, m_find.Text(), found_line, m_caseless, e);
+            FoundOffset found_line;
+            ctx.SetWrapWidth(m_wrap ? m_content_width : s_options.max_line_length);
+            found = (m_hex_mode ?
+                    ctx.Find(next, m_find.Text(), m_hex_width, found_line, m_caseless, e) :
+                    ctx.Find(next, m_find.Text(), m_content_width, found_line, left_offset, m_caseless, e));
             if (e.Code() == E_ABORT)
             {
                 SetFile(index, &ctx);
                 Center(found_line);
+                if (!m_hex_mode)
+                    m_left = left_offset;
                 canceled = true;
+                assert(!found);
+                found = false;
                 break;
             }
 
@@ -1490,6 +1495,7 @@ void Viewer::FindNext(bool next)
     }
 
     m_searching = false;
+    m_searching_file.Clear();
     m_force_update_footer = true;
     m_feedback.Clear();
 
@@ -1500,11 +1506,13 @@ void Viewer::FindNext(bool next)
     else
     {
         Center(m_found_line);
+        if (!m_hex_mode)
+            m_left = left_offset;
         m_force_update = true;
     }
 }
 
-void Viewer::Center(const FoundLine& found_line)
+void Viewer::Center(const FoundOffset& found_line)
 {
     assert(!found_line.Empty());
     if (found_line.Empty())
@@ -1512,6 +1520,7 @@ void Viewer::Center(const FoundLine& found_line)
 
     if (m_hex_mode)
     {
+// BUGBUG:  Not centering correctly...
         const FileOffset offset = GetFoundOffset(found_line);
         const unsigned center = (m_content_height / 2) * m_hex_width;
         if (offset >= center)
@@ -1521,7 +1530,7 @@ void Viewer::Center(const FoundLine& found_line)
     }
     else
     {
-        const size_t line = GetFoundLine(found_line);
+        const size_t line = GetFoundLineIndex(found_line);
         const unsigned center = m_content_height / 2;
         if (line >= center)
             m_top = line - center;
@@ -1648,7 +1657,7 @@ void Viewer::GoTo()
             if (wcstonum(p, radix, line) && line > 0)
             {
                 line = m_context.FriendlyLineNumberToIndex(line);
-                m_found_line.MarkLine(line);
+                m_found_line.MarkOffset(m_context.GetOffset(line));
                 Center(m_found_line);
                 m_force_update = true;
             }
@@ -1656,64 +1665,38 @@ void Viewer::GoTo()
     }
 }
 
-size_t Viewer::GetFoundLine(const FoundLine& found_line)
+size_t Viewer::GetFoundLineIndex(const FoundOffset& found_line)
 {
     assert(!found_line.Empty());
-    size_t line = found_line.line;
-    if (!found_line.is_line)
-    {
-        line = 0;
+    size_t line = 0;
 // TODO:  Use binary search over the lines processed so far.
-        for (size_t ii = 0; true; ++ii)
+    for (size_t ii = 0; true; ++ii)
+    {
+        if (ii >= m_context.Count())
         {
+            Error e;
+            m_context.ProcessThrough(ii + 1, e);
+            // TODO:  Do something with the error?
             if (ii >= m_context.Count())
-            {
-                Error e;
-                m_context.ProcessThrough(ii + 1, e);
-                // TODO:  Do something with the error?
-                if (ii >= m_context.Count())
-                    break;
-            }
-            if (m_context.GetOffset(ii) <= found_line.offset)
-                line = ii;
-            else
                 break;
         }
+        if (m_context.GetOffset(ii) <= found_line.offset)
+            line = ii;
+        else
+            break;
     }
     return line;
 }
 
-FileOffset Viewer::GetFoundOffset(const FoundLine& found_line, unsigned* offset_highlight)
+FileOffset Viewer::GetFoundOffset(const FoundOffset& found_line, unsigned* offset_highlight)
 {
     assert(m_hex_mode);
     assert(!found_line.Empty());
     FileOffset offset = found_line.offset;
-    if (found_line.is_line)
-    {
-        Error e;
-        m_context.ProcessThrough(found_line.line, e);
-        // TODO:  Do something with the error?
-        if (found_line.line >= m_context.Count())
-        {
-            offset = m_context.GetFileSize();
-            if (offset_highlight)
-                *offset_highlight = 0;
-        }
-        else
-        {
-            const FileOffset highlight = m_context.GetOffset(found_line.line) + found_line.offset;
-            offset = highlight & ~FileOffset(m_hex_width - 1);
-            if (offset_highlight)
-                *offset_highlight = unsigned(highlight - offset);
-        }
-    }
-    else
-    {
-        const FileOffset highlight = found_line.offset;
-        offset = highlight & ~FileOffset(m_hex_width - 1);
-        if (offset_highlight)
-            *offset_highlight = unsigned(highlight - offset);
-    }
+    const FileOffset highlight = found_line.offset;
+    offset = highlight & ~FileOffset(m_hex_width - 1);
+    if (offset_highlight)
+        *offset_highlight = unsigned(highlight - offset);
     return offset;
 }
 

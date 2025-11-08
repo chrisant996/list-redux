@@ -12,21 +12,17 @@
 
 typedef unsigned __int64 FileOffset;
 
-struct FoundLine
+struct FoundOffset
 {
-                    FoundLine() { Clear(); }
+                    FoundOffset() { Clear(); }
     bool            Empty() const { return !is_valid; }
     void            Clear();
-    void            MarkLine(size_t found_line);
     void            MarkOffset(FileOffset found_offset);
-    void            Found(size_t found_line, unsigned found_offset, unsigned found_len);
     void            Found(FileOffset found_offset, unsigned found_len);
 
-    size_t          line;           // Line number index where text was found.
-    FileOffset      offset;         // Offset where text was found (may be line-relative, or file-absolute).
+    FileOffset      offset;         // Offset where text was found.
     unsigned        len;            // Length of found text in line (NOTE: may extend past end of line if a line break occurred).
-    bool            is_valid;       // True when line or offset are valid, False otherwise.
-    bool            is_line;        // True for found line, False for absolute file offset.
+    bool            is_valid;       // True when offset is valid, False otherwise.
 };
 
 struct PipeChunk
@@ -178,8 +174,8 @@ public:
 
     void            Reset();
     void            SetWrapWidth(unsigned wrap);
-    unsigned        FormatLineData(size_t line, unsigned left_offset, StrW& s, unsigned max_width, Error& e, const WCHAR* color=nullptr, const FoundLine* found_line=nullptr);
-    bool            FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundLine* found_line=nullptr);
+    unsigned        FormatLineData(size_t line, unsigned left_offset, StrW& s, unsigned max_width, Error& e, const WCHAR* color=nullptr, const FoundOffset* found_line=nullptr, unsigned max_len=-1);
+    bool            FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundOffset* found_line=nullptr);
 
     bool            ProcessThrough(size_t line, Error& e, bool cancelable=false);
     bool            ProcessToEnd(Error& e, bool cancelable=false);
@@ -196,8 +192,8 @@ public:
     size_t          FriendlyLineNumberToIndex(size_t index) const { return m_map.FriendlyLineNumberToIndex(index); }
     unsigned        GetLength(size_t index) const;
 
-    bool            Find(bool next, const WCHAR* needle, FoundLine& found, bool caseless, Error& e);
-    bool            Find(bool next, const WCHAR* needle, unsigned hex_width, FoundLine& found, bool caseless, Error& e);
+    bool            Find(bool next, const WCHAR* needle, unsigned max_width, FoundOffset& found, unsigned& left_offset, bool caseless, Error& e);
+    bool            Find(bool next, const WCHAR* needle, unsigned hex_width, FoundOffset& found, bool caseless, Error& e);
 
     FileOffset      GetBufferOffset() const { return m_data_offset; }
     unsigned        GetBufferLength() const { return m_data_length; }

@@ -206,6 +206,8 @@ void Chooser::ForceUpdateAll()
 
 void Chooser::UpdateDisplay()
 {
+// BUGBUG:  in the @withfig/autocomplete/build directory this gets the max
+// scroll height all wrong.
     if (!m_last_feedback.Equal(m_feedback))
         m_dirty_footer = true;
 

@@ -26,6 +26,7 @@
 static const WCHAR c_eol_marker[] = L"\x1b[36m\u2022\x1b[m";
 
 constexpr unsigned c_tab_width = 8;
+constexpr unsigned c_find_horiz_scroll_threshold = 10;
 
 static HANDLE s_piped_stdin = 0;
 void SetPipedInput()
@@ -88,54 +89,30 @@ static DWORD GetSystemPageSize()
 
 static const DWORD s_page_size = GetSystemPageSize();
 
-#pragma region // FoundLine
+#pragma region // FoundOffset
 
-void FoundLine::Clear()
+void FoundOffset::Clear()
 {
     is_valid = false;
-    is_line = true;
-    line = 0;
     offset = 0;
     len = 0;
 }
 
-void FoundLine::MarkLine(size_t found_line)
+void FoundOffset::MarkOffset(FileOffset found_offset)
 {
     is_valid = true;
-    is_line = true;
-    line = found_line;
-    offset = 0;
-    len = 0;
-}
-
-void FoundLine::MarkOffset(FileOffset found_offset)
-{
-    is_valid = true;
-    is_line = false;
-    line = 0;
     offset = found_offset;
     len = 0;
 }
 
-void FoundLine::Found(size_t found_line, unsigned found_offset, unsigned found_len)
+void FoundOffset::Found(FileOffset found_offset, unsigned found_len)
 {
     is_valid = true;
-    is_line = true;
-    line = found_line;
     offset = found_offset;
     len = found_len;
 }
 
-void FoundLine::Found(FileOffset found_offset, unsigned found_len)
-{
-    is_valid = true;
-    is_line = false;
-    line = 0;
-    offset = found_offset;
-    len = found_len;
-}
-
-#pragma endregion // FoundLine
+#pragma endregion // FoundOffset
 #pragma region // PipeChunk
 
 PipeChunk::PipeChunk()
@@ -240,6 +217,7 @@ void FileLineIter::SetEncoding(FileDataType type, UINT codepage)
 
 void FileLineIter::SetWrapWidth(uint32 wrap)
 {
+    assert(wrap);
     m_wrap = wrap ? wrap : m_options.max_line_length;
 }
 
@@ -577,6 +555,7 @@ FileLineMap& FileLineMap::operator=(FileLineMap&& other)
 
 bool FileLineMap::SetWrapWidth(unsigned wrap)
 {
+    assert(wrap);
     if (m_wrap != wrap)
     {
         m_wrap = wrap;
@@ -1056,19 +1035,19 @@ void ContentCache::SetWrapWidth(unsigned wrap)
     }
 }
 
-unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, StrW& s, const unsigned max_width, Error& e, const WCHAR* const color, const FoundLine* const found_line)
+unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, StrW& s, const unsigned max_width, Error& e, const WCHAR* const color, const FoundOffset* const found_line, unsigned max_len)
 {
     if (!EnsureFileData(line, e))
         return 0;
     if (line >= m_map.Count())
         return 0;
 
-    assert(!found_line || (!found_line->Empty() && found_line->is_line));
+    assert(!found_line || !found_line->Empty());
     const FileOffset offset = GetOffset(line);
 
     assert(offset >= m_data_offset);
     const BYTE* ptr = m_data + (offset - m_data_offset);
-    const unsigned len = GetLength(line);
+    const unsigned len = min(max_len, GetLength(line));
     assert(ptr + len <= m_data + m_data_length);
 
     StrW tmp;
@@ -1084,9 +1063,10 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
 
     auto append_text = [&](const WCHAR* text, unsigned text_len, unsigned cells=1)
     {
-        if (found_line && line == found_line->line && found_line->len && text == tmp.Text() + found_line->offset)
+        assert(implies(need_found_highlight && found_line, found_line->offset >= offset));
+        if (found_line && offset <= found_line->offset && found_line->offset < offset + len && text == tmp.Text() + found_line->offset - offset)
             need_found_highlight = true;
-        else if (need_found_highlight && text >= tmp.Text() + found_line->offset + found_line->len)
+        if (need_found_highlight && text >= tmp.Text() + found_line->offset + found_line->len - offset)
             need_found_highlight = false;
 
         if (visible_len >= left_offset)
@@ -1096,13 +1076,12 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                 left_offset = 0;
                 visible_len = 0;
             }
-            if (need_found_highlight)
+            if (need_found_highlight && !highlighting_found_text)
             {
                 s.AppendColor(GetColor(ColorElement::SearchFound));
-                need_found_highlight = false;
                 highlighting_found_text = true;
             }
-            else if (highlighting_found_text && text >= tmp.Text() + found_line->offset + found_line->len)
+            else if (highlighting_found_text && !need_found_highlight)
             {
                 s.Append(c_norm);
                 if (color)
@@ -1281,7 +1260,7 @@ LOut:
     return visible_len;
 }
 
-bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundLine* found_line)
+bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundOffset* found_line)
 {
     offset += row * hex_bytes;
 
@@ -1461,6 +1440,16 @@ bool ContentCache::ProcessThrough(size_t line, Error& e, bool cancelable)
         {
             m_map.Next(nullptr, 0);
             m_completed = true;
+#ifdef DEBUG
+            size_t total_bytes = 0;
+            for (size_t i = 0; i < m_map.Count(); ++i)
+            {
+                const size_t len = GetLength(i);
+                total_bytes += len;
+            }
+            assert(m_map.Processed() == m_size);
+            assert(total_bytes == m_size);
+#endif
         }
     }
     else
@@ -1494,6 +1483,9 @@ unsigned ContentCache::GetLength(size_t line) const
     assert(line < Count());
     if (line < Count())
     {
+        // IMPORTANT:  Must have processed through the _next_ line as well to
+        // get an accurate length!
+        assert(m_map.Processed() == m_size || line + 1 < Count());
         const FileOffset offset = GetOffset(line);
         const FileOffset next = (line + 1 < Count()) ? GetOffset(line + 1) : m_map.Processed();
         assert(next - offset <= 1024);
@@ -1502,13 +1494,13 @@ unsigned ContentCache::GetLength(size_t line) const
     return 0;
 }
 
-bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, bool caseless, Error& e)
+bool ContentCache::Find(bool next, const WCHAR* needle, unsigned max_width, FoundOffset& found_line, unsigned& left_offset, bool caseless, Error& e)
 {
     StrW tmp;
     const unsigned needle_len = unsigned(wcslen(needle));
     assert(needle_len);
 
-    if (!found_line.is_line || found_line.Empty())
+    if (found_line.Empty())
     {
         if (!next)
         {
@@ -1520,39 +1512,44 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
         if (found_line.Empty())
         {
             if (next)
-                found_line.Found(0, 0, 0);
+                found_line.Found(0, 0);
             else
-                found_line.Found(Count(), 0, 0);
+                found_line.Found(m_size, 0);
         }
         else
         {
-            assert(!found_line.is_line);
             const size_t index = m_map.OffsetToIndex(found_line.offset);
             const unsigned offset = unsigned(found_line.offset - m_map.GetOffset(index));
-            found_line.Found(index, offset, 0);
+            found_line.Found(offset, 0);
         }
     }
 
-    assert(!found_line.Empty() && found_line.is_line);
-    size_t index = found_line.line;
+    assert(!found_line.Empty());
+    size_t index = m_map.OffsetToIndex(found_line.offset);
     while (true)
     {
         if (IsSignaled())
         {
-            found_line.Found(index, 0, 0);
+            found_line.Found(GetOffset(index), 0);
             e.Set(E_ABORT);
             return false;
         }
 
         if (next)
         {
-            if (index + 1 >= Count())
+            // IMPORTANT:  Must process through the _next_ line to get an
+            // accurate length for the current line.
+            const unsigned c_resolve_pending_wrap = 1;
+            if (index + 1 + c_resolve_pending_wrap >= Count())
             {
-                ProcessThrough(index + 1, e, true/*cancelable*/);
+                ProcessThrough(index + 1 + c_resolve_pending_wrap, e, true/*cancelable*/);
                 if (e.Test())
                 {
                     if (e.Code() == E_ABORT)
-                        found_line.Found(index, 0, 0);
+                    {
+                        found_line.Found(GetOffset(index), 0);
+                        left_offset = 0;
+                    }
                     return false;
                 }
                 if (index + 1 >= Count())
@@ -1574,7 +1571,8 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
         const FileOffset offset = GetOffset(index);
         assert(offset >= m_data_offset);
         const BYTE* const ptr = m_data + (offset - m_data_offset);
-        unsigned len = GetLength(index);
+        const unsigned real_len = GetLength(index);
+        unsigned len = real_len;
         assert(len);
         assert(ptr + len <= m_data + m_data_length);
 
@@ -1605,14 +1603,49 @@ bool ContentCache::Find(bool next, const WCHAR* needle, FoundLine& found_line, b
             const int n = caseless ? _wcsnicmp(p, needle, needle_len) : wcsncmp(p, needle, needle_len);
             if (n == 0)
             {
-                found_line.Found(index, unsigned(p - tmp.Text()), needle_len);
+                // Check found offset.
+                const unsigned index_in_line = unsigned(p - tmp.Text());
+                if (index_in_line >= real_len)
+                    return false; // Was actually found on the _next_ line.
+                found_line.Found(GetOffset(index) + index_in_line, needle_len);
+                // Calculate horizontal scroll offset.
+                tmp.Clear();
+                FormatLineData(index, 0, tmp, -1, e, nullptr, nullptr, index_in_line);
+                const unsigned prefix_cells = cell_count(tmp.Text());
+                tmp.Clear();
+                FormatLineData(index, 0, tmp, -1, e, nullptr, nullptr, index_in_line + needle_len);
+                const unsigned prefixneedle_cells = cell_count(tmp.Text());
+                const unsigned needle_cells = prefixneedle_cells - prefix_cells;
+                if (prefix_cells + needle_cells + c_find_horiz_scroll_threshold <= max_width)
+                {
+                    left_offset = 0;
+                }
+                else
+                {
+                    // Center the found text horizontally.
+                    const int center_offset = (max_width - needle_cells) / 2;
+                    left_offset = int(prefix_cells) - center_offset;
+                    // Nudge the left offset so it doesn't scroll past the
+                    // wrap width or line length.
+                    tmp.Clear();
+                    const unsigned line_cells = FormatLineData(index, 0, tmp, -1, e);
+                    if (line_cells)
+                    {
+                        assert(m_map.GetWrapWidth());
+                        if (m_map.GetWrapWidth())
+                            left_offset = min<int>(left_offset, int(line_cells) - min(max_width, m_map.GetWrapWidth()));
+                        else
+                            left_offset = min<int>(left_offset, int(line_cells) + c_find_horiz_scroll_threshold - max_width);
+                    }
+                    left_offset = max<int>(0, left_offset);
+                }
                 return true;
             }
         }
     }
 }
 
-bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, FoundLine& found_line, bool caseless, Error& e)
+bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, FoundOffset& found_line, bool caseless, Error& e)
 {
     StrW tmp;
     const unsigned needle_len = unsigned(wcslen(needle));
@@ -1625,13 +1658,8 @@ bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, Foun
         else
             found_line.Found(GetFileSize(), 0);
     }
-    else if (found_line.is_line)
-    {
-        size_t index = m_map.FriendlyLineNumberToIndex(found_line.line + 1);
-        found_line.Found(m_map.GetOffset(index) + found_line.offset, 0);
-    }
 
-    assert(!found_line.Empty() && !found_line.is_line);
+    assert(!found_line.Empty());
     FileOffset offset = found_line.offset;
     while (true)
     {
