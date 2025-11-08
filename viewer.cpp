@@ -347,8 +347,8 @@ LAutoFitContentWidth:
         const FileOffset hex_page = m_content_height * m_hex_width;
         if (m_hex_top + hex_page > max_hex)
         {
-            if (m_hex_top > hex_page)
-                m_hex_top -= hex_page;
+            if (max_hex > hex_page)
+                m_hex_top = max_hex - hex_page;
             else
                 m_hex_top = 0;
         }
@@ -1520,7 +1520,6 @@ void Viewer::Center(const FoundOffset& found_line)
 
     if (m_hex_mode)
     {
-// BUGBUG:  Not centering correctly...
         const FileOffset offset = GetFoundOffset(found_line);
         const unsigned center = (m_content_height / 2) * m_hex_width;
         if (offset >= center)
