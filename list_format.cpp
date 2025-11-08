@@ -359,7 +359,7 @@ void FormatFilename(StrW& s, const FileInfo* pfi, unsigned max_width, const WCHA
 
     if (max_width)
     {
-        const unsigned truncate_width = max_width - !!pfi->IsDirectory();
+        const unsigned truncate_width = max_width - (pfi->IsDirectory() ? 2 : 0);
         name_width = __wcswidth(name.Text());
         if (name_width > truncate_width)
         {
@@ -387,6 +387,12 @@ void FormatFilename(StrW& s, const FileInfo* pfi, unsigned max_width, const WCHA
     }
 
     s.Append(p);
+
+    if (pfi->IsDirectory())
+    {
+        s.Append(L"\\");
+        ++name_width;
+    }
 
     if (max_width)
         s.AppendSpaces(max_width - name_width);
@@ -924,7 +930,8 @@ unsigned WidthForFileInfo(const FileInfo* pfi, int details, int size_width)
 
     if (pfi)
     {
-        width += !!pfi->IsDirectory();  // Up or down arrow for directory.
+        // Directories add 1 for up/down arrow plus 1 for trailing backslash.
+        width += (pfi->IsDirectory() ? 2 : 0);
         width += __wcswidth(pfi->GetName().Text());
     }
 
