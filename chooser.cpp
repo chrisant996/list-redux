@@ -206,8 +206,6 @@ void Chooser::ForceUpdateAll()
 
 void Chooser::UpdateDisplay()
 {
-// BUGBUG:  in the @withfig/autocomplete/build directory this gets the max
-// scroll height all wrong.
     if (!m_last_feedback.Equal(m_feedback))
         m_dirty_footer = true;
 
@@ -887,9 +885,9 @@ void Chooser::SetTop(intptr_t top)
             m_top = top;
             m_dirty.MarkAll();
         }
-        if (m_top > m_num_rows - num_per_page && m_num_rows > num_per_page)
+        else if (m_num_rows > m_visible_rows)
         {
-            m_top = m_num_rows - num_per_page;
+            m_top = m_num_rows - m_visible_rows;
             m_dirty.MarkAll();
         }
     }
