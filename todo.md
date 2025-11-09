@@ -47,8 +47,10 @@
 - [x] `R` show ruler (both in text and hex modes)
 - [x] `N` show line numbers
 - [x] `O` show file offset
+- [x] `E` toggle show line endings
+- [x] `Space` toggle show whitespace
 - [x] `C` expand ctrl chars
-- [x] `T`expand tabs
+- [x] `T` expand tabs
 - [x] `G` go to line
 - [x] `J` jump to marked line
 - [x] `M` mark center line

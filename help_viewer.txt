@@ -31,10 +31,12 @@ Ctrl-Break  Cancel search.
 MODE KEYS:
 
          C  Toggle how control characters are shown.
+         E  Toggle showing line endings (only in text files).
          H  Toggle viewing content as hexadecimal values.
          N  Toggle showing file line numbers.
          O  Toggle showing file offsets.
          R  Toggle showing a ruler at the top.
+     Space  Toggle showing whitespace.
          T  Toggle how tab characters are shown.
          W  Toggle wrapping to the terminal width.
 

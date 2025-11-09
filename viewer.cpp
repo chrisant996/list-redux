@@ -816,12 +816,6 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
         L"C",                       // EXPAND
 #endif
     };
-    static const WCHAR* const c_tab_indicator[] =
-    {
-        L"T",                       // EXPAND
-        L"\x1b[7mT\x1b[27m",        // HIGHLIGHT
-        L"t",                       // RAW
-    };
 
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
@@ -835,6 +829,8 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
 #ifdef DEBUG
     right.Append(s_options.show_debug_info ? L"D" : L"d");
 #endif
+    if (!m_text /*&& !m_context.IsBinaryFile()*/)
+        right.Append(s_options.show_line_endings ? L"E" : L"e");
     if (!m_text)
         right.Append(m_hex_mode ? L"H" : L"h");
     right.Append(s_options.show_line_numbers ? L"N" : L"n");
@@ -843,10 +839,11 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
         right.Append(s_options.show_file_offsets ? L"O" : L"o");
         right.Append(s_options.show_ruler ? L"R" : L"r");
     }
+    right.Append(s_options.show_whitespace ? L"S" : L"s");
     right.Append(m_wrap ? L"W" : L"w");
     if (!m_text)
     {
-        right.Append(c_tab_indicator[int(s_options.tab_mode)]);
+        right.Append(s_options.expand_tabs ? L"T" : L"t");
         right.Append(c_ctrl_indicator[int(s_options.ctrl_mode)]);
     }
     uint32 right_width = cell_count(right.Text());
@@ -1150,6 +1147,13 @@ key_down:
                 m_force_update = true;
             }
             break;
+        case 'e':
+            if (input.modifier == Modifier::None)
+            {
+                s_options.show_line_endings = !s_options.show_line_endings;
+                m_force_update = true;
+            }
+            break;
         case 'g':
             if (input.modifier == Modifier::None)
             {
@@ -1239,12 +1243,19 @@ key_down:
                 }
             }
             break;
+        case ' ':
+            if (input.modifier == Modifier::None)
+            {
+                s_options.show_whitespace = !s_options.show_whitespace;
+                m_force_update = true;
+            }
+            break;
         case 't':
             if (input.modifier == Modifier::None)
             {
                 if (!m_hex_mode && !m_text)
                 {
-                    s_options.tab_mode = TabMode((int(s_options.tab_mode) + 1) % int(TabMode::__MAX));
+                    s_options.expand_tabs = !s_options.expand_tabs;
                     m_context.Reset();
                     m_force_update = true;
                 }
@@ -1813,7 +1824,8 @@ ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title)
     ViewerOptions old = s_options;
     s_options = ViewerOptions();
     s_options.ctrl_mode = CtrlMode::OEM437;
-    s_options.tab_mode = TabMode::EXPAND;
+    s_options.expand_tabs = true;
+    s_options.show_whitespace = false;
     s_options.show_line_numbers = false;
     s_options.show_file_offsets = false;
     s_options.show_ruler = false;

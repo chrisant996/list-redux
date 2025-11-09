@@ -25,7 +25,6 @@
 // static const WCHAR c_eol_marker[] = L"\x1b[36m\u22a6\x1b[m";
 static const WCHAR c_eol_marker[] = L"\x1b[36m\u2022\x1b[m";
 
-constexpr unsigned c_tab_width = 8;
 constexpr unsigned c_find_horiz_scroll_threshold = 10;
 
 static HANDLE s_piped_stdin = 0;
@@ -349,8 +348,8 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
                 blen = 1;
 
                 // Calc width of codepoint.
-                if (c == '\t' && m_options.ctrl_mode != CtrlMode::EXPAND && m_options.tab_mode != TabMode::RAW)
-                    clen = c_tab_width - (m_pending_width % c_tab_width);
+                if (c == '\t' && m_options.expand_tabs)
+                    clen = m_options.tab_width - (m_pending_width % m_options.tab_width);
                 else if (c > 0 && c < ' ')
                     clen = (m_options.ctrl_mode == CtrlMode::EXPAND) ? 2 : 1;
                 else
@@ -369,8 +368,8 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
                     break; // Not enough data; resync and continue.
 
                 // Calc width of codepoint.
-                if (c == '\t' && m_options.ctrl_mode != CtrlMode::EXPAND && m_options.tab_mode != TabMode::RAW)
-                    clen = c_tab_width - (m_pending_width % c_tab_width);
+                if (c == '\t' && m_options.expand_tabs)
+                    clen = m_options.tab_width - (m_pending_width % m_options.tab_width);
                 else if (c == '\n')
                     clen = 0;
                 else if (c == '\r' && index + 1 < can_consume && walk[1] == '\n')
@@ -1061,6 +1060,9 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
     bool need_found_highlight = false;
     bool highlighting_found_text = false;
 
+    // PREF:  Optimize color runs.  "{color}a{norm}{color}b{norm}" can be more
+    // efficiently expressed as "{color}ab{norm}".
+
     auto append_text = [&](const WCHAR* text, unsigned text_len, unsigned cells=1)
     {
         assert(implies(need_found_highlight && found_line, found_line->offset >= offset));
@@ -1114,24 +1116,24 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                 if (!left_offset && visible_len >= max_width)
                     goto LOut;
 
-                if (c == '\r' && !m_map.IsBinaryFile() && inner_iter.more() && *inner_iter.get_pointer() == '\n')
+                if (c == '\r' && !m_options.show_line_endings && !m_map.IsBinaryFile() && inner_iter.more() && *inner_iter.get_pointer() == '\n')
                 {
                     // Omit trailing \r\n at end of line in a text file.
                 }
-                else if (c == '\n' && !m_map.IsBinaryFile() && !inner_iter.more())
+                else if (c == '\n' && !m_options.show_line_endings && !m_map.IsBinaryFile() && !inner_iter.more())
                 {
                     // Omit trailing \n at end of line in a text file.
                 }
-                else if (c == '\t' && m_options.ctrl_mode != CtrlMode::EXPAND && m_options.tab_mode != TabMode::RAW)
+                else if (c == '\t' && m_options.expand_tabs)
                 {
-                    unsigned spaces = c_tab_width - (total_cells % c_tab_width);
+                    unsigned spaces = m_options.tab_width - (total_cells % m_options.tab_width);
                     const bool something_fits = (visible_len + spaces > left_offset);
-                    const bool apply_color = (m_options.tab_mode == TabMode::HIGHLIGHT && something_fits && !color);
+                    const bool apply_color = (m_options.show_whitespace && something_fits && !color);
                     if (apply_color)
-                        s.AppendColor(GetColor(ColorElement::CtrlCode));
+                        s.AppendColor(GetColor(ColorElement::Whitespace));
                     while (spaces--)
                     {
-                        if (m_options.tab_mode == TabMode::HIGHLIGHT)
+                        if (m_options.show_whitespace)
                             append_text(spaces ? L"-" : L">", 1);
                         else
                             append_text(L" ", 1);
@@ -1142,12 +1144,25 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                 }
                 else if (c >= 0 && c < ' ')
                 {
+                    const bool whitespace = (c == '\t' || c == '\r' || c == '\n');
+                    const WCHAR* ctrl_color = nullptr;
+                    if (!color)
+                    {
+                        ColorElement celm = whitespace ? ColorElement::Whitespace : ColorElement::CtrlCode;
+                        if (c == '\r')
+                        {
+                            if (inner_iter.next() != '\n')
+                                celm = ColorElement::CtrlCode;
+                            inner_iter.unnext();
+                        }
+                        ctrl_color = GetColor(celm);
+                    }
                     if (m_options.ctrl_mode == CtrlMode::EXPAND)
                     {
                         const bool something_fits = (visible_len + 2 > left_offset);
-                        const bool apply_color = (something_fits && !color);
+                        const bool apply_color = (ctrl_color && something_fits);
                         if (apply_color)
-                            s.AppendColor(GetColor(ColorElement::CtrlCode));
+                            s.AppendColor(ctrl_color);
                         append_text(L"^", 1);
                         if (left_offset || visible_len < max_width)
                         {
@@ -1160,15 +1175,15 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                     else if (m_options.ctrl_mode == CtrlMode::PERIOD)
                     {
                         assert(left_offset || visible_len < max_width);
-                        const bool apply_color = (!left_offset && !color);
+                        const bool apply_color = (ctrl_color && !left_offset);
                         if (apply_color)
-                            s.AppendColor(GetColor(ColorElement::CtrlCode));
+                            s.AppendColor(ctrl_color);
                         append_text(L".", 1);
                         s.AppendNormalIf(apply_color);
                     }
 #endif
 #ifdef INCLUDE_CTRLMODE_SPACE
-                    else if (m_options.ctrl_mode == CtrlMode::SPACE)
+                    else if (m_options.ctrl_mode == CtrlMode::SPACE && !whitespace)
                     {
                         assert(left_offset || visible_len < max_width);
                         append_text(L" ", 1);
@@ -1178,7 +1193,11 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                     {
                         assert(m_options.ctrl_mode == CtrlMode::OEM437);
                         assert(left_offset || visible_len < max_width);
+                        const bool apply_color = (ctrl_color && whitespace);
+                        if (apply_color)
+                            s.AppendColor(ctrl_color);
                         append_text(c_oem437[c], 1);
+                        s.AppendNormalIf(apply_color);
                     }
                 }
                 else if (maybe_bom == walk && c == 0xfeff)
@@ -1195,7 +1214,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                         if (something_fits)
                         {
                             if (!color)
-                                s.AppendColor(GetColor(ColorElement::CtrlCode));
+                                s.AppendColor(GetColor(c == '\t' ? ColorElement::Whitespace : ColorElement::CtrlCode));
                             // FUTURE:  Maybe '^' for ctrl codes and '?' for
                             // the 0xfffd codepoint?
                             append_text(L"?", 1);
@@ -1211,6 +1230,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                     {
 // TODO:  Figure out what should happen for this assert now...
 //                        assert(clen == 1);
+                        bool white = false;
                         if (!left_offset)
                         {
                             if (truncate_cells < 0 && visible_len + clen > max_width)
@@ -1226,8 +1246,18 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                                 assert(visible_len <= max_width);
                                 return visible_len;
                             }
+                            if (c == ' ' && m_options.show_whitespace)
+                            {
+                                white = true;
+                                if (!color)
+                                    s.AppendColor(GetColor(ColorElement::Whitespace));
+                                append_text(L"\u00b7", 1, 1);            // ·
+                            }
                         }
-                        append_text(inner_iter.character_pointer(), inner_iter.character_length(), clen);
+                        if (!white)
+                            append_text(inner_iter.character_pointer(), inner_iter.character_length(), clen);
+                        if (!color)
+                            s.AppendNormalIf(white);
                     }
                 }
             }

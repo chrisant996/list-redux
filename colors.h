@@ -31,6 +31,7 @@ enum class ColorElement
     Divider,
     LineNumber,
     Content,
+    Whitespace,
     CtrlCode,
     EndOfFileLine,
     MarkedLine,

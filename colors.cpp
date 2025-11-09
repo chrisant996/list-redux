@@ -38,6 +38,7 @@ static const WCHAR* c_default_colors[] =
     L"90",              // Divider
     L"90",              // LineNumber
     L"",                // Content
+    L"90",              // Whitespace
     L"33",              // CtrlCode
     L"7",               // EndOfFileLine
     L"7",               // MarkedLine
@@ -749,6 +750,7 @@ static const WCHAR* const c_reg_color_name[] =
     L"Divider",
     L"LineNumber",
     L"Content",
+    L"Whitespace",
     L"CtrlCode",
     L"EndOfFileLine",
     L"MarkedLine",
