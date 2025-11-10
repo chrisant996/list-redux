@@ -8,6 +8,7 @@
 ### General
 
 - [x] read color configuration from `.listredux` file
+- [x] history in ReadInput() prompts
 - [ ] some way to configure colors inside the app
 - [ ] optionally save configured colors to `.listredux` file
 - [ ] some way to revert to default colors inside the app
@@ -30,6 +31,7 @@
 - [x] `F` new file mask (wildcard) or path
 - [x] ~~`P` change drive/path~~
 - [x] some way to incrementally search the list of file names
+- [ ] some way to tag files that contain a string (or don't contain)
 - [ ] show used and free space in footer
 
 ### File Viewer (list file content)
@@ -95,14 +97,15 @@
 
 ### Maybe
 
-- A key to temporarily swap back to the original screen?
-- Option to suppress "Are you sure" confirmations on destructive operations (such as delete/moving files)?
-- Cut and paste to new or existing file [did it really "cut" or just "copy"?]
+- persist history lists for input prompts?
+- a key to temporarily swap back to the original screen?
+- option to suppress "Are you sure" confirmations on destructive operations (such as delete/moving files)?
+- cut and paste to new or existing file [did it really "cut" or just "copy"?]
 - allow copying, moving tagged files?
 - `/Nnn` lock the first `nn` lines of the file at the top of the display
 - `/Cnn` lock the first `nn` columns of each line on the left side of the display
 - search for hex bytes in hex mode
-- search for regex?
+- search for regex?  _But regex engines generally expect NUL termination and the entire content loaded into contiguous memory._
 - modify files in hex mode
 - search for text in files in file chooser
 - view file at cursor (`Alt-I` "insert file" in list.com)
