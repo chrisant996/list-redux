@@ -781,8 +781,20 @@ LAutoFitContentWidth:
             StrW tmp;
             left.AppendSpaces(4);
             // -1 because of how MakeCommandLine works inside.
-            const int32 limit = m_terminal_width - 1 - left.Length();
-            ellipsify_ex(m_searching_file.Text(), limit, ellipsify_mode::PATH, tmp);
+            const WCHAR* name = FindName(m_searching_file.Text());
+            int32 limit = m_terminal_width - 21 - left.Length();
+            if (cell_count(name) <= 20 && limit >= 20)
+            {
+                StrW only_path;
+                only_path.Set(m_searching_file.Text(), name - m_searching_file.Text());
+                ellipsify_ex(only_path.Text(), limit, ellipsify_mode::PATH, tmp);
+                tmp.Append(name);
+            }
+            else
+            {
+                limit = m_terminal_width - 1 - left.Length();
+                ellipsify_ex(m_searching_file.Text(), limit, ellipsify_mode::PATH, tmp);
+            }
             left.Append(tmp.Text());
         }
         MakeCommandLine(s, left.Text());
