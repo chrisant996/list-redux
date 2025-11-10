@@ -78,7 +78,7 @@ struct InputRecord
 extern const WCHAR c_prompt_char[];
 
 InputRecord SelectInput(DWORD timeout=INFINITE);
-bool ReadInput(StrW& out, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&)>> input_callback=std::nullopt);
+bool ReadInput(StrW& out, std::vector<StrW>* history=nullptr, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&)>> input_callback=std::nullopt);
 
 class AutoMouseConsoleMode
 {

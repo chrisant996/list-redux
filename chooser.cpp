@@ -1036,7 +1036,8 @@ void Chooser::NewFileMask(Error& e)
     s.Printf(L"\r\x1b[KEnter new file mask or path%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    ReadInput(s);
+    static std::vector<StrW> s_file_mask_history;
+    ReadInput(s, &s_file_mask_history);
 
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
@@ -1083,7 +1084,8 @@ void Chooser::ChangeAttributes(Error& e)
     s.Printf(L"\r\x1b[KChange attributes ('ashr' to set or '-a-s-h-r' to clear)%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    ReadInput(s);
+    static std::vector<StrW> s_change_attr_history;
+    ReadInput(s, &s_change_attr_history);
 
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
@@ -1152,7 +1154,8 @@ void Chooser::NewDirectory(Error& e)
     s.Printf(L"\rEnter new directory name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    ReadInput(s);
+    static std::vector<StrW> s_new_dir_history;
+    ReadInput(s, &s_new_dir_history);
 
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
@@ -1189,7 +1192,8 @@ void Chooser::RenameEntry(Error& e)
     s.Printf(L"\rEnter new name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    ReadInput(s);
+    static std::vector<StrW> s_rename_entry_history;
+    ReadInput(s, &s_rename_entry_history);
 
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
@@ -1398,7 +1402,8 @@ void Chooser::SweepFiles(Error& e)
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rEnter program to run%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
-    ReadInput(program);
+    static std::vector<StrW> s_sweep_program_history;
+    ReadInput(program, &s_sweep_program_history);
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
 
@@ -1413,7 +1418,8 @@ void Chooser::SweepFiles(Error& e)
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rArguments before file name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
-    ok = ReadInput(args_before);
+    static std::vector<StrW> s_sweep_args_before_history;
+    ok = ReadInput(args_before, &s_sweep_args_before_history);
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
     if (!ok)
@@ -1426,7 +1432,8 @@ void Chooser::SweepFiles(Error& e)
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rArguments after file name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
-    ok = ReadInput(args_after);
+    static std::vector<StrW> s_sweep_args_after_history;
+    ok = ReadInput(args_after, &s_sweep_args_after_history);
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
     if (!ok)

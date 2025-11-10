@@ -1416,7 +1416,8 @@ void Viewer::DoSearch(bool next, bool caseless)
     OutputConsole(m_hout, s.Text(), s.Length());
 
 // TODO:  make a variant of ReadInput that plays nicely with the Command line.
-    ReadInput(s);
+    static std::vector<StrW> s_search_history;
+    ReadInput(s, &s_search_history);
 
     OutputConsole(m_hout, c_norm);
     m_force_update = true;
@@ -1622,7 +1623,8 @@ void Viewer::GoTo()
         OutputConsole(m_hout, s.Text(), s.Length());
 
         done = true;
-        ReadInput(s, 32, callback);
+        std::vector<StrW> s_goto_history;
+        ReadInput(s, &s_goto_history, 32, callback);
 
         OutputConsole(m_hout, c_norm);
         if (done)
@@ -1771,7 +1773,8 @@ void Viewer::OpenNewFile(Error& e)
     s.Printf(L"\r%s", tmp.Text());
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    ReadInput(s, m_terminal_width - 1 - tmp.Length());
+    static std::vector<StrW> s_open_file_history;
+    ReadInput(s, &s_open_file_history, m_terminal_width - 1 - tmp.Length());
 
     OutputConsole(m_hout, c_norm);
 

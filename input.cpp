@@ -401,7 +401,7 @@ InputRecord SelectInput(DWORD timeout)
     return input;
 }
 
-bool ReadInput(StrW& out, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
+bool ReadInput(StrW& out, std::vector<StrW>* history, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
 {
     out.Clear();
 
@@ -410,6 +410,9 @@ bool ReadInput(StrW& out, DWORD max_width, std::optional<std::function<int32(con
 
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     GetConsoleScreenBufferInfo(hout, &csbi);
+
+    StrW curr_input_history;
+    size_t history_index = history ? history->size() : 0;
 
     StrW tmp;
     while (true)
@@ -457,7 +460,28 @@ bool ReadInput(StrW& out, DWORD max_width, std::optional<std::function<int32(con
                     TruncateWcwidth(out, __wcswidth(out.Text()) - 1, 0);
                 break;
             case Key::ENTER:
+                if (history && out.Length())
+                    history->emplace_back(out);
                 return true;
+            case Key::UP:
+                if (history && history_index)
+                {
+                    if (history_index == history->size())
+                        curr_input_history.Set(out);
+                    --history_index;
+                    out.Set((*history)[history_index]);
+                }
+                continue; // Avoid resetting history_index.
+            case Key::DOWN:
+                if (history && history_index < history->size())
+                {
+                    ++history_index;
+                    if (history_index == history->size())
+                        out.Set(curr_input_history);
+                    else
+                        out.Set((*history)[history_index]);
+                }
+                continue; // Avoid resetting history_index.
             }
         }
         else if (input.type == InputType::Char)
@@ -465,6 +489,9 @@ bool ReadInput(StrW& out, DWORD max_width, std::optional<std::function<int32(con
             if (input.key_char >= ' ')
                 out.Append(&input.key_char, 1);
         }
+
+        if (history && history_index < history->size())
+            history_index = history->size();
     }
 }
 
