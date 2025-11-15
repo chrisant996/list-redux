@@ -825,7 +825,7 @@ bool FileLineMap::IsUTF8Compatible() const
 {
     switch (GetCodePage())
     {
-    case 20127:         // 7-bit US-ASCII (Windows)
+    case CP_USASCII:    // 7-bit US-ASCII (Windows)
     case CP_UTF8:       // UTF-8
         return true;
     }

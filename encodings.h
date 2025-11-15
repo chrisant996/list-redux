@@ -8,6 +8,8 @@
 #include <memory>
 #include <vector>
 
+constexpr UINT CP_USASCII = 20127;
+
 class StrW;
 
 enum class FileDataType { Binary, Text };

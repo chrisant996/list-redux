@@ -359,6 +359,26 @@ UINT EnsureSingleByteCP(UINT cp)
     }
 }
 
+static bool IsValidUTF8WithHighBit(const BYTE* bytes, int32 length)
+{
+    if (length <= 0)
+        return false;
+
+    bool any_high = false;
+    Utf8Accumulator acc;
+    while (length > 0)
+    {
+        const int32 b = acc.Build(*bytes);
+        if (b < 0)
+            return false;
+        any_high |= !!(*bytes & 0x80);
+        --length;
+        ++bytes;
+    }
+
+    return any_high;
+}
+
 static bool DetectCodePage(const BYTE* bytes, int32 length, UINT* codepage, StrW* encoding_name)
 {
     if (!IsCoInitialized())
@@ -378,7 +398,8 @@ static bool DetectCodePage(const BYTE* bytes, int32 length, UINT* codepage, StrW
     {
         DetectEncodingInfo info[1] = {};
         INT scores = _countof(info);
-        hr = s_mlang->DetectInputCodepage(0, 0, reinterpret_cast<CHAR*>(const_cast<BYTE*>(bytes)), &length, info, &scores);
+        INT src_size = length;
+        hr = s_mlang->DetectInputCodepage(0, 0, reinterpret_cast<CHAR*>(const_cast<BYTE*>(bytes)), &src_size, info, &scores);
         if (SUCCEEDED(hr))
         {
             cp = info[0].nCodePage;
@@ -391,7 +412,17 @@ static bool DetectCodePage(const BYTE* bytes, int32 length, UINT* codepage, StrW
         }
     }
 
-    if (!s_multibyte_enabled && cp != 20127 && cp != 437)
+    if (cp == CP_USASCII || cp == 1252)
+    {
+        if (IsValidUTF8WithHighBit(bytes, length))
+        {
+            cp = CP_UTF8;
+            if (encoding_name)
+                GetCodePageName(cp, *encoding_name);
+        }
+    }
+
+    if (!s_multibyte_enabled && cp != CP_USASCII && cp != 437)
     {
         if (encoding_name)
             encoding_name->Clear();

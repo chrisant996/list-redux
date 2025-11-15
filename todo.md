@@ -80,7 +80,8 @@
   - [x] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
   - [x] allow toggling between Binary and detected Text codepage
   - [x] allow manual override for Text encoding
-  - [ ] detect UTF8 more aggressively; MLang chooses Western European instead of UTF8 in a file that's ASCII except for one emoji.
+  - [x] detect UTF8 more aggressively; MLang chooses Western European instead of UTF8 in a file that's ASCII except for one emoji.
+  - [ ] use ICU for encodings when available
 
 ### Future
 
@@ -99,7 +100,6 @@
 ### Maybe
 
 - persist history lists for input prompts?
-- a key to temporarily swap back to the original screen?
 - option to suppress "Are you sure" confirmations on destructive operations (such as delete/moving files)?
 - cut and paste to new or existing file [did it really "cut" or just "copy"?]
 - allow copying, moving tagged files?
@@ -132,6 +132,7 @@
 - Telephone dialer
 - Printing
 - hex mode: option to end a row at a newline (requires computing and caching hex mode pagination/delineation offsets) _[Too many drawbacks; including that it can't just seek without parsing anymore.]_
+- a key to temporarily swap back to the original screen? _[Not generally very useful, and I don't want to perturb the original screen by printing "Press any key to return".]_
 
 
 
