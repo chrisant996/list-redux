@@ -1147,7 +1147,7 @@ key_down:
                 if (!m_hex_mode && !m_text)
                 {
                     s_options.ctrl_mode = CtrlMode((int(s_options.ctrl_mode) + 1) % int(CtrlMode::__MAX));
-                    m_context.Reset();
+                    m_context.ClearProcessed();
                     m_force_update = true;
                 }
             }
@@ -1268,7 +1268,7 @@ key_down:
                 if (!m_hex_mode && !m_text)
                 {
                     s_options.expand_tabs = !s_options.expand_tabs;
-                    m_context.Reset();
+                    m_context.ClearProcessed();
                     m_force_update = true;
                 }
             }

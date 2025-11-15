@@ -172,13 +172,15 @@ FileLineIter& FileLineIter::operator=(FileLineIter&& other)
 {
     // m_options can't be updated, and it doesn't need to be.
     m_wrap = other.m_wrap;
+
     m_codepage = other.m_codepage;
     m_binary_file = other.m_binary_file;
+    m_decoder = std::move(other.m_decoder);
+
     m_offset = other.m_offset;
     m_bytes = other.m_bytes;
     m_count = other.m_count;
     m_available = other.m_available;
-    m_decoder = std::move(other.m_decoder);
     m_width_state.reset(); // Does not carry over.
     m_pending_length = other.m_pending_length;
     m_pending_width = other.m_pending_width;
@@ -186,20 +188,26 @@ FileLineIter& FileLineIter::operator=(FileLineIter&& other)
     m_pending_wrap_width = other.m_pending_wrap_width;
 
     other.Reset();
-
     return *this;
 }
 
 void FileLineIter::Reset()
 {
     // m_wrap carries over.
-    // m_codepage carries over.
+
+    m_codepage = 0;
     m_binary_file = true;
+    m_decoder = nullptr;
+
+    ClearProcessed();
+}
+
+void FileLineIter::ClearProcessed()
+{
     m_offset = 0;
     m_bytes = nullptr;
     m_count = 0;
     m_available = 0;
-    // m_decoder carries over.
     m_width_state.reset();
     m_pending_length = 0;
     m_pending_width = 0;
@@ -528,27 +536,27 @@ FileLineMap::FileLineMap(const ViewerOptions& options)
 
 FileLineMap& FileLineMap::operator=(FileLineMap&& other)
 {
-    m_wrap = other.m_wrap;
     m_lines = std::move(other.m_lines);
     m_line_numbers = std::move(other.m_line_numbers);
-    m_detected_type = other.m_detected_type;
-    m_detected_codepage = other.m_detected_codepage;
-    m_codepage = other.m_codepage;
-    m_detected_encoding_name = std::move(other.m_detected_encoding_name);
-    m_encoding_name = std::move(other.m_encoding_name);
+
     m_current_line_number = other.m_current_line_number;
     m_processed = other.m_processed;
     m_pending_begin = other.m_pending_begin;
     m_line_iter = std::move(other.m_line_iter);
     m_skip_whitespace = other.m_skip_whitespace;
     m_wrapped_current_line = other.m_wrapped_current_line;
+
+    m_wrap = other.m_wrap;
+
+    m_detected_type = other.m_detected_type;
+    m_detected_codepage = other.m_detected_codepage;
+    m_codepage = other.m_codepage;
+    m_detected_encoding_name = std::move(other.m_detected_encoding_name);
+    m_encoding_name = std::move(other.m_encoding_name);
     m_is_unicode_encoding = other.m_is_unicode_encoding;
-#ifdef USE_SMALL_DATA_BUFFER
     m_need_type = other.m_need_type;
-#endif
 
-    other.Clear();
-
+    other.Reset();
     return *this;
 }
 
@@ -558,34 +566,40 @@ bool FileLineMap::SetWrapWidth(unsigned wrap)
     if (m_wrap != wrap)
     {
         m_wrap = wrap;
-        Clear();
+        ClearProcessed();
         return true;
     }
     return false;
 }
 
-void FileLineMap::Clear()
+void FileLineMap::Reset()
 {
-    // m_wrap carries over
-    m_lines.clear();
-    m_line_numbers.clear();
+    ClearProcessed();
+    m_line_iter.Reset();
+
+    m_wrap = 0;
+
     m_detected_type = FileDataType::Binary;
     m_detected_codepage = 0;
     m_codepage = 0;
     m_detected_encoding_name.Clear();
     m_encoding_name.Clear();
+    m_is_unicode_encoding = false;
+    m_need_type = true;
+}
+
+void FileLineMap::ClearProcessed()
+{
+    m_lines.clear();
+    m_line_numbers.clear();
+
     m_current_line_number = 1;
     m_processed = 0;
     m_pending_begin = 0;
-    m_line_iter.Reset();
+    m_line_iter.ClearProcessed();
     m_skip_whitespace = 0;
     m_wrapped_current_line = false;
-    m_is_unicode_encoding = false;
-#ifdef USE_SMALL_DATA_BUFFER
-    m_need_type = true;
-#endif
 }
-
 
 void FileLineMap::OverrideEncoding(UINT codepage)
 {
@@ -609,18 +623,14 @@ void FileLineMap::SetFileType(FileDataType type, UINT codepage, const WCHAR* enc
     m_detected_encoding_name = encoding_name;
     m_encoding_name = encoding_name;
     m_line_iter.SetEncoding(type, m_codepage);
-#ifdef USE_SMALL_DATA_BUFFER
     m_need_type = false;
-#endif
 }
 
 void FileLineMap::Next(const BYTE* bytes, size_t available)
 {
     if (!m_processed)
     {
-#ifdef USE_SMALL_DATA_BUFFER
         if (m_need_type)
-#endif
         {
             UINT codepage;
             StrW encoding_name;
@@ -1012,17 +1022,19 @@ void ContentCache::Close()
     m_redirected = false;
     m_eof = false;
 
-    Reset();
+    ClearProcessed();
 
     m_data_offset = 0;
     m_data_length = 0;
     m_data_slop = 0;
 }
 
-void ContentCache::Reset()
+void ContentCache::ClearProcessed()
 {
-    m_map.Clear();
+    m_map.ClearProcessed();
     m_completed = false;
+    if (!m_text && !m_redirected)
+        m_eof = false;
 }
 
 void ContentCache::SetWrapWidth(unsigned wrap)

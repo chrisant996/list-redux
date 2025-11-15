@@ -80,6 +80,7 @@
   - [x] **IMPORTANT:**  Are any OEM codepages multi-byte?  Should it just use 437?
   - [x] allow toggling between Binary and detected Text codepage
   - [x] allow manual override for Text encoding
+  - [ ] detect UTF8 more aggressively; MLang chooses Western European instead of UTF8 in a file that's ASCII except for one emoji.
 
 ### Future
 

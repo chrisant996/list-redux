@@ -70,6 +70,7 @@ public:
     FileLineIter&   operator=(FileLineIter&& other);
 
     void            Reset();
+    void            ClearProcessed();
     void            SetEncoding(FileDataType type, UINT codepage);
     void            SetWrapWidth(uint32 wrap_width);
     void            SetBytes(FileOffset offset, const BYTE* bytes, size_t available);
@@ -81,13 +82,15 @@ public:
 private:
     const ViewerOptions& m_options;
     uint32          m_wrap = 80;
+
     UINT            m_codepage = 0;
     bool            m_binary_file = true;
+    std::unique_ptr<IDecoder> m_decoder;
+
     FileOffset      m_offset = 0;
     const BYTE*     m_bytes = nullptr;
     size_t          m_count = 0;
     size_t          m_available = 0;
-    std::unique_ptr<IDecoder> m_decoder;
     character_sequence_state m_width_state;
     uint32          m_pending_length = 0;       // Length in bytes.
     uint32          m_pending_width = 0;        // Width in character cells.
@@ -106,7 +109,8 @@ public:
     bool            SetWrapWidth(unsigned wrap);
     unsigned        GetWrapWidth() const { return m_wrap; }
 
-    void            Clear();
+    void            Reset();
+    void            ClearProcessed();
     FileOffset      Processed() const { return m_processed; }
     void            Next(const BYTE* bytes, size_t count);
 
@@ -129,26 +133,31 @@ public:
     void            SetFileType(FileDataType type, UINT codepage, const WCHAR* encoding_name);
 
 private:
-    unsigned        m_wrap = 0;
 
+private:
+    // Content.
     std::vector<FileOffset> m_lines;
     std::vector<size_t> m_line_numbers;
-    FileDataType    m_detected_type = FileDataType::Binary;
-    UINT            m_detected_codepage = 0;
-    UINT            m_codepage = 0;
-    StrW            m_detected_encoding_name;
-    StrW            m_encoding_name;
+
+    // Processing.
     size_t          m_current_line_number = 1;
     FileOffset      m_processed = 0;
     FileOffset      m_pending_begin = 0;
     FileLineIter    m_line_iter;
     uint8           m_skip_whitespace = 0;
     bool            m_wrapped_current_line = false;
-    bool            m_is_unicode_encoding = false;
 
-#ifdef USE_SMALL_DATA_BUFFER
+    // Configuration.
+    unsigned        m_wrap = 0;
+
+    // Encoding.
+    FileDataType    m_detected_type = FileDataType::Binary;
+    UINT            m_detected_codepage = 0;
+    UINT            m_codepage = 0;
+    StrW            m_detected_encoding_name;
+    StrW            m_encoding_name;
+    bool            m_is_unicode_encoding = false;
     bool            m_need_type = true;
-#endif
 };
 
 class ContentCache
@@ -172,7 +181,7 @@ public:
     bool            Open(const WCHAR* name, Error& e);
     void            Close();
 
-    void            Reset();
+    void            ClearProcessed();
     void            SetWrapWidth(unsigned wrap);
     unsigned        FormatLineData(size_t line, unsigned left_offset, StrW& s, unsigned max_width, Error& e, const WCHAR* color=nullptr, const FoundOffset* found_line=nullptr, unsigned max_len=-1);
     bool            FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundOffset* found_line=nullptr);
@@ -199,6 +208,7 @@ public:
     unsigned        GetBufferLength() const { return m_data_length; }
 
 private:
+    void            Reset();
     bool            EnsureDataBuffer(Error& e);
     bool            LoadData(FileOffset offset, DWORD& end_slop, Error& e);
     bool            EnsureFileData(size_t line, Error& e);
