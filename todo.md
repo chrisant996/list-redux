@@ -81,7 +81,6 @@
   - [x] allow toggling between Binary and detected Text codepage
   - [x] allow manual override for Text encoding
   - [x] detect UTF8 more aggressively; MLang chooses Western European instead of UTF8 in a file that's ASCII except for one emoji.
-  - [ ] use ICU for encodings when available
 
 ### Future
 
@@ -133,6 +132,7 @@
 - Printing
 - hex mode: option to end a row at a newline (requires computing and caching hex mode pagination/delineation offsets) _[Too many drawbacks; including that it can't just seek without parsing anymore.]_
 - a key to temporarily swap back to the original screen? _[Not generally very useful, and I don't want to perturb the original screen by printing "Press any key to return".]_
+- use ICU for encodings when available _[ICU is independent from codepages, so it uses strings to identify encodings, and it has its own analogs to MLang and MultiByteToWideChar, and it's only available in Win10+ circa 2019 onward, so adjusting to use ICU when available will be an invasive change.]_
 
 
 
