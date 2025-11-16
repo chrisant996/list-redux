@@ -46,6 +46,7 @@ public:
     ChooserOutcome  Go(Error& e);
     StrW            GetSelectedFile() const;
     std::vector<StrW> GetTaggedFiles() const;
+    std::vector<intptr_t> GetTaggedIndices(intptr_t* num_before_index=nullptr) const;
 
 private:
     void            Reset();

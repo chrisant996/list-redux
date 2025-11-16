@@ -852,6 +852,30 @@ std::vector<StrW> Chooser::GetTaggedFiles() const
     return files;
 }
 
+std::vector<intptr_t> Chooser::GetTaggedIndices(intptr_t* num_before_index) const
+{
+    StrW s;
+    std::vector<intptr_t> indices;
+    if (num_before_index)
+        (*num_before_index) = 0;
+    if (m_index < 0)
+        num_before_index = nullptr;
+    for (size_t i = 0; i < m_files.size(); ++i)
+    {
+        if (m_tagged.IsMarked(i))
+        {
+            const auto& file = m_files[i];
+            if (!file.IsDirectory())
+            {
+                indices.emplace_back(i);
+                if (num_before_index && i < size_t(m_index))
+                    ++(*num_before_index);
+            }
+        }
+    }
+    return indices;
+}
+
 void Chooser::SetIndex(intptr_t index)
 {
     assert(index >= -1); // Accept -1 because of m_count-1 when m_count==0.
@@ -1072,10 +1096,12 @@ void Chooser::ChangeAttributes(Error& e)
     if (m_files[m_index].IsPseudoDirectory())
         return;
 
-    // TODO:  Support for marked files and directories.
-
-    StrW path = GetSelectedFile();
-    if (path.Empty())
+    std::vector<intptr_t> indices;
+    if (m_tagged.AnyMarked())
+        indices = GetTaggedIndices();
+    else if (size_t(m_index) < m_files.size() && !m_files[m_index].IsPseudoDirectory())
+        indices.emplace_back(m_index);
+    if (indices.empty())
         return;
 
     StrW s;
@@ -1131,19 +1157,24 @@ void Chooser::ChangeAttributes(Error& e)
     if (!mask)
         return;
 
-    const DWORD current = GetFileAttributesW(path.Text());
-    if (current == 0xffffffff)
+    StrW path;
+    for (const auto& i : indices)
     {
+        m_files[i].GetPathName(path);
+        const DWORD current = GetFileAttributesW(path.Text());
+        if (current == 0xffffffff)
+        {
 LError:
-        e.Sys();
-        return;
+            e.Sys();
+            return;
+        }
+
+        const DWORD update = (current & ~mask) | attr;
+        if (!SetFileAttributesW(path.Text(), update))
+            goto LError;
+
+        m_files[i].UpdateAttributes(update);
     }
-
-    const DWORD update = (current & ~mask) | attr;
-    if (!SetFileAttributesW(path.Text(), update))
-        goto LError;
-
-    m_files[m_index].UpdateAttributes(update);
 }
 
 void Chooser::NewDirectory(Error& e)
