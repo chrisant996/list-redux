@@ -163,7 +163,10 @@ ChooserOutcome Chooser::Go(Error& e)
                 if (outcome != ChooserOutcome::CONTINUE)
                     return outcome;
                 if (e.Test())
+                {
                     ReportError(e);
+                    ForceUpdateAll();
+                }
             }
             break;
         }
@@ -532,7 +535,10 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
 
                     Navigate(dir.Text(), e);
                     if (e.Test())
+                    {
                         ReportError(e);
+                        ForceUpdateAll();
+                    }
                 }
                 else
                 {
@@ -720,7 +726,10 @@ LNext:
                 dir.ToParent();             // Actually goes up to parent.
                 Navigate(dir.Text(), e);
                 if (e.Test())
+                {
                     ReportError(e);
+                    ForceUpdateAll();
+                }
             }
             break;
 
@@ -1370,7 +1379,7 @@ void Chooser::RunFile(bool edit, Error& e)
         bool ok = false;
 #ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
         SetLastError(ERROR_ACCESS_DENIED);
-        e.Set(L"(Destructive operations are disallowed.)");
+        e.Sys(L"(Destructive operations are disallowed.)");
 #else
         s.AppendMaybeQuoted(file.Text());
 #endif
@@ -1496,7 +1505,7 @@ void Chooser::SweepFiles(Error& e)
         bool ok = false;
 #ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
         SetLastError(ERROR_ACCESS_DENIED);
-        e.Set(L"(Destructive operations are disallowed.)");
+        e.Sys(L"(Destructive operations are disallowed.)");
 #else
         s.Clear();
         s.AppendMaybeQuoted(program.Text());
