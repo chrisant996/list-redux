@@ -770,12 +770,12 @@ LAutoFitContentWidth:
 
     // Command line.
     StrW left;
+    if (m_searching)
+        left.Append(L"Searching... (Ctrl-Break to cancel)");
+    else
+        left.Printf(L"Command%s %s", c_prompt_char, m_feedback.Text());
     if (update_command_line)
     {
-        if (m_searching)
-            left.Append(L"Searching... (Ctrl-Break to cancel)");
-        else
-            left.Printf(L"Command%s %s", c_prompt_char, m_feedback.Text());
         if (m_searching && !m_searching_file.Empty())
         {
             StrW tmp;
