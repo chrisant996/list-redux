@@ -6,6 +6,7 @@
 #include "pch.h"
 #include "chooser.h"
 #include "scan.h"
+#include "filesys.h"
 #include "list_format.h"
 #include "input.h"
 #include "output.h"
@@ -223,6 +224,11 @@ void Chooser::UpdateDisplay()
     StrW s;
 
     EnsureColumnWidths();
+    EnsureTop();
+    if (m_top + m_visible_rows > m_num_rows)
+        m_top = m_num_rows - m_visible_rows;
+    if (m_top < 0)
+        m_top = 0;
 
     scroll_car scroll_car;
     const int32 rows = int32(min<intptr_t>(m_visible_rows, m_num_rows));
@@ -665,9 +671,11 @@ LNext:
             break;
 
         case Key::DEL:
-            if (input.modifier == Modifier::None)
+            if (input.modifier == Modifier::None ||
+                input.modifier == Modifier::SHIFT)
             {
-                DeleteEntries(e);
+                const bool recycle = (input.modifier == Modifier::None);
+                DeleteEntries(e, recycle);
             }
             break;
         }
@@ -842,10 +850,14 @@ StrW Chooser::GetSelectedFile() const
     return s;
 }
 
-std::vector<StrW> Chooser::GetTaggedFiles() const
+std::vector<StrW> Chooser::GetTaggedFiles(intptr_t* num_before_index) const
 {
     StrW s;
     std::vector<StrW> files;
+    if (num_before_index)
+        (*num_before_index) = 0;
+    if (m_index < 0)
+        num_before_index = nullptr;
     for (size_t i = 0; i < m_files.size(); ++i)
     {
         if (m_tagged.IsMarked(i))
@@ -855,6 +867,8 @@ std::vector<StrW> Chooser::GetTaggedFiles() const
             {
                 m_files[i].GetPathName(s);
                 files.emplace_back(std::move(s));
+                if (num_before_index && i < size_t(m_index))
+                    ++(*num_before_index);
             }
         }
     }
@@ -912,7 +926,6 @@ void Chooser::SetTop(intptr_t top)
 
     if (top != m_top)
     {
-        const intptr_t num_per_page = (m_visible_rows * m_num_per_row);
         if (top <= m_num_rows - m_visible_rows)
         {
             m_top = top;
@@ -1263,39 +1276,38 @@ void Chooser::RenameEntry(Error& e)
     RefreshDirectoryListing(e);
 }
 
-void Chooser::DeleteEntries(Error& e)
+void Chooser::DeleteEntries(Error& e, bool recycle)
 {
     std::vector<StrW> files;
-    StrW name;
     bool is_dir = false;
+    intptr_t num_before_index = 0;
 
     if (m_tagged.AnyMarked())
     {
-        files = GetTaggedFiles();
+        files = GetTaggedFiles(&num_before_index);
     }
     else if (size_t(m_index) < m_files.size() && !m_files[m_index].IsPseudoDirectory())
     {
-        name = GetSelectedFile();
-        if (name.Empty())
-            return;
+        files.emplace_back(GetSelectedFile());
         is_dir = m_files[m_index].IsDirectory();
     }
 
-    if (files.empty() && name.Empty())
+    if (files.empty())
         return;
 
     StrW msg;
-    if (files.size() <= 1)
+    const WCHAR* opname = recycle ? L"recycle" : L"PERMANENTLY DELETE";
+    if (files.size() == 1)
     {
-        const WCHAR* file = files.empty() ? name.Text() : files[0].Text();
+        const WCHAR* file = files[0].Text();
         const WCHAR* name_part = FindName(file);
         if (name_part && *name_part)
-            msg.Printf(L"Confirm delete '%s'?", name_part);
+            msg.Printf(L"Confirm %s '%s'?", opname, name_part);
     }
     if (msg.Empty())
     {
-        const size_t n = files.size() + !name.Empty();
-        msg.Printf(L"Confirm delete %zu item%s?", n, (n == 1) ? L"" : L"s");
+        const size_t n = files.size();
+        msg.Printf(L"Confirm %s %zu item%s?", opname, n, (n == 1) ? L"" : L"s");
     }
     if (!AskForConfirmation(msg.Text()))
         return;
@@ -1303,58 +1315,47 @@ void Chooser::DeleteEntries(Error& e)
     UpdateDisplay();
 
     bool any = false;
-    if (!files.empty())
-    {
-        for (const auto& file : files)
-        {
-            BOOL ok = false;
 #ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
-            SetLastError(ERROR_ACCESS_DENIED);
-            e.Set(L"(Destructive operations are disallowed.)");
+    SetLastError(ERROR_ACCESS_DENIED);
+    e.Sys(L"(Destructive operations are disallowed.)");
 #else
-            ok = DeleteFileW(file.Text());
-#endif
-            if (!ok)
-            {
-                e.Sys();
-                const WCHAR* name_part = FindName(file.Text());
-                if (name_part && *name_part)
-                    e.Set(L"Unable to delete '%1'.") << name_part;
-                break;
-            }
+    BOOL ok = true;
+    if (recycle)
+    {
+        const int r = Recycle(files, e);
+        if (r >= 0)
+        {
+            files.clear();
             any = true;
         }
     }
-    else if (!name.Empty())
+    for (const auto& file : files)
     {
-        BOOL ok = false;
-#ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
-        SetLastError(ERROR_ACCESS_DENIED);
-        e.Set(L"(Destructive operations are disallowed.)");
-#else
         if (is_dir)
-            ok = RemoveDirectoryW(name.Text());
+            ok = RemoveDirectoryW(file.Text());
         else
-            ok = DeleteFileW(name.Text());
-#endif
+            ok = DeleteFileW(file.Text());
         if (!ok)
         {
             e.Sys();
-            const WCHAR* name_part = FindName(name.Text());
+            const WCHAR* name_part = FindName(file.Text());
             if (name_part && *name_part)
                 e.Set(L"Unable to delete '%1'.") << name_part;
+            break;
         }
-        else
-        {
-            any = true;
-        }
+        any = true;
     }
+#endif
 
     if (any)
     {
         Error dummy;
         Error* err = e.Test() ? &dummy : &e; // Don't overwrite e!
+        const auto top = m_top;
+        const auto index = m_index;
         RefreshDirectoryListing(*err);
+        m_top = top;
+        m_index = index - num_before_index;
     }
 }
 

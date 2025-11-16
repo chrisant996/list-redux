@@ -45,7 +45,7 @@ public:
     void            Navigate(const WCHAR* dir, Error& e);
     ChooserOutcome  Go(Error& e);
     StrW            GetSelectedFile() const;
-    std::vector<StrW> GetTaggedFiles() const;
+    std::vector<StrW> GetTaggedFiles(intptr_t* num_before_index=nullptr) const;
     std::vector<intptr_t> GetTaggedIndices(intptr_t* num_before_index=nullptr) const;
 
 private:
@@ -67,7 +67,7 @@ private:
     void            ChangeAttributes(Error& e);
     void            NewDirectory(Error& e);
     void            RenameEntry(Error& e);
-    void            DeleteEntries(Error& e);
+    void            DeleteEntries(Error& e, bool recycle);
     void            RunFile(bool edit, Error& e);
     void            SweepFiles(Error& e);
     void            ShowFileList();

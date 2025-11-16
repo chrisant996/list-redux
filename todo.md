@@ -25,7 +25,8 @@
 - [x] `A` attrib for current file (enter combination of `ashr`/`ASHR` to clear/set attributes)
 - [x] `R` rename current file
 - [x] `N` create new directory
-- [x] `DEL` to delete file(s) or (empty) directory
+- [x] `DEL` to recycle file(s) or directory
+- [x] `Shift-DEL` to delete file(s) or an empty directory
 - [x] `.` change to parent directory
 - [x] `E` edit file (`%EDITOR%` or `notepad.exe` or maybe `edit.exe`)
 - [x] `F` new file mask (wildcard) or path

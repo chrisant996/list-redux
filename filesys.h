@@ -5,6 +5,10 @@
 
 #pragma once
 
+#include <vector>
+
 enum class FileType { Invalid, Device, Dir, File };
 FileType GetFileType(const WCHAR* p);
+
+int Recycle(const std::vector<StrW>& names, Error& e);
 
