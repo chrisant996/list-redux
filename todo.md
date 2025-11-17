@@ -22,7 +22,7 @@
 - [x] `*` or `F5` to refresh the directory listing
 - [x] Launch the program associated with a file
 - [x] `W` for file sWeep command: execute a specified program using each tagged file as a parameter
-- [x] `A` attrib for current file (enter combination of `ashr`/`ASHR` to clear/set attributes)
+- [x] `A` attrib for current or tagged files (enter combination of `ashr`/`-a-s-h-r` to set/clear attributes)
 - [x] `R` rename current file
 - [x] `N` create new directory
 - [x] `DEL` to recycle file(s) or directory
