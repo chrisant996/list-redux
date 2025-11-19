@@ -71,6 +71,7 @@ private:
     void            RunFile(bool edit, Error& e);
     void            SweepFiles(Error& e);
     void            ShowFileList();
+    void            SearchAndTag(Error& e, bool caseless);
 
 private:
     const HANDLE    m_hout;

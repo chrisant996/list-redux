@@ -401,8 +401,11 @@ InputRecord SelectInput(DWORD timeout)
     return input;
 }
 
-bool ReadInput(StrW& out, std::vector<StrW>* history, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
+bool ReadInput(StrW& out, History hindex, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
 {
+    static std::vector<StrW> s_histories[History::MAX];
+    std::vector<StrW>* const history = (size_t(hindex) < _countof(s_histories)) ? &s_histories[size_t(hindex)] : nullptr;
+
     out.Clear();
 
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);

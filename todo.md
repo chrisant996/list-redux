@@ -31,8 +31,9 @@
 - [x] `E` edit file (`%EDITOR%` or `notepad.exe` or maybe `edit.exe`)
 - [x] `F` new file mask (wildcard) or path
 - [x] ~~`P` change drive/path~~
-- [x] some way to incrementally search the list of file names
-- [ ] some way to tag files that contain a string (or don't contain)
+- [x] `F2` incrementally search the list of file names
+- [x] search for text in files in file chooser (tag matching files)
+- [ ] `N` invert tagged files
 - [ ] show used and free space in footer
 
 ### File Viewer (list file content)
@@ -45,8 +46,7 @@
 - [x] `W` wrapping
   - [x] text files wrap with awareness of word breaks (can split after a run of spaces, or on a transition from punctuation to word characters, or if a single word exceeds the max line length)
   - [x] word wrapping mutates line numbers; consider having an index of "user friendly" line numbers to show in the left margin for Go To Line.
-- [x] search in text mode (/ for case sensitive, \ for caseless)
-- [x] search in hex mode
+  - [ ] toggle hanging indent (up to half the terminal width) (a third? a quarter? configurable maximum?)
 - [x] `R` show ruler (both in text and hex modes)
 - [x] `N` show line numbers
 - [x] `O` show file offset
@@ -60,15 +60,21 @@
 - [x] `U` clear marked line (unmark)
 - [x] `Alt-O` open a new file
 - [x] `Alt-C` close current file
-- [x] `F4` toggle multi-file search (next/prev cross file boundaries)
-  - [x] make search interruptible with `Ctrl-Break`
 - [x] `/@` to supply a file with a list of names to view
 - [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
+- searching
+  - [x] search in text mode (/ for case sensitive, \ for caseless)
+  - [x] search in hex mode
+  - [x] `F4` toggle multi-file search (next/prev cross file boundaries)
+  - [x] make search interruptible with `Ctrl-Break`
+  - [ ] search for regex (use RE2 and search line by line)
+  - [ ] search for hex bytes in hex mode
 - hex mode
   - [x] go to offset
   - [x] highlight newline characters in hex mode
   - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [x] go to line
+  - [ ] modify file
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
   - [x] Binary files **_and hex mode_** use OEM CP.
@@ -90,28 +96,20 @@
   - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
   - [ ] mouse wheel should scroll by _N_ lines
 - [ ] `S` configure sort order
-- [ ] option to sort horizontally instead of vertically
 - detect certain file types and render with formatting/color
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
   - [ ] detect C++, Lua, etc and render syntax coloring
-- [ ] toggle hanging indent (up to half the terminal width) (a third? a quarter? configurable maximum?)
+- [ ] option to sort horizontally instead of vertically
 
 ### Maybe
 
 - persist history lists for input prompts?
-- option to suppress "Are you sure" confirmations on destructive operations (such as delete/moving files)?
 - cut and paste to new or existing file [did it really "cut" or just "copy"?]
 - allow copying, moving tagged files?
 - `/Nnn` lock the first `nn` lines of the file at the top of the display
 - `/Cnn` lock the first `nn` columns of each line on the left side of the display
-- search for hex bytes in hex mode
-- search for regex?  _But regex engines generally expect NUL termination and the entire content loaded into contiguous memory._
-- modify files in hex mode
-- search for text in files in file chooser
 - view file at cursor (`Alt-I` "insert file" in list.com)
-- `\` present a directory tree of the selected drive; select a subdirectory to list by moving the cursor and pressing Enter
-  - list.com shows 8 levels, but selecting any directory just goes to its top level parent directory
 - archive files
   - view archive file contents and select files for viewing or extracting
   - add to archive files
@@ -119,6 +117,9 @@
   - a separate pair of chooser and viewer operate in each split screen
   - a key to switch between split screens
   - a key (or modifier) to scroll both split screens
+- option to suppress "Are you sure" confirmations on destructive operations (such as delete/moving files)?
+- `\` present a directory tree of the selected drive; select a subdirectory to list by moving the cursor and pressing Enter
+  - list.com shows 8 levels, but selecting any directory just goes to its top level parent directory
 
 
 

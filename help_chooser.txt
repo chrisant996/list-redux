@@ -23,7 +23,7 @@ ACTION KEYS:
 
          .  Navigate to parent directory.
    F2 or @  Incremental file name search, jump to selected file.
-         F  New file mask or path.
+         P  New path or file mask.
 
          A  Change file or directory attributes.
          N  Create new directory.
@@ -40,7 +40,10 @@ TAGGING KEYS:
          T  Tag the selected file.
          U  Untag the selected file.
      SPACE  Toggle tagged for the selected file.
+    \ or F  Search for text and tag files (any case).
+    / or S  Search for text and tag files (case sensitive).
     Ctrl-A  Tag all files.
+    Ctrl-N  Invert tagged files.
     Ctrl-T  Tag all files.
     Ctrl-U  Untag all files.
 

@@ -56,3 +56,4 @@ struct ViewerOptions
 #endif
 };
 
+extern ViewerOptions g_options;

@@ -34,7 +34,7 @@ const DWORD c_max_needle = 32;
 static_assert(c_max_needle <= c_data_buffer_slop); // Important for searching across word wrapped line breaks.
 
 static unsigned s_max_line_length = c_default_max_line_length;
-static ViewerOptions s_options;
+ViewerOptions g_options;
 
 constexpr unsigned c_horiz_scroll_amount = 10;
 
@@ -46,12 +46,12 @@ void SetMaxLineLength(const WCHAR* arg)
         max_line_length = 16;
     else if (max_line_length > c_max_line_length)
         max_line_length = c_max_line_length;
-    s_options.max_line_length = max_line_length;
+    g_options.max_line_length = max_line_length;
 }
 
 void SetViewerScrollbar(bool scrollbar)
 {
-    s_options.show_scrollbar = scrollbar;
+    g_options.show_scrollbar = scrollbar;
 }
 
 class Viewer;
@@ -167,7 +167,7 @@ Viewer::Viewer(const char* text, const WCHAR* title)
 : m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
 , m_title(title)
 , m_text(text)
-, m_context(s_options)
+, m_context(g_options)
 {
     Error e;
     m_context.SetTextContent(m_text, e);
@@ -182,7 +182,7 @@ Viewer::Viewer(const char* text, const WCHAR* title)
 Viewer::Viewer(const std::vector<StrW>& files)
 : m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
 , m_files(&files)
-, m_context(s_options)
+, m_context(g_options)
 {
 }
 
@@ -243,12 +243,12 @@ unsigned Viewer::CalcMarginWidth() const
 #endif
 
         StrW s;
-        if (s_options.show_line_numbers)
+        if (g_options.show_line_numbers)
         {
             s.Printf(L"%lu", m_context.CountFriendlyLines());
             margin = std::max<unsigned>(c_min_margin_width, s.Length() + 2);
         }
-        else if (s_options.show_file_offsets)
+        else if (g_options.show_file_offsets)
         {
 #ifdef DEBUG
             s.Printf(L"%lx", m_context.Processed());
@@ -277,7 +277,7 @@ void Viewer::UpdateDisplay()
 
     const bool update_header = (m_force_update || file_changed || offset_changed || processed_changed);
     const bool update_content = (m_force_update || offset_changed);
-    const bool update_debug_row = (s_options.show_debug_info);
+    const bool update_debug_row = (g_options.show_debug_info);
     bool update_command_line = (m_force_update || m_force_update_footer || feedback_changed);
 
     if (!update_header && !update_content && !update_debug_row && !update_command_line)
@@ -299,7 +299,7 @@ void Viewer::UpdateDisplay()
     // Decide terminal dimensions and content height.  Content width can't be
     // decided yet because it may depend on the margin width (which depends on
     // the highest, i.e. widest, file number or file offset).
-    const unsigned debug_row = !!s_options.show_debug_info;
+    const unsigned debug_row = !!g_options.show_debug_info;
     const DWORD colsrows = GetConsoleColsRows(m_hout);
     m_terminal_width = LOWORD(colsrows);
     m_terminal_height = HIWORD(colsrows);
@@ -307,7 +307,7 @@ void Viewer::UpdateDisplay()
         m_content_height = m_terminal_height - (2 + debug_row);
     else
         m_content_height = 0;
-    const bool show_scrollbar = (s_options.show_scrollbar &&
+    const bool show_scrollbar = (g_options.show_scrollbar &&
                                  m_content_height >= 4 &&
                                  !(m_errmsg.Length() || !m_context.HasContent()) &&
                                  m_context.GetFileSize() > 0);
@@ -326,7 +326,7 @@ LAutoFitContentWidth:
     m_content_width = m_terminal_width - m_margin_width - show_scrollbar;
     {
         Error e;
-        m_context.SetWrapWidth(m_wrap ? m_content_width : s_options.max_line_length);
+        m_context.SetWrapWidth(m_wrap ? m_content_width : g_options.max_line_length);
         working.ShowFeedback(m_context.Completed(), m_context.Count(), m_top + m_content_height, this, false/*bytes*/);
         m_context.ProcessThrough(m_top + m_content_height, e);
         const unsigned new_margin_width = CalcMarginWidth();
@@ -355,7 +355,7 @@ LAutoFitContentWidth:
     }
     else
     {
-        if (s_options.show_ruler)
+        if (g_options.show_ruler)
         {
             // When the ruler is shown, allow the last line to go all the way
             // to the top, to allow easy measuring.
@@ -416,7 +416,7 @@ LAutoFitContentWidth:
         s.Append(L"\x1b[1H");
         s.AppendColor(GetColor(ColorElement::Header));
 
-        if (s_options.show_ruler)
+        if (g_options.show_ruler)
         {
             if (m_hex_mode)
             {
@@ -467,11 +467,11 @@ LAutoFitContentWidth:
             }
             if (m_hex_mode)
                 right.Printf(L"    Offset: %06lx-%06lx", m_hex_top, bottom_offset);
-            else if (s_options.show_file_offsets)
+            else if (g_options.show_file_offsets)
                 right.Printf(L"    Offset: %06lx-%06lx", m_context.GetOffset(m_top), bottom_offset);
             else
                 right.Printf(L"    Line: %lu", m_top + 1);
-            if (s_options.show_file_offsets || m_hex_mode)
+            if (g_options.show_file_offsets || m_hex_mode)
                 right.Printf(L" of %06lx", m_context.GetFileSize());
             else if (!m_context.Completed())
                 right.Printf(L"   (%u%%)", LinePercent(bottom_line_plusone));
@@ -621,7 +621,7 @@ LAutoFitContentWidth:
             const FoundOffset* found_line = m_found_line.Empty() ? nullptr : &m_found_line;
             for (size_t row = 0; row < m_content_height; ++row)
             {
-                if (s_options.show_endoffile_line && m_top + row == m_context.Count())
+                if (g_options.show_endoffile_line && m_top + row == m_context.Count())
                 {
                     msg_text = c_endoffile_marker;
                     msg_color = GetColor(ColorElement::EndOfFileLine);
@@ -660,7 +660,7 @@ LAutoFitContentWidth:
                     if (m_margin_width)
                     {
                         s.AppendColor(GetColor(ColorElement::LineNumber));
-                        if (s_options.show_line_numbers)
+                        if (g_options.show_line_numbers)
                         {
                             const size_t prev_num = (m_top + row > 0) ? m_context.GetLineNunber(m_top + row - 1) : 0;
                             const size_t num = m_context.GetLineNunber(m_top + row);
@@ -669,7 +669,7 @@ LAutoFitContentWidth:
                             else
                                 s.Printf(L"%*s%s", m_margin_width - 2, L"", c_div_char);
                         }
-                        else if (s_options.show_file_offsets)
+                        else if (g_options.show_file_offsets)
                             s.Printf(L"%0*lx%s", m_margin_width - 2, m_context.GetOffset(m_top + row), c_div_char);
                         else
                             assert(!m_margin_width);
@@ -740,14 +740,14 @@ LAutoFitContentWidth:
     }
 
     // Debug row.
-    if (s_options.show_debug_info && update_debug_row)
+    if (g_options.show_debug_info && update_debug_row)
     {
         s.Printf(L"\x1b[%uH", m_terminal_height - debug_row);
         s.AppendColor(GetColor(ColorElement::DebugRow));
 
         StrW left;
         StrW right;
-        if (s_options.show_file_offsets || m_hex_mode)
+        if (g_options.show_file_offsets || m_hex_mode)
             left.Printf(L"Buffer: offset %06lx, %x bytes", m_context.GetBufferOffset(), m_context.GetBufferLength());
         else
             left.Printf(L"Buffer: offset %lu, %u bytes", m_context.GetBufferOffset(), m_context.GetBufferLength());
@@ -839,24 +839,24 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
     right.Printf(L"    %-6s", m_context.GetEncodingName(m_hex_mode));
     right.Append(L"    Options: ");
 #ifdef DEBUG
-    right.Append(s_options.show_debug_info ? L"D" : L"d");
+    right.Append(g_options.show_debug_info ? L"D" : L"d");
 #endif
     if (!m_text /*&& !m_context.IsBinaryFile()*/)
-        right.Append(s_options.show_line_endings ? L"E" : L"e");
+        right.Append(g_options.show_line_endings ? L"E" : L"e");
     if (!m_text)
         right.Append(m_hex_mode ? L"H" : L"h");
-    right.Append(s_options.show_line_numbers ? L"N" : L"n");
+    right.Append(g_options.show_line_numbers ? L"N" : L"n");
     if (!m_text)
     {
-        right.Append(s_options.show_file_offsets ? L"O" : L"o");
-        right.Append(s_options.show_ruler ? L"R" : L"r");
+        right.Append(g_options.show_file_offsets ? L"O" : L"o");
+        right.Append(g_options.show_ruler ? L"R" : L"r");
     }
-    right.Append(s_options.show_whitespace ? L"S" : L"s");
+    right.Append(g_options.show_whitespace ? L"S" : L"s");
     right.Append(m_wrap ? L"W" : L"w");
     if (!m_text)
     {
-        right.Append(s_options.expand_tabs ? L"T" : L"t");
-        right.Append(c_ctrl_indicator[int(s_options.ctrl_mode)]);
+        right.Append(g_options.expand_tabs ? L"T" : L"t");
+        right.Append(c_ctrl_indicator[int(g_options.ctrl_mode)]);
     }
     uint32 right_width = cell_count(right.Text());
 
@@ -982,7 +982,7 @@ key_down:
             }
             else
             {
-                if (!m_context.Completed() || m_top + (s_options.show_ruler ? 0 : m_content_height) < CountForDisplay())
+                if (!m_context.Completed() || m_top + (g_options.show_ruler ? 0 : m_content_height) < CountForDisplay())
                     ++m_top;
             }
             break;
@@ -1146,7 +1146,7 @@ key_down:
             {
                 if (!m_hex_mode && !m_text)
                 {
-                    s_options.ctrl_mode = CtrlMode((int(s_options.ctrl_mode) + 1) % int(CtrlMode::__MAX));
+                    g_options.ctrl_mode = CtrlMode((int(g_options.ctrl_mode) + 1) % int(CtrlMode::__MAX));
                     m_context.ClearProcessed();
                     m_force_update = true;
                 }
@@ -1155,14 +1155,14 @@ key_down:
         case 'd':
             if (input.modifier == Modifier::ALT)
             {
-                s_options.show_debug_info = !s_options.show_debug_info;
+                g_options.show_debug_info = !g_options.show_debug_info;
                 m_force_update = true;
             }
             break;
         case 'e':
             if (input.modifier == Modifier::None)
             {
-                s_options.show_line_endings = !s_options.show_line_endings;
+                g_options.show_line_endings = !g_options.show_line_endings;
                 m_force_update = true;
             }
             break;
@@ -1193,9 +1193,9 @@ key_down:
             {
                 if (!m_text && m_hex_mode)
                 {
-                    ++s_options.hex_grouping;
-                    if (unsigned(1) << s_options.hex_grouping >= m_hex_width)
-                        s_options.hex_grouping = 0;
+                    ++g_options.hex_grouping;
+                    if (unsigned(1) << g_options.hex_grouping >= m_hex_width)
+                        g_options.hex_grouping = 0;
                     m_force_update = true;
                 }
             }
@@ -1222,8 +1222,8 @@ key_down:
             {
                 if (!m_hex_mode)
                 {
-                    s_options.show_line_numbers = !s_options.show_line_numbers;
-                    s_options.show_file_offsets = false;
+                    g_options.show_line_numbers = !g_options.show_line_numbers;
+                    g_options.show_file_offsets = false;
                     m_force_update = true;
                 }
             }
@@ -1233,8 +1233,8 @@ key_down:
             {
                 if (!m_hex_mode && !m_text)
                 {
-                    s_options.show_file_offsets = !s_options.show_file_offsets;
-                    s_options.show_line_numbers = false;
+                    g_options.show_file_offsets = !g_options.show_file_offsets;
+                    g_options.show_line_numbers = false;
                     m_force_update = true;
                 }
             }
@@ -1249,7 +1249,7 @@ key_down:
             {
                 if (!m_text)
                 {
-                    s_options.show_ruler = !s_options.show_ruler;
+                    g_options.show_ruler = !g_options.show_ruler;
                     // TODO:  Only the header needs to redraw.
                     m_force_update = true;
                 }
@@ -1258,7 +1258,7 @@ key_down:
         case ' ':
             if (input.modifier == Modifier::None)
             {
-                s_options.show_whitespace = !s_options.show_whitespace;
+                g_options.show_whitespace = !g_options.show_whitespace;
                 m_force_update = true;
             }
             break;
@@ -1267,7 +1267,7 @@ key_down:
             {
                 if (!m_hex_mode && !m_text)
                 {
-                    s_options.expand_tabs = !s_options.expand_tabs;
+                    g_options.expand_tabs = !g_options.expand_tabs;
                     m_context.ClearProcessed();
                     m_force_update = true;
                 }
@@ -1294,20 +1294,20 @@ key_down:
             }
             break;
 
-        case '/':
+        case 'f':
         case 's':
             if (input.modifier == Modifier::None)
             {
                 // TODO:  What should it do in hex mode?
-                DoSearch(true, false/*caseless*/);
+                DoSearch(true, input.key_char == 'f'/*caseless*/);
             }
             break;
+        case '/':
         case '\\':
-        case 'f':
-            if (input.modifier == Modifier::None)
+            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
             {
                 // TODO:  What should it do in hex mode?
-                DoSearch(true, true/*caseless*/);
+                DoSearch(true, input.key_char == '\\'/*caseless*/);
             }
             break;
         }
@@ -1416,7 +1416,7 @@ void Viewer::SetFile(intptr_t index, ContentCache* context)
 
 size_t Viewer::CountForDisplay() const
 {
-    return m_context.Count() + s_options.show_endoffile_line;
+    return m_context.Count() + g_options.show_endoffile_line;
 }
 
 void Viewer::DoSearch(bool next, bool caseless)
@@ -1428,8 +1428,7 @@ void Viewer::DoSearch(bool next, bool caseless)
     OutputConsole(m_hout, s.Text(), s.Length());
 
 // TODO:  make a variant of ReadInput that plays nicely with the Command line.
-    static std::vector<StrW> s_search_history;
-    ReadInput(s, &s_search_history);
+    ReadInput(s, History::Search);
 
     OutputConsole(m_hout, c_norm);
     m_force_update = true;
@@ -1467,7 +1466,7 @@ void Viewer::FindNext(bool next)
     if (!found && !canceled && !m_text && m_multifile_search && m_files)
     {
         size_t index = m_index;
-        ContentCache ctx(s_options);
+        ContentCache ctx(g_options);
         while (!found)
         {
             if (next)
@@ -1494,7 +1493,7 @@ void Viewer::FindNext(bool next)
             }
 
             FoundOffset found_line;
-            ctx.SetWrapWidth(m_wrap ? m_content_width : s_options.max_line_length);
+            ctx.SetWrapWidth(m_wrap ? m_content_width : g_options.max_line_length);
             found = (m_hex_mode ?
                     ctx.Find(next, m_find.Text(), m_hex_width, found_line, m_caseless, e) :
                     ctx.Find(next, m_find.Text(), m_content_width, found_line, left_offset, m_caseless, e));
@@ -1635,8 +1634,7 @@ void Viewer::GoTo()
         OutputConsole(m_hout, s.Text(), s.Length());
 
         done = true;
-        std::vector<StrW> s_goto_history;
-        ReadInput(s, &s_goto_history, 32, callback);
+        ReadInput(s, History::Goto, 32, callback);
 
         OutputConsole(m_hout, c_norm);
         if (done)
@@ -1785,8 +1783,7 @@ void Viewer::OpenNewFile(Error& e)
     s.Printf(L"\r%s", tmp.Text());
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    static std::vector<StrW> s_open_file_history;
-    ReadInput(s, &s_open_file_history, m_terminal_width - 1 - tmp.Length());
+    ReadInput(s, History::OpenFile, m_terminal_width - 1 - tmp.Length());
 
     OutputConsole(m_hout, c_norm);
 
@@ -1836,21 +1833,21 @@ ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e)
 
 ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title)
 {
-    ViewerOptions old = s_options;
-    s_options = ViewerOptions();
-    s_options.ctrl_mode = CtrlMode::OEM437;
-    s_options.expand_tabs = true;
-    s_options.show_whitespace = false;
-    s_options.show_line_numbers = false;
-    s_options.show_file_offsets = false;
-    s_options.show_ruler = false;
-    s_options.show_endoffile_line = true;
-    s_options.show_debug_info = false;
+    ViewerOptions old = g_options;
+    g_options = ViewerOptions();
+    g_options.ctrl_mode = CtrlMode::OEM437;
+    g_options.expand_tabs = true;
+    g_options.show_whitespace = false;
+    g_options.show_line_numbers = false;
+    g_options.show_file_offsets = false;
+    g_options.show_ruler = false;
+    g_options.show_endoffile_line = true;
+    g_options.show_debug_info = false;
 
     Viewer viewer(text, title);
     ViewerOutcome ret = viewer.Go(e);
 
-    s_options = old;
+    g_options = old;
     return ret;
 }
 

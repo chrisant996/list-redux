@@ -6,6 +6,7 @@
 #include "pch.h"
 #include "chooser.h"
 #include "scan.h"
+#include "contentcache.h"
 #include "filesys.h"
 #include "list_format.h"
 #include "input.h"
@@ -27,6 +28,8 @@ constexpr scroll_bar_style c_sbstyle = scroll_bar_style::half_line_chars;
 static const WCHAR c_clreol[] = L"\x1b[K";
 
 static const WCHAR c_no_files_tagged[] = L"*** No Files Tagged ***";
+static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
+static const WCHAR c_canceled[] = L"*** Canceled ***";
 
 static void ApplyAttr(DWORD& mask, DWORD& attr, bool& minus, DWORD flag)
 {
@@ -705,11 +708,25 @@ LNext:
             break;
 
         case '@':
+            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            {
+                ShowFileList();
+            }
+            break;
+
+        case 'f':
+        case 's':
+            if (input.modifier == Modifier::None)
+            {
+                // TODO:  What should it do in hex mode?
+                SearchAndTag(e, input.key_char == 'f'/*caseless*/);
+            }
+            break;
         case '/':
         case '\\':
             if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
             {
-                ShowFileList();
+                SearchAndTag(e, input.key_char == '\\'/*caseless*/);
             }
             break;
 
@@ -719,7 +736,7 @@ LNext:
                 RefreshDirectoryListing(e);
             }
             break;
-        case 'f':
+        case 'p':
             if (input.modifier == Modifier::None)
             {
                 NewFileMask(e);
@@ -828,6 +845,10 @@ LNext:
                 m_tagged.MarkAll();
                 m_dirty.MarkAll();
             }
+            break;
+        case '\x0e':    // CTRL-N
+            m_tagged.Reverse();
+            m_dirty.MarkAll();
             break;
         case '\x15':    // CTRL-U
             if (m_tagged.AnyMarked())
@@ -1082,8 +1103,7 @@ void Chooser::NewFileMask(Error& e)
     s.Printf(L"\r\x1b[KEnter new file mask or path%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    static std::vector<StrW> s_file_mask_history;
-    ReadInput(s, &s_file_mask_history);
+    ReadInput(s, History::FileMask);
 
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
@@ -1132,8 +1152,7 @@ void Chooser::ChangeAttributes(Error& e)
     s.Printf(L"\r\x1b[KChange attributes ('ashr' to set or '-a-s-h-r' to clear)%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    static std::vector<StrW> s_change_attr_history;
-    ReadInput(s, &s_change_attr_history);
+    ReadInput(s, History::ChangeAttr);
 
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
@@ -1207,8 +1226,7 @@ void Chooser::NewDirectory(Error& e)
     s.Printf(L"\rEnter new directory name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    static std::vector<StrW> s_new_dir_history;
-    ReadInput(s, &s_new_dir_history);
+    ReadInput(s, History::NewDirectory);
 
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
@@ -1245,8 +1263,7 @@ void Chooser::RenameEntry(Error& e)
     s.Printf(L"\rEnter new name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    static std::vector<StrW> s_rename_entry_history;
-    ReadInput(s, &s_rename_entry_history);
+    ReadInput(s, History::RenameEntry);
 
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
@@ -1443,8 +1460,7 @@ void Chooser::SweepFiles(Error& e)
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rEnter program to run%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
-    static std::vector<StrW> s_sweep_program_history;
-    ReadInput(program, &s_sweep_program_history);
+    ReadInput(program, History::SweepProgram);
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
 
@@ -1459,8 +1475,7 @@ void Chooser::SweepFiles(Error& e)
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rArguments before file name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
-    static std::vector<StrW> s_sweep_args_before_history;
-    ok = ReadInput(args_before, &s_sweep_args_before_history);
+    ok = ReadInput(args_before, History::SweepArgsBefore);
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
     if (!ok)
@@ -1473,8 +1488,7 @@ void Chooser::SweepFiles(Error& e)
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rArguments after file name%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
-    static std::vector<StrW> s_sweep_args_after_history;
-    ok = ReadInput(args_after, &s_sweep_args_after_history);
+    ok = ReadInput(args_after, History::SweepArgsAfter);
     OutputConsole(m_hout, c_norm);
     ForceUpdateAll();
     if (!ok)
@@ -1573,4 +1587,76 @@ void Chooser::ShowFileList()
     ForceUpdateAll();
     if (!result.canceled)
         SetIndex(result.selected);
+}
+
+void Chooser::SearchAndTag(Error& e, bool caseless)
+{
+    StrW s;
+    s.Printf(L"\x1b[%uH", m_terminal_height);
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Printf(L"\r\x1b[KSearch%s ", c_prompt_char);
+    OutputConsole(m_hout, s.Text(), s.Length());
+
+    StrW find;
+    ReadInput(find, History::Search);
+
+    OutputConsole(m_hout, c_norm);
+    m_dirty_footer = true;
+
+    if (find.Empty())
+        return;
+
+    bool canceled = false;
+    size_t num_found = 0;
+    FoundOffset found_line;
+    ContentCache ctx(g_options);
+    for (size_t index = 0; index < m_files.size(); ++index)
+    {
+        if (m_files[index].IsDirectory())
+            continue;
+
+        m_files[index].GetPathName(s);
+#if 0
+        m_searching_file = s.Text();
+        m_dirty_footer = true;
+        UpdateDisplay();
+#endif
+
+        ctx.Open(s.Text(), e);
+        ctx.SetWrapWidth(g_options.max_line_length);
+
+        if (e.Test())
+        {
+            ReportError(e);
+            ForceUpdateAll();
+            break;
+        }
+
+        unsigned left_offset = 0;
+        const bool found = ctx.Find(true, find.Text(), 999, found_line, left_offset, caseless, e);
+        if (e.Code() == E_ABORT)
+        {
+            canceled = true;
+            break;
+        }
+
+        if (found)
+        {
+            ++num_found;
+            m_tagged.Mark(index, 1);
+            m_dirty.Mark(index % m_num_rows, 1);
+        }
+    }
+
+    m_dirty_footer = true;
+
+    m_feedback.Clear();
+    if (canceled)
+        m_feedback = c_canceled;
+    else if (e.Test())
+        return;
+    else if (!num_found)
+        m_feedback = c_text_not_found;
+    else
+        m_feedback.Printf(L"*** Tagged %zu file(s) ***", num_found);
 }
