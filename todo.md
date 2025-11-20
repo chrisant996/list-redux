@@ -13,6 +13,7 @@
 - [ ] optionally save configured colors to `.listredux` file
 - [ ] some way to revert to default colors inside the app
 - [ ] documentation for the `.listredux` file
+- [ ] documentation for regular expressions (link to MSVC ECMAScript syntax page)
 
 ### File Chooser (list files in directory)
 
