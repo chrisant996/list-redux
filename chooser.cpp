@@ -1597,13 +1597,19 @@ void Chooser::SearchAndTag(Error& e, bool caseless)
     s.Printf(L"\r\x1b[KSearch%s ", c_prompt_char);
     OutputConsole(m_hout, s.Text(), s.Length());
 
-    StrW find;
-    ReadInput(find, History::Search);
+    auto searcher = ReadSearchInput(m_terminal_width, caseless, false, e);
 
     OutputConsole(m_hout, c_norm);
     m_dirty_footer = true;
 
-    if (find.Empty())
+    if (e.Test())
+    {
+        ReportError(e);
+        ForceUpdateAll();
+        return;
+    }
+
+    if (!searcher)
         return;
 
     bool canceled = false;
@@ -1633,7 +1639,7 @@ void Chooser::SearchAndTag(Error& e, bool caseless)
         }
 
         unsigned left_offset = 0;
-        const bool found = ctx.Find(true, find.Text(), 999, found_line, left_offset, caseless, e);
+        const bool found = ctx.Find(true, searcher, 999, found_line, left_offset, e);
         if (e.Code() == E_ABORT)
         {
             canceled = true;

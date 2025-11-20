@@ -29,11 +29,10 @@
 - [x] `Shift-DEL` to delete file(s) or an empty directory
 - [x] `.` change to parent directory
 - [x] `E` edit file (`%EDITOR%` or `notepad.exe` or maybe `edit.exe`)
-- [x] `F` new file mask (wildcard) or path
-- [x] ~~`P` change drive/path~~
+- [x] `P` new file mask (wildcard) or path
 - [x] `F2` incrementally search the list of file names
-- [x] search for text in files in file chooser (tag matching files)
-- [ ] `N` invert tagged files
+- [x] `F` `S` `/` `\` search for text in files in file chooser (tag matching files)
+- [x] `Ctrl-N` invert tagged files
 - [ ] show used and free space in footer
 
 ### File Viewer (list file content)
@@ -67,7 +66,7 @@
   - [x] search in hex mode
   - [x] `F4` toggle multi-file search (next/prev cross file boundaries)
   - [x] make search interruptible with `Ctrl-Break`
-  - [ ] search for regex (use RE2 and search line by line)
+  - [x] search for regex (search line by line)
   - [ ] search for hex bytes in hex mode
 - hex mode
   - [x] go to offset
@@ -104,6 +103,7 @@
 
 ### Maybe
 
+- use RE2 regex library
 - persist history lists for input prompts?
 - cut and paste to new or existing file [did it really "cut" or just "copy"?]
 - allow copying, moving tagged files?

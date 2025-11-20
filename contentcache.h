@@ -5,6 +5,7 @@
 
 #include "vieweroptions.h"
 #include "encodings.h"
+#include "searcher.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
 
@@ -201,8 +202,8 @@ public:
     size_t          FriendlyLineNumberToIndex(size_t index) const { return m_map.FriendlyLineNumberToIndex(index); }
     unsigned        GetLength(size_t index) const;
 
-    bool            Find(bool next, const WCHAR* needle, unsigned max_width, FoundOffset& found, unsigned& left_offset, bool caseless, Error& e);
-    bool            Find(bool next, const WCHAR* needle, unsigned hex_width, FoundOffset& found, bool caseless, Error& e);
+    bool            Find(bool next, const std::unique_ptr<Searcher>& searcher, unsigned max_width, FoundOffset& found, unsigned& left_offset, Error& e);
+    bool            Find(bool next, const std::unique_ptr<Searcher>& searcher, unsigned hex_width, FoundOffset& found, Error& e);
 
     FileOffset      GetBufferOffset() const { return m_data_offset; }
     unsigned        GetBufferLength() const { return m_data_length; }

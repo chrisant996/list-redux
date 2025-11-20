@@ -14,6 +14,10 @@ LEFT/RIGHT  Move selection left/right one file.
      ENTER  View the selected file, or navigate to directory.
     L or V  View the tagged files.
 
+    \ or F  Search for text and tag files (any case).
+    / or S  Search for text and tag files (case sensitive).
+Ctrl-Break  Cancel search.
+
          1  Show only file names.
          2  Show file names and sizes.
          3  Show file names, dates, and sizes.
@@ -40,8 +44,6 @@ TAGGING KEYS:
          T  Tag the selected file.
          U  Untag the selected file.
      SPACE  Toggle tagged for the selected file.
-    \ or F  Search for text and tag files (any case).
-    / or S  Search for text and tag files (case sensitive).
     Ctrl-A  Tag all files.
     Ctrl-N  Invert tagged files.
     Ctrl-T  Tag all files.

@@ -1536,11 +1536,10 @@ unsigned ContentCache::GetLength(size_t line) const
     return 0;
 }
 
-bool ContentCache::Find(bool next, const WCHAR* needle, unsigned max_width, FoundOffset& found_line, unsigned& left_offset, bool caseless, Error& e)
+bool ContentCache::Find(bool next, const std::unique_ptr<Searcher>& searcher, unsigned max_width, FoundOffset& found_line, unsigned& left_offset, Error& e)
 {
     StrW tmp;
-    const unsigned needle_len = unsigned(wcslen(needle));
-    assert(needle_len);
+    const unsigned needle_delta = searcher->GetNeedleDelta();
 
     if (found_line.Empty())
     {
@@ -1618,80 +1617,83 @@ bool ContentCache::Find(bool next, const WCHAR* needle, unsigned max_width, Foun
         assert(len);
         assert(ptr + len <= m_data + m_data_length);
 
-        // IMPORTANT:  This is how Find() handles searching across forced line
-        // breaks -- it relies on the data buffer always having at least
-        // c_data_buffer_slop bytes more than the current line (except at the
-        // end of the file), and on max_needle being less than or equal to
-        // c_data_buffer_slop.
-        if (len && ptr[len - 1] != '\n')
+        if (needle_delta)
         {
-            // Extend len by needle_len - 1, not to extend the end of the
-            // buffer, and also not to extend past a newline.  This only needs
-            // to include enough extra to handle when the needle is split
-            // across a max line length break; anything past that will be
-            // caught when searching the next line.
-            for (unsigned extend = needle_len - 1; extend-- && ptr + len < m_data + m_data_length && ptr[len - 1] != '\n';)
-                ++len;
+            // IMPORTANT:  This is how Find() handles searching across forced
+            // line breaks -- it relies on the data buffer always having at
+            // least c_data_buffer_slop bytes more than the current line
+            // (except at the end of the file), and on max_needle being less
+            // than or equal to c_data_buffer_slop.
+            if (len && ptr[len - 1] != '\n')
+            {
+                // Extend len by needle_len - 1, not to extend the end of the
+                // buffer, and also not to extend past a newline.  This only
+                // needs to include enough extra to handle when the needle is
+                // split across a max line length break; anything past that
+                // will be caught when searching the next line.
+                unsigned extend = needle_delta - 1;
+                while (extend-- && ptr + len < m_data + m_data_length && ptr[len - 1] != '\n')
+                    ++len;
+            }
         }
 
         StrW tmp;
         m_map.GetLineText(ptr, len, tmp);
+        TrimLineEnding(tmp);
 
         // FUTURE:  Optional regex search?
         // PERF:  Boyer-Moore search?
-        const WCHAR* const end = tmp.Text() + tmp.Length() - (needle_len - 1);
-        for (const WCHAR* p = tmp.Text(); p < end; ++p)
+        if (searcher->Match(tmp.Text(), tmp.Length(), e))
         {
-            const int n = caseless ? _wcsnicmp(p, needle, needle_len) : wcsncmp(p, needle, needle_len);
-            if (n == 0)
+            if (e.Test())
+                return false;
+
+            // Check found offset.
+            const unsigned index_in_line = searcher->GetMatchStart();
+            const unsigned needle_len = searcher->GetMatchLength();
+            if (index_in_line >= real_len)
+                return false; // Was actually found on the _next_ line.
+            found_line.Found(GetOffset(index) + index_in_line, needle_len);
+            // Calculate horizontal scroll offset.
+            tmp.Clear();
+            FormatLineData(index, 0, tmp, -1, e, nullptr, nullptr, index_in_line);
+            const unsigned prefix_cells = cell_count(tmp.Text());
+            tmp.Clear();
+            FormatLineData(index, 0, tmp, -1, e, nullptr, nullptr, index_in_line + needle_len);
+            const unsigned prefixneedle_cells = cell_count(tmp.Text());
+            const unsigned needle_cells = prefixneedle_cells - prefix_cells;
+            if (prefix_cells + needle_cells + c_find_horiz_scroll_threshold <= max_width)
             {
-                // Check found offset.
-                const unsigned index_in_line = unsigned(p - tmp.Text());
-                if (index_in_line >= real_len)
-                    return false; // Was actually found on the _next_ line.
-                found_line.Found(GetOffset(index) + index_in_line, needle_len);
-                // Calculate horizontal scroll offset.
-                tmp.Clear();
-                FormatLineData(index, 0, tmp, -1, e, nullptr, nullptr, index_in_line);
-                const unsigned prefix_cells = cell_count(tmp.Text());
-                tmp.Clear();
-                FormatLineData(index, 0, tmp, -1, e, nullptr, nullptr, index_in_line + needle_len);
-                const unsigned prefixneedle_cells = cell_count(tmp.Text());
-                const unsigned needle_cells = prefixneedle_cells - prefix_cells;
-                if (prefix_cells + needle_cells + c_find_horiz_scroll_threshold <= max_width)
-                {
-                    left_offset = 0;
-                }
-                else
-                {
-                    // Center the found text horizontally.
-                    const int center_offset = (max_width - needle_cells) / 2;
-                    left_offset = int(prefix_cells) - center_offset;
-                    // Nudge the left offset so it doesn't scroll past the
-                    // wrap width or line length.
-                    tmp.Clear();
-                    const unsigned line_cells = FormatLineData(index, 0, tmp, -1, e);
-                    if (line_cells)
-                    {
-                        assert(m_map.GetWrapWidth());
-                        if (m_map.GetWrapWidth())
-                            left_offset = min<int>(left_offset, int(line_cells) - min(max_width, m_map.GetWrapWidth()));
-                        else
-                            left_offset = min<int>(left_offset, int(line_cells) + c_find_horiz_scroll_threshold - max_width);
-                    }
-                    left_offset = max<int>(0, left_offset);
-                }
-                return true;
+                left_offset = 0;
             }
+            else
+            {
+                // Center the found text horizontally.
+                const int center_offset = (max_width - needle_cells) / 2;
+                left_offset = int(prefix_cells) - center_offset;
+                // Nudge the left offset so it doesn't scroll past the
+                // wrap width or line length.
+                tmp.Clear();
+                const unsigned line_cells = FormatLineData(index, 0, tmp, -1, e);
+                if (line_cells)
+                {
+                    assert(m_map.GetWrapWidth());
+                    if (m_map.GetWrapWidth())
+                        left_offset = min<int>(left_offset, int(line_cells) - min(max_width, m_map.GetWrapWidth()));
+                    else
+                        left_offset = min<int>(left_offset, int(line_cells) + c_find_horiz_scroll_threshold - max_width);
+                }
+                left_offset = max<int>(0, left_offset);
+            }
+            return true;
         }
     }
 }
 
-bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, FoundOffset& found_line, bool caseless, Error& e)
+bool ContentCache::Find(bool next, const std::unique_ptr<Searcher>& searcher, unsigned hex_width, FoundOffset& found_line, Error& e)
 {
     StrW tmp;
-    const unsigned needle_len = unsigned(wcslen(needle));
-    assert(needle_len);
+    const unsigned needle_delta = searcher->GetNeedleDelta();
 
     if (found_line.Empty())
     {
@@ -1745,36 +1747,40 @@ bool ContentCache::Find(bool next, const WCHAR* needle, unsigned hex_width, Foun
         }
         assert(ptr + len <= m_data + m_data_length);
 
-        // IMPORTANT:  This is how Find() handles searching across forced line
-        // breaks -- it relies on the data buffer always having at least
-        // c_data_buffer_slop bytes more than the current line (except at the
-        // end of the file), and on max_needle being less than or equal to
-        // c_data_buffer_slop.
+        if (needle_delta)
         {
-            // Extend len by needle_len - 1, not to extend the end of the
-            // buffer.  This only needs to include enough extra to handle when
-            // the needle is split across a max line length break; anything
-            // past that will be caught when searching the next line.
-            for (unsigned extend = needle_len - 1; extend-- && ptr + len < m_data + m_data_length;)
-                ++len;
+            // IMPORTANT:  This is how Find() handles searching across forced
+            // line breaks -- it relies on the data buffer always having at
+            // least c_data_buffer_slop bytes more than the current line
+            // (except at the end of the file), and on max_needle being less
+            // than or equal to c_data_buffer_slop.
+            {
+                // Extend len by needle_len - 1, not to extend the end of the
+                // buffer.  This only needs to include enough extra to handle
+                // when the needle is split across a max line length break;
+                // anything past that will be caught when searching the next
+                // line.
+                unsigned extend = needle_delta - 1;
+                while (extend-- && ptr + len < m_data + m_data_length)
+                    ++len;
+            }
         }
 
 // TODO:  Encodings.  But what does that even mean for hex mode?  Really it should have a hex entry mode.
 // TODO:  Non-convertible characters will make conversion go haywire.
         StrW tmp;
         m_map.GetLineText(ptr, len, tmp, true/*hex_mode*/);
+        TrimLineEnding(tmp);
 
 // TODO:  Optional regex search.
 // TODO:  Boyer-Moore search.
-        const WCHAR* const end = tmp.Text() + tmp.Length() - (needle_len - 1);
-        for (const WCHAR* p = tmp.Text(); p < end; ++p)
+        if (searcher->Match(tmp.Text(), tmp.Length(), e))
         {
-            const int n = caseless ? _wcsnicmp(p, needle, needle_len) : wcsncmp(p, needle, needle_len);
-            if (n == 0)
-            {
-                found_line.Found(offset + (p - tmp.Text()), needle_len);
-                return true;
-            }
+            if (e.Test())
+                return false;
+
+            found_line.Found(offset + searcher->GetMatchStart(), searcher->GetMatchLength());
+            return true;
         }
     }
 }

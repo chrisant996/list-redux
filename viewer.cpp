@@ -140,10 +140,9 @@ private:
     bool            m_searching = false;
     StrW            m_searching_file;
 
-    StrW            m_find;
-    bool            m_caseless = false;
+    std::unique_ptr<Searcher> m_searcher;
     bool            m_multifile_search = false;
-    FoundOffset       m_found_line;
+    FoundOffset     m_found_line;
 
     bool            m_allow_mouse = false;
 };
@@ -1062,7 +1061,7 @@ key_down:
             {
                 // F3 = forward, Shift-F3 = backward.
                 const bool next = (input.modifier & Modifier::SHIFT) == Modifier::None;
-                if (m_find.Empty())
+                if (!m_searcher)
                 {
                     if (!next && m_found_line.Empty())
                     {
@@ -1427,24 +1426,29 @@ void Viewer::DoSearch(bool next, bool caseless)
     MakeCommandLine(s, tmp.Text());
     OutputConsole(m_hout, s.Text(), s.Length());
 
-// TODO:  make a variant of ReadInput that plays nicely with the Command line.
-    ReadInput(s, History::Search);
+    Error e;
+    auto searcher = ReadSearchInput(m_terminal_width, caseless, false, e);
 
     OutputConsole(m_hout, c_norm);
     m_force_update = true;
 
-    if (s.Length())
+    if (e.Test())
     {
-        m_find.Set(std::move(s));
-        m_caseless = caseless;
-        m_found_line.Clear();
-        FindNext(next);
+        ReportError(e);
+        return;
     }
+
+    if (!searcher)
+        return;
+
+    m_searcher = std::move(searcher);
+    m_found_line.Clear();
+    FindNext(next);
 }
 
 void Viewer::FindNext(bool next)
 {
-    assert(m_find.Length());
+    assert(m_searcher);
 
     // TODO:  When should a search start over at the top of the file?
 
@@ -1459,8 +1463,8 @@ void Viewer::FindNext(bool next)
     Error e;
     unsigned left_offset = m_left;
     bool found = (m_hex_mode ?
-            m_context.Find(next, m_find.Text(), m_hex_width, m_found_line, m_caseless, e) :
-            m_context.Find(next, m_find.Text(), m_content_width, m_found_line, left_offset, m_caseless, e));
+            m_context.Find(next, m_searcher, m_hex_width, m_found_line, e) :
+            m_context.Find(next, m_searcher, m_content_width, m_found_line, left_offset, e));
     bool canceled = (e.Code() == E_ABORT);
 
     if (!found && !canceled && !m_text && m_multifile_search && m_files)
@@ -1495,8 +1499,8 @@ void Viewer::FindNext(bool next)
             FoundOffset found_line;
             ctx.SetWrapWidth(m_wrap ? m_content_width : g_options.max_line_length);
             found = (m_hex_mode ?
-                    ctx.Find(next, m_find.Text(), m_hex_width, found_line, m_caseless, e) :
-                    ctx.Find(next, m_find.Text(), m_content_width, found_line, left_offset, m_caseless, e));
+                    ctx.Find(next, m_searcher, m_hex_width, found_line, e) :
+                    ctx.Find(next, m_searcher, m_content_width, found_line, left_offset, e));
             if (e.Code() == E_ABORT)
             {
                 SetFile(index, &ctx);
