@@ -75,6 +75,12 @@
   - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [x] go to line
   - [ ] modify file
+    - [ ] navigate through bytes
+    - [ ] navigate through characters
+    - [ ] change bytes
+    - [ ] change characters
+    - [ ] discard changes
+    - [ ] save changes
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
   - [x] Binary files **_and hex mode_** use OEM CP.
@@ -95,6 +101,10 @@
   - Mouse wheel input is automatically converted to UP/DOWN keys even when ENABLE_MOUSE_INPUT is omitted, because of switching to the alternate screen.
   - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
   - [ ] mouse wheel should scroll by _N_ lines
+- improve input routine
+  - [ ] arrow keys
+  - [ ] CUA keys
+  - [ ] scrollable bounds
 - [ ] `S` configure sort order
 - detect certain file types and render with formatting/color
   - [ ] detect git patches and render some lines with color
