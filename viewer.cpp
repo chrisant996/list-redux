@@ -387,7 +387,7 @@ LAutoFitContentWidth:
         else if (m_context.Completed())
         {
             // Use line based metrics.
-            scroll_car.set_extents(m_content_height, m_context.Count());
+            scroll_car.set_extents(m_content_height, CountForDisplay());
             scroll_car.set_position(m_top);
         }
         else
