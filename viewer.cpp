@@ -1743,7 +1743,7 @@ void Viewer::ChooseEncoding()
 
     encodings.insert(encodings.begin(), { 0, L"Binary File" });
 
-    uint32 longest = c_min_popuplist_content_width - (2 + 2 + 7);
+    uint32 longest = c_min_popuplist_content_width - (2 + 9);
     for (size_t i = 0; i < encodings.size(); ++i)
     {
         const auto& enc = encodings[i];
@@ -1763,12 +1763,13 @@ void Viewer::ChooseEncoding()
             auto& name = names[i];
             const bool star = (enc.codepage == m_context.GetDetectedCodePage() ||
                                !enc.codepage && m_context.IsDetectedBinaryFile());
-            tmp.Set(i == index ? L"> " : (star ? L"* " : L"  "));
+            tmp.Set(i == index ? L"> " : (star ? L"* " : L"  "));       // 2
             tmp.Append(name);
             tmp.AppendSpaces(2 + longest - cell_count(tmp.Text()));
             name = std::move(tmp);
+            assert(tmp.Empty());
             tmp.Printf(L"(%u)", enc.codepage);
-            name.Printf(L"%7s", tmp.Text());
+            name.Printf(L"  %7s", tmp.Text());                          // 9
         }
     }
 
