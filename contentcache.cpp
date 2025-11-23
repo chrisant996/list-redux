@@ -876,6 +876,7 @@ ContentCache::ContentCache(const ViewerOptions& options)
 : m_options(options)
 , m_map(options)
 {
+    SetSize(0);
 }
 
 ContentCache& ContentCache::operator=(ContentCache&& other)
@@ -883,6 +884,7 @@ ContentCache& ContentCache::operator=(ContentCache&& other)
     // m_options can't be updated, and it doesn't need to be.
     m_file = other.m_file;
     m_size = other.m_size;
+    m_hex_size_width = other.m_hex_size_width;
     m_redirected = other.m_redirected;
     m_chunks = std::move(other.m_chunks);
     m_text = other.m_text;
@@ -899,6 +901,18 @@ ContentCache& ContentCache::operator=(ContentCache&& other)
     other.Close();
 
     return *this;
+}
+
+void ContentCache::SetSize(FileOffset size)
+{
+    m_size = size;
+    m_hex_size_width = 6;
+    if (size)
+    {
+        StrW tmp;
+        tmp.Printf(L"%lx", size);
+        m_hex_size_width = max(m_hex_size_width, tmp.Length());
+    }
 }
 
 bool ContentCache::EnsureDataBuffer(Error& e)
@@ -928,7 +942,7 @@ bool ContentCache::SetTextContent(const char* text, Error& e)
         return false;
 
     m_text = text;
-    m_size = strlen(text);
+    SetSize(strlen(text));
     m_eof = true;
     return true;
 }
@@ -953,7 +967,7 @@ bool ContentCache::Open(const WCHAR* name, Error& e)
 
         LARGE_INTEGER liSize;
         if (GetFileSizeEx(m_file, &liSize))
-            m_size = liSize.QuadPart;
+            SetSize(liSize.QuadPart);
 
 #ifdef USE_SMALL_DATA_BUFFER
         // Debug builds use a very small read chunk size, which greatly
@@ -979,6 +993,7 @@ bool ContentCache::Open(const WCHAR* name, Error& e)
     }
     else
     {
+        FileOffset size = 0;
         const HANDLE hin = s_piped_stdin;
         s_piped_stdin = 0;
         if (!hin || hin == INVALID_HANDLE_VALUE)
@@ -1003,8 +1018,9 @@ bool ContentCache::Open(const WCHAR* name, Error& e)
                 return !e.Test();
             }
             chunk.Wrote(bytes_read);
-            m_size += bytes_read;
+            size += bytes_read;
         }
+        SetSize(size);
     }
 }
 
@@ -1016,7 +1032,7 @@ void ContentCache::Close()
         m_file = INVALID_HANDLE_VALUE;
     }
 
-    m_size = 0;
+    SetSize(0);
     m_chunks.swap(PipeChunks {});
     m_text = nullptr;
     m_redirected = false;
@@ -1345,7 +1361,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     // Format the offset.
     if (offset % 0x400 == 0)
         s.AppendColor(L"1");
-    s.Printf(L"%08.8x", offset);
+    s.Printf(L"%0*.*x", m_hex_size_width, m_hex_size_width, offset);
     if (offset % 0x400 == 0)
         s.Append(c_norm);
     s.Append(L"  ", 2);
@@ -1469,7 +1485,7 @@ bool ContentCache::ProcessThrough(size_t line, Error& e, bool cancelable)
             m_map.Next(data, to_process);
 
             if (m_size < m_map.Processed())
-                m_size = m_map.Processed();
+                SetSize(m_map.Processed());
 
             if (cancelable && IsSignaled())
             {

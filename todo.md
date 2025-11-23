@@ -75,7 +75,7 @@
   - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [x] go to line
   - [ ] modify file
-    - [ ] navigate through bytes
+    - [x] navigate through bytes
     - [ ] navigate through characters
     - [ ] change bytes
     - [ ] change characters

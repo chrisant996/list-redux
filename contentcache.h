@@ -184,6 +184,7 @@ public:
 
     void            ClearProcessed();
     void            SetWrapWidth(unsigned wrap);
+    unsigned        GetHexOffsetColumnWidth() const { return m_hex_size_width; }
     unsigned        FormatLineData(size_t line, unsigned left_offset, StrW& s, unsigned max_width, Error& e, const WCHAR* color=nullptr, const FoundOffset* found_line=nullptr, unsigned max_len=-1);
     bool            FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundOffset* found_line=nullptr);
 
@@ -209,7 +210,7 @@ public:
     unsigned        GetBufferLength() const { return m_data_length; }
 
 private:
-    void            Reset();
+    void            SetSize(FileOffset size);
     bool            EnsureDataBuffer(Error& e);
     bool            LoadData(FileOffset offset, DWORD& end_slop, Error& e);
     bool            EnsureFileData(size_t line, Error& e);
@@ -219,6 +220,7 @@ private:
     const ViewerOptions& m_options;
     HANDLE          m_file = INVALID_HANDLE_VALUE;
     FileOffset      m_size = 0;
+    unsigned        m_hex_size_width = 0;
 
     bool            m_redirected = false;
     PipeChunks      m_chunks;
