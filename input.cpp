@@ -414,6 +414,10 @@ bool ReadInput(StrW& out, History hindex, DWORD max_width, std::optional<std::fu
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     GetConsoleScreenBufferInfo(hout, &csbi);
 
+    // FUTURE:  Allow horizontal scrolling and fit into the terminal width.
+    if (unsigned(csbi.dwCursorPosition.X) + max_width >= unsigned(csbi.dwSize.X))
+        return false;
+
     StrW curr_input_history;
     size_t history_index = history ? history->size() : 0;
 
@@ -435,8 +439,9 @@ bool ReadInput(StrW& out, History hindex, DWORD max_width, std::optional<std::fu
         {
         case InputType::None:
         case InputType::Error:
-        case InputType::Resize:
             continue;
+        case InputType::Resize:
+            return false;
         }
 
         if (input_callback)

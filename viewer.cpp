@@ -760,6 +760,11 @@ LAutoFitContentWidth:
             right.Printf(L"    Encoding: %u, %s", m_context.GetCodePage(), m_context.GetEncodingName());
         if (left.Length() + right.Length() > m_terminal_width)
             right.Clear();
+        if (left.Length() > m_terminal_width)
+        {
+            ellipsify(left.Text(), m_terminal_width, right, false);
+            left = std::move(right);
+        }
 
         s.Append(left);
         s.AppendSpaces(m_terminal_width - (left.Length() + right.Length()));

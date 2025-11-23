@@ -150,6 +150,7 @@ unsigned TruncateWcwidth(StrW& s, const unsigned truncate_width, const WCHAR tru
     }
 
     const WCHAR* truncate = s.Text();
+    unsigned width_fits = 0;
     unsigned width = 0;
 
     wcwidth_iter iter(s.Text(), s.Length());
@@ -161,7 +162,10 @@ unsigned TruncateWcwidth(StrW& s, const unsigned truncate_width, const WCHAR tru
             break;
 
         if (width + truncation_char_width <= truncate_width)
+        {
             truncate = p;
+            width_fits = width + truncation_char_width;
+        }
 
         const int32 w = iter.character_wcwidth_onectrl();
 
@@ -174,7 +178,7 @@ unsigned TruncateWcwidth(StrW& s, const unsigned truncate_width, const WCHAR tru
                 if (truncation_char == '.')
                     s.Append(truncation_char);
             }
-            return width + truncation_char_width;
+            return width_fits;
         }
 
         width += w;

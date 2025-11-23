@@ -265,18 +265,17 @@ DWORD GetConsoleColsRows(HANDLE hout)
             s_console = CreateFileW(L"CONOUT$", GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, 0);
         }
 
-        if (s_is_console || s_console != INVALID_HANDLE_VALUE)
-        {
-            CONSOLE_SCREEN_BUFFER_INFO csbi;
-
-            if (GetConsoleScreenBufferInfo(s_console, &csbi))
-            {
-                s_num_cols = (csbi.srWindow.Right - csbi.srWindow.Left) + 1;
-                s_num_rows = (csbi.srWindow.Bottom - csbi.srWindow.Top) + 1;
-            }
-        }
-
         s_initialized = true;
+    }
+
+    if (s_is_console || s_console != INVALID_HANDLE_VALUE)
+    {
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        if (GetConsoleScreenBufferInfo(s_console, &csbi))
+        {
+            s_num_cols = (csbi.srWindow.Right - csbi.srWindow.Left) + 1;
+            s_num_rows = (csbi.srWindow.Bottom - csbi.srWindow.Top) + 1;
+        }
     }
 
     return (s_num_rows << 16) | s_num_cols;

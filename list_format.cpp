@@ -942,6 +942,9 @@ unsigned WidthForFileInfo(const FileInfo* pfi, int details, int size_width)
 
 unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int details, bool selected, bool tagged, int size_width)
 {
+    if (max_width < 3)
+        return 0;
+
     const WCHAR* color = nullptr;
     if (CanUseEscapeCodes())
     {
@@ -954,29 +957,46 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
 
     s.AppendColor(color);
 
-    const unsigned details_width = WidthForFileInfoDetails(pfi, details, size_width);
-    const unsigned filename_width = (max_width > details_width ? max_width - details_width : 0);
-    assert(filename_width > 0);
+    unsigned details_width = WidthForFileInfoDetails(pfi, details, size_width);
+    unsigned filename_width;
+    if (max_width >= details_width + 8)
+    {
+        filename_width = max_width - details_width;
+    }
+    else
+    {
+        filename_width = min(max_width, unsigned(8));
+        details_width = max_width - filename_width;
+    }
+
+    if (filename_width <= 0)
+        return 0;
+
     FormatFilename(s, pfi, filename_width);
     assert(filename_width == cell_count(s.Text() + orig_len));
 
     if (details)
     {
+        StrW d;
         if (details >= 2)
         {
-            s.AppendSpaces(1);
-            FormatTime(s, pfi, s_time_style);
+            d.AppendSpaces(1);
+            FormatTime(d, pfi, s_time_style);
         }
         if (details >= 1)
         {
-            s.AppendSpaces(1);
-            FormatFileSize(s, pfi, SizeStyleForDetails(details), nullptr, size_width);
+            d.AppendSpaces(1);
+            FormatFileSize(d, pfi, SizeStyleForDetails(details), nullptr, size_width);
         }
         if (details >= 3)
         {
-            s.AppendSpaces(1);
-            FormatAttributes(s, pfi->GetAttributes());
+            d.AppendSpaces(1);
+            FormatAttributes(d, pfi->GetAttributes());
         }
+        const unsigned w = TruncateWcwidth(d, details_width - 1, s_chTruncated);
+        assert(w <= details_width - 1);
+        d.AppendSpaces(details_width - 1 - w);
+        s.Append(d);
     }
 
     const WCHAR* div_color = nullptr;

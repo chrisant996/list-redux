@@ -156,7 +156,10 @@ ChooserOutcome Chooser::Go(Error& e)
         {
         case InputType::None:
         case InputType::Error:
+            continue;
+
         case InputType::Resize:
+            Relayout();
             continue;
 
         case InputType::Key:
@@ -238,7 +241,7 @@ void Chooser::UpdateDisplay()
     scroll_car.set_style(c_sbstyle);
     scroll_car.set_extents(rows, m_num_rows);
     scroll_car.set_position(m_top);
-    m_vert_scroll_column = scroll_car.has_car() ? m_terminal_width - 2 : 0;
+    m_vert_scroll_column = scroll_car.has_car() ? m_terminal_width : 0;
 
     // Header.
     if (m_dirty_header)
@@ -256,8 +259,15 @@ void Chooser::UpdateDisplay()
 #endif
         if (left.Length() + right.Length() + 40 > m_terminal_width)
             right.Clear();
-        const unsigned limit_len = m_terminal_width - (left.Length() + right.Length());
-        ellipsify_ex(m_dir.Text(), limit_len, ellipsify_mode::PATH, dir);
+        if (left.Length() >= m_terminal_width)
+        {
+            left.Set(L"LIST");
+        }
+        else
+        {
+            const unsigned limit_len = m_terminal_width - (left.Length() + right.Length());
+            ellipsify_ex(m_dir.Text(), limit_len, ellipsify_mode::PATH, dir);
+        }
 
         s.Append(left);
         s.Append(dir);
@@ -309,7 +319,7 @@ void Chooser::UpdateDisplay()
                     if (!c_floating || car)
                     {
                         // Space was reserved by update_layout() or col_max.
-                        const uint32 pad_to = m_terminal_width - 2;
+                        const uint32 pad_to = m_terminal_width - 1;
                         if (pad_to >= row_width)
                         {
                             s2.AppendSpaces(pad_to - row_width);
@@ -332,7 +342,7 @@ void Chooser::UpdateDisplay()
                     }
                 }
 
-                assert(row_width < m_terminal_width);
+                assert(row_width <= m_terminal_width);
                 if (row_width < m_terminal_width)
                     s2.Append(c_clreol);
 
@@ -376,6 +386,11 @@ void Chooser::UpdateDisplay()
         }
         if (left.Length() + right.Length() > m_terminal_width)
             right.Clear();
+        if (left.Length() > m_terminal_width)
+        {
+            ellipsify(left.Text(), m_terminal_width, right, false);
+            left = std::move(right);
+        }
 
         s.Append(left);
         s.AppendSpaces(m_terminal_width - (left.Length() + right.Length()));
@@ -423,6 +438,7 @@ void Chooser::EnsureColumnWidths()
         !m_terminal_height || terminal_height != m_terminal_height ||
         !m_num_per_row || !m_num_rows || !m_visible_rows)
     {
+        unsigned target_width = terminal_width;
         m_terminal_width = terminal_width;
         m_terminal_height = terminal_height;
 
@@ -458,7 +474,7 @@ void Chooser::EnsureColumnWidths()
                     m_col_widths.emplace_back(width);
                     total_width += width + m_padding;
                     width = 0;
-                    if (total_width > m_terminal_width)
+                    if (total_width > target_width)
                     {
                         m_col_widths.clear();
                         break;
@@ -478,17 +494,18 @@ void Chooser::EnsureColumnWidths()
         // into the terminal width.
         if (m_col_widths.empty())
         {
+            target_width -= 2; // Reserve space for scrollbar.
             m_col_widths = CalculateColumns([this](size_t index){
                 return WidthForFileInfo(&m_files[index], m_details, m_max_size_width);
-            }, m_files.size(), true, m_padding, terminal_width, terminal_width / 4);
+            }, m_files.size(), true, m_padding, target_width, target_width / 4);
 
             m_num_per_row = int32(std::max<intptr_t>(1, m_col_widths.size()));
             m_num_rows = (m_count + m_num_per_row - 1) / m_num_per_row;
             m_visible_rows = int32(std::min<intptr_t>(m_num_rows, (terminal_height > 2) ? terminal_height - 2 : 0));
         }
 
-        if (m_col_widths.size() == 1 && m_col_widths[0] > m_terminal_width)
-            m_col_widths[0] = m_terminal_width;
+        if (m_col_widths.size() == 1 && m_col_widths[0] > target_width)
+            m_col_widths[0] = target_width;
 
         ForceUpdateAll();
     }
