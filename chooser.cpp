@@ -731,12 +731,12 @@ LNext:
             }
             break;
 
-        case 'f':
         case 's':
-            if (input.modifier == Modifier::None)
+        case 'S':
+            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
             {
                 // TODO:  What should it do in hex mode?
-                SearchAndTag(e, input.key_char == 'f'/*caseless*/);
+                SearchAndTag(e, input.modifier == Modifier::None/*caseless*/);
             }
             break;
         case '/':

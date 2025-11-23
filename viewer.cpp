@@ -1298,12 +1298,12 @@ key_down:
             }
             break;
 
-        case 'f':
         case 's':
-            if (input.modifier == Modifier::None)
+        case 'S':
+            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
             {
                 // TODO:  What should it do in hex mode?
-                DoSearch(true, input.key_char == 'f'/*caseless*/);
+                DoSearch(true, input.modifier == Modifier::None/*caseless*/);
             }
             break;
         case '/':
