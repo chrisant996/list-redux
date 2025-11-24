@@ -1018,8 +1018,9 @@ bool Chooser::AskForConfirmation(const WCHAR* msg)
         {
         case InputType::None:
         case InputType::Error:
-        case InputType::Resize:
             continue;
+        case InputType::Resize:
+            goto LDone;
         }
 
         if (input.type == InputType::Char)

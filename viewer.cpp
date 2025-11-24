@@ -54,6 +54,44 @@ void SetViewerScrollbar(bool scrollbar)
     g_options.show_scrollbar = scrollbar;
 }
 
+// 1 = yes, 0 = no, -1 = cancel.
+static int ConfirmSaveChanges(HANDLE hout)
+{
+    const WCHAR* const msg = L"Do you want to save your changes to this file?";
+    const WCHAR* const directive = L"Press Y to save, N to discard, or any other key to cancel...";
+    // TODO:  ColorElement::Command might not be the most appropriate color.
+    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
+    OutputConsole(hout, s.Text(), s.Length());
+
+    while (true)
+    {
+        const InputRecord input = SelectInput();
+        switch (input.type)
+        {
+        case InputType::None:
+        case InputType::Error:
+            continue;
+        }
+
+        if (input.type == InputType::Char)
+        {
+            switch (input.key_char)
+            {
+            case 'y':
+            case 'Y':
+                return 1;
+            case 'n':
+            case 'N':
+                return 0;
+            }
+        }
+
+        break;
+    }
+
+    return -1;
+}
+
 class Viewer;
 class ScopedWorkingIndicator;
 
@@ -979,6 +1017,21 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             break;
 
         case Key::ESC:
+            if (m_hex_mode)
+            {
+                if (m_context.IsDirty())
+                {
+                    const int confirm = ConfirmSaveChanges(m_hout);
+                    m_force_update = true;
+                    if (confirm < 0)
+                        break;
+                    else if (confirm == 0)
+                        m_context.DiscardBytes();
+                    else if (!m_context.SaveBytes(e))
+                        break;
+                }
+                goto toggle_hex_mode;
+            }
             return ViewerOutcome::RETURN;
 
         case Key::HOME:
@@ -1288,7 +1341,7 @@ hex_right:
         case 'b':
         case 'f':
 hex_digit:
-            if (m_hex_mode && input.modifier == Modifier::None)
+            if (m_hex_mode && input.modifier == Modifier::None && !m_context.IsPipe() && !m_text)
             {
                 BYTE value;
                 if (input.key_char >= '0' && input.key_char <= '9')
@@ -1361,6 +1414,7 @@ hex_digit:
         case 'h':
             if (input.modifier == Modifier::None)
             {
+toggle_hex_mode:
                 if (!m_text)
                 {
                     m_hex_mode = !m_hex_mode;

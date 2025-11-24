@@ -994,7 +994,8 @@ bool ContentCache::Open(const WCHAR* name, Error& e)
 
     if (!m_redirected)
     {
-        m_file = CreateFileW(name, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, 0);
+        // Open for write as well, in case the file is edited in hex mode.
+        m_file = CreateFileW(name, GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, 0);
         if (m_file == INVALID_HANDLE_VALUE)
         {
             e.Sys();
@@ -2147,9 +2148,43 @@ void ContentCache::SetByte(FileOffset offset, BYTE value, bool high_nybble)
 
 bool ContentCache::SaveBytes(Error& e)
 {
-// TODO:  Save pending bytes.
-    e.Set(E_NOTIMPL);
-    return false;
+    if (!IsOpen() || !IsDirty())
+        return false;
+
+    for (auto& p : m_patch_blocks)
+    {
+        FileOffset offset;
+        BYTE bytes[p.second.c_size];
+        unsigned len = 0;
+
+        bool past_end = false;
+        for (unsigned index = 0; !past_end; ++index)
+        {
+            past_end = (index >= p.second.c_size);
+            if (!past_end && p.second.IsSet(p.first + index))
+            {
+                if (!len)
+                    offset = p.first + index;
+                bytes[len++] = p.second.GetByte(p.first + index);
+            }
+            else if (len)
+            {
+                DWORD wrote;
+                LARGE_INTEGER liSeek;
+                liSeek.QuadPart = offset;
+                if (!SetFilePointerEx(m_file, liSeek, nullptr, FILE_BEGIN) ||
+                    !WriteFile(m_file, bytes, len, &wrote, nullptr))
+                {
+                    e.Sys();
+                    return false;
+                }
+            }
+        }
+    }
+
+    DiscardBytes();
+    ClearProcessed();  // Make sure to reread the file.
+    return true;
 }
 
 bool ContentCache::IsByteDirty(FileOffset offset, BYTE& value) const

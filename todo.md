@@ -74,14 +74,14 @@
   - [x] highlight newline characters in hex mode
   - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [x] go to line
-  - [ ] modify file
+  - [x] modify file
     - [x] navigate through bytes
     - [ ] navigate through characters
     - [x] change bytes
     - [ ] change characters
     - [x] next/prev change
-    - [ ] discard changes
-    - [ ] save changes
+    - [x] discard changes
+    - [x] save changes
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
   - [x] Binary files **_and hex mode_** use OEM CP.
