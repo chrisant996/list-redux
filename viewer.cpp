@@ -165,6 +165,8 @@ private:
     bool            m_hex_mode = false;
     unsigned        m_hex_width = 0;
     FileOffset      m_hex_top = 0;
+
+    bool            m_hex_edit = false;
     FileOffset      m_hex_pos = 0;
     bool            m_hex_high_nybble = true;
 
@@ -174,6 +176,7 @@ private:
     StrW            m_last_feedback = 0;
     FileOffset      m_last_hex_top = 0;
     FileOffset      m_last_hex_pos = 0;
+    bool            m_last_hex_edit = false;
     FileOffset      m_last_processed = FileOffset(-1);
     bool            m_last_completed = false;
     bool            m_force_update = false;
@@ -314,11 +317,12 @@ void Viewer::UpdateDisplay()
     // decided yet because it may depend on the margin width (which depends on
     // the highest, i.e. widest, file number or file offset).
     const unsigned debug_row = !!g_options.show_debug_info;
+    const unsigned hex_ruler = !!m_hex_mode;
     const DWORD colsrows = GetConsoleColsRows(m_hout);
     m_terminal_width = LOWORD(colsrows);
     m_terminal_height = HIWORD(colsrows);
-    if (m_terminal_height > 2 + debug_row)
-        m_content_height = m_terminal_height - (2 + debug_row);
+    if (m_terminal_height > 1 + hex_ruler + debug_row + 1)
+        m_content_height = m_terminal_height - (1 + hex_ruler + debug_row + 1);
     else
         m_content_height = 0;
     const bool show_scrollbar = (g_options.show_scrollbar &&
@@ -334,14 +338,17 @@ void Viewer::UpdateDisplay()
     {
         const FileOffset max_hex = m_context.GetMaxHexOffset(m_hex_width);
         const FileOffset hex_page = m_content_height * m_hex_width;
-        if (m_hex_top > m_hex_pos)
-            m_hex_top = m_hex_pos - (m_hex_pos % m_hex_width);
-        if (m_hex_top + hex_page <= m_hex_pos)
+        if (m_hex_edit)
         {
-            if (m_hex_pos >= (hex_page - m_hex_width))
-                m_hex_top = m_hex_pos - (m_hex_pos % m_hex_width) - (hex_page - m_hex_width);
-            else
-                m_hex_top = 0;
+            if (m_hex_top > m_hex_pos)
+                m_hex_top = m_hex_pos - (m_hex_pos % m_hex_width);
+            if (m_hex_top + hex_page <= m_hex_pos)
+            {
+                if (m_hex_pos >= (hex_page - m_hex_width))
+                    m_hex_top = m_hex_pos - (m_hex_pos % m_hex_width) - (hex_page - m_hex_width);
+                else
+                    m_hex_top = 0;
+            }
         }
         if (m_hex_top + hex_page > max_hex)
         {
@@ -375,7 +382,7 @@ void Viewer::UpdateDisplay()
     // Decide what changed.
     const bool file_changed = (m_last_index != m_index);
     const bool top_changed = (m_hex_mode ? (m_last_hex_top != m_hex_top) : (m_last_top != m_top || m_last_left != m_left));
-    const bool pos_changed = (m_hex_mode && m_last_hex_pos != m_hex_pos);
+    const bool pos_changed = (m_hex_edit && m_last_hex_pos != m_hex_pos);
     const bool processed_changed = (m_last_processed != m_context.Processed() || m_last_completed != m_context.Completed());
     const bool feedback_changed = (!m_last_feedback.Equal(m_feedback));
 
@@ -468,37 +475,17 @@ LAutoFitContentWidth:
         s.Append(L"\x1b[1H");
         s.AppendColor(GetColor(ColorElement::Header));
 
-        if (g_options.show_ruler)
+        if (g_options.show_ruler && !m_hex_mode)
         {
-            if (m_hex_mode)
+            s.AppendSpaces(m_margin_width);
+            left.Set(L"\u252c\u252c\u252c\u252c\u253c\u252c\u252c\u252c");
+            for (unsigned width = 0; width < m_content_width; width += 10)
             {
-                left.AppendSpaces(8 + 2);
-                for (unsigned ii = 0; ii < m_hex_width; ++ii)
-                {
-                    if (ii)
-                        left.AppendSpaces((ii % 8) ? 1 : 2);
-                    left.Printf(L"%02x", ii);
-                }
-                left.AppendSpaces(3);
-                for (unsigned ii = 0; ii < m_hex_width; ++ii)
-                {
-                    left.Printf(L"%x", ii & 0xf);
-                }
-                PadToWidth(left, m_terminal_width);
+                right.Clear();
+                right.Printf(L"%u", m_left + width + 10);
+                left.SetLength(std::min<unsigned>(10 - right.Length(), m_content_width - width));
                 s.Append(left);
-            }
-            else
-            {
-                s.AppendSpaces(m_margin_width);
-                left.Set(L"\u252c\u252c\u252c\u252c\u253c\u252c\u252c\u252c");
-                for (unsigned width = 0; width < m_content_width; width += 10)
-                {
-                    right.Clear();
-                    right.Printf(L"%u", m_left + width + 10);
-                    left.SetLength(std::min<unsigned>(10 - right.Length(), m_content_width - width));
-                    s.Append(left);
-                    s.Append(right);
-                }
+                s.Append(right);
             }
         }
         else
@@ -518,7 +505,7 @@ LAutoFitContentWidth:
                 bottom_line_plusone = std::min<size_t>(m_top + m_content_height, m_context.Count());
                 bottom_offset = !bottom_line_plusone ? 0 : m_context.GetOffset(bottom_line_plusone - 1) + m_context.GetLength(bottom_line_plusone - 1);
             }
-            if (m_hex_mode)
+            if (m_hex_edit)
                 pos.Printf(L"    Pos: %06lx (%lu)", m_hex_pos, m_hex_pos);
             if (m_hex_mode)
                 right.Printf(L"    Offset: %06lx-%06lx", m_hex_top, bottom_offset);
@@ -645,6 +632,24 @@ LAutoFitContentWidth:
         }
         else if (m_hex_mode)
         {
+            StrW ruler;
+            ruler.AppendColor(GetColor(ColorElement::Header));
+            ruler.AppendSpaces(m_context.GetHexOffsetColumnWidth());
+            for (unsigned ii = 0; ii < m_hex_width; ++ii)
+            {
+                if (ii % (1 << g_options.hex_grouping) == 0)
+                    ruler.Append(L"  ", ((ii % 8) == 0) ? 2 : 1);
+                ruler.Printf(L"%02x", ii);
+            }
+            ruler.AppendSpaces(3);
+            for (unsigned ii = 0; ii < m_hex_width; ++ii)
+            {
+                ruler.Printf(L"%x", ii & 0xf);
+            }
+            PadToWidth(ruler, m_terminal_width);
+            ruler.Append(c_norm);
+            s.Append(ruler);
+
             const FoundOffset* found_line = m_found_line.Empty() ? nullptr : &m_found_line;
             for (unsigned row = 0; row < m_content_height; ++row)
             {
@@ -869,7 +874,7 @@ LAutoFitContentWidth:
     {
         unsigned cursor_y;
         unsigned cursor_x;
-        if (m_hex_mode)
+        if (m_hex_edit)
         {
             unsigned pos_in_row = (m_hex_pos % m_hex_width);
             cursor_x = 1;                               // One-based.
@@ -881,6 +886,7 @@ LAutoFitContentWidth:
             cursor_x += !m_hex_high_nybble;
             cursor_y = 1;                               // One-based.
             cursor_y += 1;                              // Header row.
+            cursor_y += 1;                              // Hex ruler.
             cursor_y += unsigned(m_hex_pos - m_hex_top) / m_hex_width;
         }
         else
@@ -924,9 +930,14 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
     if (m_multifile_search)
         right.Append(L"    MultiFile");
     right.Printf(L"    %-6s", m_context.GetEncodingName(m_hex_mode));
-    right.Append(L"    Options: ");
-    if (!m_hex_mode)
+    if (m_hex_mode)
     {
+        right.Append(m_hex_edit ? L"    Hex Mode (EDIT)" : L"    Hex Mode (View)");
+        right.Append(L"   ESC=End");
+    }
+    else
+    {
+        right.Append(L"    Options: ");
         if (!m_text /*&& !m_context.IsBinaryFile()*/)
             right.Append(g_options.show_line_endings ? L"E" : L"e");
         right.Append(g_options.show_line_numbers ? L"N" : L"n");
@@ -939,15 +950,12 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
             right.Append(g_options.expand_tabs ? L"T" : L"t");
             right.Append(c_ctrl_indicator[int(g_options.ctrl_mode)]);
         }
-    }
-    if (!m_text)
-    {
-        right.Append(m_hex_mode ? L"H" : L"h");
-        right.Append(g_options.show_ruler ? L"R" : L"r");
-    }
+        if (!m_text)
+           right.Append(g_options.show_ruler ? L"R" : L"r");
 #ifdef DEBUG
-    right.Append(g_options.show_debug_info ? L"D" : L"d");
+        right.Append(g_options.show_debug_info ? L"D" : L"d");
 #endif
+    }
     uint32 right_width = cell_count(right.Text());
 
     StrW tmp;
@@ -1017,21 +1025,10 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             break;
 
         case Key::ESC:
+            if (m_hex_edit)
+                goto toggle_hex_edit;
             if (m_hex_mode)
-            {
-                if (m_context.IsDirty())
-                {
-                    const int confirm = ConfirmSaveChanges(m_hout);
-                    m_force_update = true;
-                    if (confirm < 0)
-                        break;
-                    else if (confirm == 0)
-                        m_context.DiscardBytes();
-                    else if (!m_context.SaveBytes(e))
-                        break;
-                }
                 goto toggle_hex_mode;
-            }
             return ViewerOutcome::RETURN;
 
         case Key::HOME:
@@ -1039,12 +1036,15 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
                 m_top = 0;
             else if (input.modifier == Modifier::CTRL)
             {
+hex_top:
                 m_hex_top = 0;
                 m_hex_pos = 0;
                 m_hex_high_nybble = true;
             }
             else if (input.modifier == Modifier::None)
             {
+                if (!m_hex_edit)
+                    goto hex_top;
                 m_hex_pos -= m_hex_pos % m_hex_width;
                 m_hex_high_nybble = true;
             }
@@ -1066,6 +1066,7 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             }
             else if (input.modifier == Modifier::CTRL)
             {
+hex_bottom:
                 const FileOffset partial = (m_context.GetFileSize() % m_hex_width);
                 m_hex_top = m_context.GetFileSize() + (partial ? m_hex_width - partial : 0);
                 if (m_hex_top >= m_content_height * m_hex_width)
@@ -1085,6 +1086,8 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             }
             else if (input.modifier == Modifier::None)
             {
+                if (!m_hex_edit)
+                    goto hex_bottom;
                 if (m_context.GetFileSize() > 0)
                 {
                     m_hex_pos -= m_hex_pos % m_hex_width;
@@ -1102,20 +1105,35 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
             break;
         case Key::UP:
 key_up:
-            if (m_hex_mode)
-            {
-                if (m_hex_pos >= m_hex_width)
-                    m_hex_pos -= m_hex_width;
-            }
-            else
+            if (!m_hex_mode)
             {
                 if (m_top)
                     --m_top;
             }
+            else if (!m_hex_edit)
+            {
+                if (m_hex_top)
+                    m_hex_top -= m_hex_width;
+            }
+            else
+            {
+                if (m_hex_pos >= m_hex_width)
+                    m_hex_pos -= m_hex_width;
+            }
             break;
         case Key::DOWN:
 key_down:
-            if (m_hex_mode)
+            if (!m_hex_mode)
+            {
+                if (!m_context.Completed() || m_top + (g_options.show_ruler ? 0 : m_content_height) < CountForDisplay())
+                    ++m_top;
+            }
+            else if (!m_hex_edit)
+            {
+                if (m_hex_top + m_content_height * m_hex_width < m_context.GetFileSize())
+                    m_hex_top += m_hex_width;
+            }
+            else
             {
                 if (m_hex_pos + m_hex_width < m_context.GetFileSize())
                     m_hex_pos += m_hex_width;
@@ -1127,22 +1145,20 @@ key_down:
                     m_hex_high_nybble = true;
                 }
             }
-            else
-            {
-                if (!m_context.Completed() || m_top + (g_options.show_ruler ? 0 : m_content_height) < CountForDisplay())
-                    ++m_top;
-            }
             break;
         case Key::PGUP:
             if (m_hex_mode)
             {
-                const FileOffset hex_page = m_content_height * m_hex_width;
-                if (m_hex_pos > hex_page)
-                    m_hex_pos -= hex_page;
-                else
+                const FileOffset hex_page = (m_content_height - 1) * m_hex_width;
+                if (m_hex_edit)
                 {
-                    m_hex_pos = 0;
-                    m_hex_high_nybble = true;
+                    if (m_hex_pos > hex_page)
+                        m_hex_pos -= hex_page;
+                    else
+                    {
+                        m_hex_pos = 0;
+                        m_hex_high_nybble = true;
+                    }
                 }
                 if (m_hex_top > hex_page)
                     m_hex_top -= hex_page;
@@ -1161,17 +1177,20 @@ key_down:
             if (m_hex_mode)
             {
                 const FileOffset hex_page = m_content_height * m_hex_width;
-                if (m_hex_pos + hex_page < m_context.GetFileSize())
-                    m_hex_pos += hex_page;
-                else if (m_context.GetFileSize() > 0)
-                    m_hex_pos = m_context.GetFileSize() - 1;
-                else
+                if (m_hex_edit)
                 {
-                    m_hex_pos = 0;
-                    m_hex_high_nybble = true;
+                    if (m_hex_pos + hex_page - m_hex_width < m_context.GetFileSize())
+                        m_hex_pos += hex_page - m_hex_width;
+                    else if (m_context.GetFileSize() > 0)
+                        m_hex_pos = m_context.GetFileSize() - 1;
+                    else
+                    {
+                        m_hex_pos = 0;
+                        m_hex_high_nybble = true;
+                    }
                 }
-                if (m_hex_top + hex_page + hex_page < m_context.GetMaxHexOffset(m_hex_width))
-                    m_hex_top += hex_page;
+                if (m_hex_top + hex_page + hex_page - m_hex_width < m_context.GetMaxHexOffset(m_hex_width))
+                    m_hex_top += hex_page - m_hex_width;
                 else if (m_context.GetMaxHexOffset(m_hex_width) >= m_hex_top)
                     m_hex_top = m_context.GetMaxHexOffset(m_hex_width) - hex_page;
                 else
@@ -1189,7 +1208,14 @@ key_down:
             break;
 
         case Key::LEFT:
-            if (m_hex_mode)
+            if (!m_hex_mode)
+            {
+                if (m_left <= c_horiz_scroll_amount)
+                    m_left = 0;
+                else
+                    m_left -= c_horiz_scroll_amount;
+            }
+            else if (m_hex_edit)
             {
                 if (m_hex_pos > 0 || !m_hex_high_nybble)
                 {
@@ -1198,18 +1224,18 @@ key_down:
                         --m_hex_pos;
                 }
             }
-            else
-            {
-                if (m_left <= c_horiz_scroll_amount)
-                    m_left = 0;
-                else
-                    m_left -= c_horiz_scroll_amount;
-            }
             break;
         case Key::RIGHT:
-            if (m_hex_mode)
+            if (!m_hex_mode)
             {
-hex_right:
+                if (s_max_line_length <= m_content_width)
+                    m_left = 0;
+                else if (m_left + m_content_width <= s_max_line_length)
+                    m_left += c_horiz_scroll_amount;
+            }
+            else if (m_hex_edit)
+            {
+hex_edit_right:
                 if ((m_hex_pos + 1 < m_context.GetFileSize()) ||
                     (m_hex_high_nybble && m_context.GetFileSize()))
                 {
@@ -1217,13 +1243,6 @@ hex_right:
                     if (m_hex_high_nybble)
                         ++m_hex_pos;
                 }
-            }
-            else
-            {
-                if (s_max_line_length <= m_content_width)
-                    m_left = 0;
-                else if (m_left + m_content_width <= s_max_line_length)
-                    m_left += c_horiz_scroll_amount;
             }
             break;
 
@@ -1352,7 +1371,7 @@ hex_digit:
                     assert(false);
                 m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
                 m_force_update = true;
-                goto hex_right;
+                goto hex_edit_right;
             }
             break;
         case 'c':
@@ -1392,7 +1411,27 @@ hex_digit:
             }
             break;
         case 'e':
-            if (input.modifier == Modifier::None)
+            if (input.modifier == Modifier::ALT)
+            {
+                if (m_hex_mode && !m_text && !m_context.IsPipe())
+                {
+toggle_hex_edit:
+                    if (m_hex_edit && m_context.IsDirty())
+                    {
+                        const int confirm = ConfirmSaveChanges(m_hout);
+                        m_force_update = true;
+                        if (confirm < 0)
+                            break;
+                        else if (confirm == 0)
+                            m_context.DiscardBytes();
+                        else if (!m_context.SaveBytes(e))
+                            break;
+                    }
+                    m_hex_edit = !m_hex_edit;
+                    m_force_update_footer = true;
+                }
+            }
+            else if (input.modifier == Modifier::None)
             {
                 if (m_hex_mode)
                 {
@@ -1450,10 +1489,12 @@ toggle_hex_mode:
         case 'm':
             if (input.modifier == Modifier::None)
             {
-                if (m_hex_mode)
-                    m_found_line.MarkOffset(m_hex_pos);
-                else
+                if (!m_hex_mode)
                     m_found_line.MarkOffset(m_context.GetOffset(m_top + (std::min<size_t>(m_content_height, m_context.Count()) / 2)));
+                else if (!m_hex_edit)
+                    m_found_line.MarkOffset(std::min<FileOffset>(m_hex_top + (m_content_height / 2) * m_hex_width, m_context.GetFileSize() / 2));
+                else
+                    m_found_line.MarkOffset(m_hex_pos);
                 m_force_update = true;
             }
             break;
@@ -1620,6 +1661,7 @@ void Viewer::SetFile(intptr_t index, ContentCache* context)
     m_top = 0;
     m_left = 0;
     m_hex_top = 0;
+    m_hex_edit = false;
     m_hex_pos = 0;
     m_hex_high_nybble = true;
     m_force_update = true;

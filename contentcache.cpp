@@ -882,18 +882,11 @@ const WCHAR* FileLineMap::GetEncodingName(bool hex_mode) const
         if (hex_mode)
         {
             static StrW s_hexmode_encoding_name;
-            StrW tmp;
-            if (GetCodePageName(GetCodePage(hex_mode), tmp))
-            {
-                s_hexmode_encoding_name.Clear();
-                s_hexmode_encoding_name.Printf(L"Hex Mode (%s)", tmp.Text());
+            if (GetCodePageName(GetCodePage(hex_mode), s_hexmode_encoding_name))
                 return s_hexmode_encoding_name.Text();
-            }
         }
-        else if (!m_encoding_name.Empty())
-        {
+        if (!m_encoding_name.Empty())
             return m_encoding_name.Text();
-        }
     }
     return IsBinaryFile() ? L"Binary" : L"Text";
 }
