@@ -62,6 +62,7 @@
 - [x] `Alt-C` close current file
 - [x] `/@` to supply a file with a list of names to view
 - [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
+- [ ] `F5` to reprocess/reload the file
 - searching
   - [x] search in text mode (/ for case sensitive, \ for caseless)
   - [x] search in hex mode
@@ -70,19 +71,21 @@
   - [x] search for regex (search line by line)
   - [ ] search for hex bytes in hex mode
 - hex mode
+  - [ ] always show hex ruler on a second header row
   - [x] go to offset
   - [x] highlight newline characters in hex mode
   - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [x] go to line
   - [x] modify file
     - [x] navigate through bytes
-    - [ ] navigate through characters
+    - [ ] navigate through characters (`Tab` to toggle between bytes and characters)
     - [x] change bytes
     - [ ] change characters
-      - [ ] This may require removing `r`, `h`, and any other ASCII hotkeys in hex mode.
-    - [x] next/prev change
-    - [x] discard changes
-    - [x] save changes
+      - [ ] This may require removing `r`, `h`, `@`, `s`, `Shift-s`, `\`, `/`, `?`, `g`, `j`, `m`, `u` (and any other ASCII hotkeys in hex mode)
+    - [x] `F7`/`F8` prev/next change
+    - [x] `Esc` prompt to save or discard changes
+    - [ ] `Ctrl-S` to save changes
+    - [ ] discard edited byte at cursor
     - [ ] ability to undo saving edited bytes (restore to original bytes)
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
