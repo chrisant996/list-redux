@@ -1,65 +1,65 @@
 
 BASIC KEYS:
 
-         ESC  Exit the file viewer.
+           ESC  Exit the file viewer.
 
-     F1 or ?  Show this help.
+       F1 or ?  Show this help.
 
-    HOME/END  Scroll to beginning/end of file.
-  LEFT/RIGHT  Scroll file contents left/right.
-     UP/DOWN  Scroll file contents up/down one line.
-   PGUP/PGDN  Scroll file contents up/down one page.
+      HOME/END  Scroll to beginning/end of file.
+    LEFT/RIGHT  Scroll file contents left/right.
+       UP/DOWN  Scroll file contents up/down one line.
+     PGUP/PGDN  Scroll file contents up/down one page.
 
-      S or \  Search for text (any case).  (Also Alt-S)
-Shift-S or /  Search for text (case sensitive).  (Also Alt-Shift-S)
-  Ctrl-Break  Cancel search.
-          F3  Find Next.
-    Shift-F3  Find Prev.
-          F4  Toggle multi-file search.
+        S or \  Search for text (any case).  (Also Alt-S)
+  Shift-S or /  Search for text (case sensitive).  (Also Alt-Shift-S)
+    Ctrl-Break  Cancel search.
+            F3  Find Next.
+      Shift-F3  Find Prev.
+            F4  Toggle multi-file search.
 
-  Alt-G or G  Go to line or file offset (press again to toggle).
-  Alt-J or J  Jump to marked line.
-  Alt-M or M  Mark line (or file offset in hex mode).
-  Alt-U or U  Clear marked line (unmark).
+    Alt-G or G  Go to line or file offset (press again to toggle).
+    Alt-J or J  Jump to marked line.
+    Alt-M or M  Mark line (or file offset in hex mode).
+    Alt-U or U  Clear marked line (unmark).
 
-     F2 or @  Show list of files, jump to selected file.
-      Ctrl-N  Next file.
-      Ctrl-P  Previous file.
-       Alt-C  Close the current file.
-       Alt-O  Open a new file.
+       F2 or @  Show list of files, jump to selected file.
+        Ctrl-N  Next file.
+        Ctrl-P  Previous file.
+         Alt-C  Close the current file.
+         Alt-O  Open a new file.
 
 TEXT VIEWER KEYS:
 
-           C  Toggle how control characters are shown.
-           E  Toggle showing line endings (only in text files).
-           H  Toggle viewing content as hexadecimal values.
-           N  Toggle showing file line numbers.
-           O  Toggle showing file offsets.
-           R  Toggle showing a ruler at the top.
-       Space  Toggle showing whitespace.
-           T  Toggle how tab characters are shown.
-           W  Toggle wrapping to the terminal width.
+             C  Toggle how control characters are shown.
+             E  Toggle showing line endings (only in text files).
+             H  Toggle viewing content as hexadecimal values.
+             N  Toggle showing file line numbers.
+             O  Toggle showing file offsets.
+             R  Toggle showing a ruler at the top.
+         Space  Toggle showing whitespace.
+             T  Toggle how tab characters are shown.
+             W  Toggle wrapping to the terminal width.
 
-      Ctrl-E  Choose file encoding.
+        Ctrl-E  Choose file encoding.
 
 HEX VIEWER KEYS:
 
-           H  Toggle viewing content as hexadecimal values.
-       Alt-H  Cycle through hex grouping widths in hex mode.
-       Alt-E  Toggle edit mode.
+             H  Toggle viewing content as hexadecimal values.
+         Alt-H  Cycle through hex grouping widths in hex mode.
+         Alt-E  Toggle edit mode.
 
 HEX EDIT MODE KEYS:
 
-  Hex digits  Change the current byte in the hex columns.
-Letters, etc  Change the current byte in the characters column.
-         TAB  Toggle editing in hex columns or characters column.
+    Hex digits  Change the current byte in the hex columns.
+  Letters, etc  Change the current byte in the characters column.
+           TAB  Toggle editing in hex columns or characters column.
 
-          F7  Jump to previous row with edits.
-          F8  Jump to next row with edits.
-      Ctrl-S  Save changes.
-Alt-E or ESC  End edit mode (prompt whether to save or discard).
+            F7  Jump to previous row with edits.
+            F8  Jump to next row with edits.
+        Ctrl-S  Save changes.
+  Alt-E or ESC  End edit mode (prompt whether to save or discard).
 
 MISCELLANEOUS:
 
-       Alt-D  Toggle showing debug info.
+         Alt-D  Toggle showing debug info.
 
