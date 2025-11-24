@@ -121,7 +121,8 @@
 
 ### Maybe
 
-- use RE2 regex library
+- optionally build with RE2 regex library (and do it for official releases)
+- use ICU for encodings when available _[ICU is independent from codepages, so it uses strings to identify encodings, and it has its own analogs to MLang and MultiByteToWideChar, and it's only available in Win10+ circa 2019 onward, so adjusting to use ICU when available will be an invasive change.]_
 - persist history lists for input prompts?
 - cut and paste to new or existing file [did it really "cut" or just "copy"?]
 - allow copying, moving tagged files?
@@ -143,8 +144,8 @@
 
 # KNOWN ISSUES
 
+- Relies on ANSI escape code support in the terminal.  Could remove that limitation by porting Clink's terminal emulator.
 - Very large files consisting mostly of very short lines may take an excessive amount of memory to open.  This could lead to crashing the program.
-- File encodings are not handled yet.
 
 ### Not Planned
 
@@ -152,7 +153,6 @@
 - Printing
 - hex mode: option to end a row at a newline (requires computing and caching hex mode pagination/delineation offsets) _[Too many drawbacks; including that it can't just seek without parsing anymore.]_
 - a key to temporarily swap back to the original screen? _[Not generally very useful, and I don't want to perturb the original screen by printing "Press any key to return".]_
-- use ICU for encodings when available _[ICU is independent from codepages, so it uses strings to identify encodings, and it has its own analogs to MLang and MultiByteToWideChar, and it's only available in Win10+ circa 2019 onward, so adjusting to use ICU when available will be an invasive change.]_
 
 
 
