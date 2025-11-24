@@ -62,7 +62,7 @@
 - [x] `Alt-C` close current file
 - [x] `/@` to supply a file with a list of names to view
 - [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
-- [ ] `F5` to reprocess/reload the file
+- [x] `F5` to reprocess/reload the file (but not documented, since the file is opened with deny shared writing)
 - [x] remember scroll position in each file
 - searching
   - [x] search in text mode (/ for case sensitive, \ for caseless)

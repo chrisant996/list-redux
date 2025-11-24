@@ -1311,6 +1311,10 @@ hex_edit_right:
                 m_force_update_footer = true;
             }
             break;
+        case Key::F5:
+            m_context.ClearProcessed();
+            m_force_update = true;
+            break;
         case Key::F7:
         case Key::F8:
             if (m_hex_mode && input.modifier == Modifier::None)
