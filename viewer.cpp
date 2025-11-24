@@ -1308,6 +1308,36 @@ hex_edit_right:
     }
     else if (input.type == InputType::Char)
     {
+        if (m_hex_edit)
+        {
+// TODO:  Interpret typeable characters as input.
+// TODO:  Different interpretation if cursor in hex columns vs character columns.
+            switch (input.key_char)
+            {
+            case '0':   case '1':   case '2':   case '3':   case '4':
+            case '5':   case '6':   case '7':   case '8':   case '9':
+                if (input.modifier == Modifier::None)
+                {
+                    const BYTE value = input.key_char - '0';
+                    m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
+                    m_force_update = true;
+                    goto hex_edit_right;
+                }
+                break;
+            case 'a':   case 'b':   case 'c':   case 'd':   case 'e':   case 'f':
+            case 'A':   case 'B':   case 'C':   case 'D':   case 'E':   case 'F':
+                if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
+                {
+                    const BYTE ten_char = (input.key_char >= 'a' && input.key_char <= 'f') ? 'a' : 'A';
+                    const BYTE value = input.key_char - ten_char + 10;
+                    m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
+                    m_force_update = true;
+                    goto hex_edit_right;
+                }
+                break;
+            }
+        }
+
         switch (input.key_char)
         {
         case '?':
@@ -1340,40 +1370,12 @@ hex_edit_right:
             break;
 
         case '@':
-            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            if ((input.modifier & ~(Modifier::SHIFT|Modifier::ALT)) == Modifier::None)
             {
                 ShowFileList();
             }
             break;
 
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-        case 'a':
-        case 'b':
-        case 'f':
-hex_digit:
-            if (m_hex_mode && input.modifier == Modifier::None && !m_context.IsPipe() && !m_text)
-            {
-                BYTE value;
-                if (input.key_char >= '0' && input.key_char <= '9')
-                    value = input.key_char - '0';
-                else if (input.key_char >= 'a' && input.key_char <= 'f')
-                    value = input.key_char - 'a' + 10;
-                else
-                    assert(false);
-                m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
-                m_force_update = true;
-                goto hex_edit_right;
-            }
-            break;
         case 'c':
             if (input.modifier == Modifier::ALT)
             {
@@ -1382,10 +1384,6 @@ hex_digit:
             else if (input.modifier != Modifier::None)
             {
                 break;
-            }
-            else if (m_hex_mode)
-            {
-                goto hex_digit;
             }
             __fallthrough;
         case '^':
@@ -1404,10 +1402,6 @@ hex_digit:
             {
                 g_options.show_debug_info = !g_options.show_debug_info;
                 m_force_update = true;
-            }
-            else if (input.modifier == Modifier::None && m_hex_mode)
-            {
-                goto hex_digit;
             }
             break;
         case 'e':
@@ -1433,11 +1427,7 @@ toggle_hex_edit:
             }
             else if (input.modifier == Modifier::None)
             {
-                if (m_hex_mode)
-                {
-                    goto hex_digit;
-                }
-                else
+                if (!m_hex_mode)
                 {
                     g_options.show_line_endings = !g_options.show_line_endings;
                     m_force_update = true;
@@ -1445,7 +1435,7 @@ toggle_hex_edit:
             }
             break;
         case 'g':
-            if (input.modifier == Modifier::None)
+            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
             {
                 GoTo();
             }
@@ -1480,14 +1470,14 @@ toggle_hex_mode:
             }
             break;
         case 'j':
-            if (input.modifier == Modifier::None)
+            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
             {
                 if (!m_found_line.Empty())
                     Center(m_found_line);
             }
             break;
         case 'm':
-            if (input.modifier == Modifier::None)
+            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
             {
                 if (!m_hex_mode)
                     m_found_line.MarkOffset(m_context.GetOffset(m_top + (std::min<size_t>(m_content_height, m_context.Count()) / 2)));
@@ -1539,8 +1529,11 @@ toggle_hex_mode:
         case ' ':
             if (input.modifier == Modifier::None)
             {
-                g_options.show_whitespace = !g_options.show_whitespace;
-                m_force_update = true;
+                if (!m_hex_mode)
+                {
+                    g_options.show_whitespace = !g_options.show_whitespace;
+                    m_force_update = true;
+                }
             }
             break;
         case 't':
@@ -1555,7 +1548,7 @@ toggle_hex_mode:
             }
             break;
         case 'u':
-            if (input.modifier == Modifier::None)
+            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
             {
                 if (!m_found_line.Empty())
                 {
@@ -1577,15 +1570,15 @@ toggle_hex_mode:
 
         case 's':
         case 'S':
-            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            if ((input.modifier & ~(Modifier::SHIFT|Modifier::ALT)) == Modifier::None)
             {
                 // TODO:  What should it do in hex mode?
-                DoSearch(true, input.modifier == Modifier::None/*caseless*/);
+                DoSearch(true, (input.modifier & Modifier::SHIFT) == Modifier::None/*caseless*/);
             }
             break;
         case '/':
         case '\\':
-            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            if ((input.modifier & ~(Modifier::SHIFT|Modifier::ALT)) == Modifier::None)
             {
                 // TODO:  What should it do in hex mode?
                 DoSearch(true, input.key_char == '\\'/*caseless*/);

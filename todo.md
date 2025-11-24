@@ -71,17 +71,17 @@
   - [x] search for regex (search line by line)
   - [ ] search for hex bytes in hex mode
 - hex mode
-  - [ ] always show hex ruler on a second header row
+  - [x] always show hex ruler on a second header row
   - [x] go to offset
   - [x] highlight newline characters in hex mode
   - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [x] go to line
-  - [x] modify file
+  - [x] `Alt-E` toggle hex edit mode
     - [x] navigate through bytes
     - [ ] navigate through characters (`Tab` to toggle between bytes and characters)
     - [x] change bytes
     - [ ] change characters
-      - [ ] This may require removing `r`, `h`, `@`, `s`, `Shift-s`, `\`, `/`, `?`, `g`, `j`, `m`, `u` (and any other ASCII hotkeys in hex mode)
+    - [x] in hex exit mode, interpret typeable keys as edits instead of commands (and add Alt-key versions)
     - [x] `F7`/`F8` prev/next change
     - [x] `Esc` prompt to save or discard changes
     - [ ] `Ctrl-S` to save changes
