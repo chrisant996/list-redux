@@ -109,6 +109,14 @@ class Viewer
 {
     friend class ScopedWorkingIndicator;
 
+    struct ScrollPosition
+    {
+        FileOffset  top = 0;
+        unsigned    left = 0;
+        FileOffset  hex_top = 0;
+        FileOffset  hex_pos = 0;
+    };
+
 public:
                     Viewer(const char* text, const WCHAR* title=L"Text");
                     Viewer(const std::vector<StrW>& files);
@@ -152,6 +160,7 @@ private:
     StrW            m_title;
     const char*     m_text = nullptr;
     const std::vector<StrW>* m_files = nullptr;
+    std::map<const WCHAR*, ScrollPosition> m_file_positions;
     std::vector<StrW> m_alt_files;
     intptr_t        m_index = -1;
 
@@ -314,6 +323,8 @@ void Viewer::UpdateDisplay()
     static bool s_no_accumulate = false;
 #endif
 
+    bool update_command_line = false;
+
     // Decide terminal dimensions and content height.  Content width can't be
     // decided yet because it may depend on the margin width (which depends on
     // the highest, i.e. widest, file number or file offset).
@@ -333,6 +344,31 @@ void Viewer::UpdateDisplay()
 
     // Decide how many hex bytes fit per line.
     InitHexWidth();
+
+    // Process enough lines to display the current screenful of lines.  If
+    // processing lines causes the margin width to change, then wrapping and
+    // processing may need to be redone.
+    ScopedWorkingIndicator working;
+    unsigned autofit_retries = 0;
+LAutoFitContentWidth:
+    assert(autofit_retries != 2); // Should be impossible to occur...
+    m_margin_width = CalcMarginWidth();
+    m_content_width = m_terminal_width - m_margin_width - show_scrollbar;
+    {
+        Error e;
+        m_context.SetWrapWidth(m_wrap ? m_content_width : g_options.max_line_length);
+        working.ShowFeedback(m_context.Completed(), m_context.Count(), m_top + m_content_height, this, false/*bytes*/);
+        m_context.ProcessThrough(m_top + m_content_height, e);
+        const unsigned new_margin_width = CalcMarginWidth();
+        if (new_margin_width != m_margin_width)
+        {
+            // Margin width changed; redo wrapping and processing (processing
+            // may be a no-op if wrapping isn't active).
+            if (autofit_retries++ < 4)
+                goto LAutoFitContentWidth;
+        }
+    }
+    update_command_line |= working.NeedsCleanup();
 
     // Fix the top offset.
     if (m_hex_mode)
@@ -391,7 +427,7 @@ void Viewer::UpdateDisplay()
     const bool update_header = (m_force_update || file_changed || top_changed || pos_changed || processed_changed);
     const bool update_content = (m_force_update || top_changed);
     const bool update_debug_row = (g_options.show_debug_info);
-    bool update_command_line = (m_force_update || m_force_update_footer || feedback_changed);
+    update_command_line |= (m_force_update || m_force_update_footer || feedback_changed);
     if (!update_header && !update_content && !update_debug_row && !update_command_line)
         return;
 
@@ -408,31 +444,6 @@ void Viewer::UpdateDisplay()
     m_last_completed = m_context.Completed();
     m_force_update = false;
     m_force_update_footer = false;
-
-    // Process enough lines to display the current screenful of lines.  If
-    // processing lines causes the margin width to change, then wrapping and
-    // processing may need to be redone.
-    ScopedWorkingIndicator working;
-    unsigned autofit_retries = 0;
-LAutoFitContentWidth:
-    assert(autofit_retries != 2); // Should be impossible to occur...
-    m_margin_width = CalcMarginWidth();
-    m_content_width = m_terminal_width - m_margin_width - show_scrollbar;
-    {
-        Error e;
-        m_context.SetWrapWidth(m_wrap ? m_content_width : g_options.max_line_length);
-        working.ShowFeedback(m_context.Completed(), m_context.Count(), m_top + m_content_height, this, false/*bytes*/);
-        m_context.ProcessThrough(m_top + m_content_height, e);
-        const unsigned new_margin_width = CalcMarginWidth();
-        if (new_margin_width != m_margin_width)
-        {
-            // Margin width changed; redo wrapping and processing (processing
-            // may be a no-op if wrapping isn't active).
-            if (autofit_retries++ < 4)
-                goto LAutoFitContentWidth;
-        }
-    }
-    update_command_line |= working.NeedsCleanup();
 
     // Compute scrollbar metrics.
     scroll_car scroll_car;
@@ -1406,13 +1417,15 @@ hex_edit_right:
         case 'N'-'@':   // CTRL-N
             if (input.modifier == Modifier::CTRL)
             {
-                SetFile(m_index + 1);
+                if (!m_hex_edit)
+                    SetFile(m_index + 1);
             }
             break;
         case 'P'-'@':   // CTRL-P
             if (input.modifier == Modifier::CTRL)
             {
-                SetFile(m_index - 1);
+                if (!m_hex_edit)
+                    SetFile(m_index - 1);
             }
             break;
         case 'S'-'@':   // CTRL-S
@@ -1671,7 +1684,19 @@ void Viewer::EnsureAltFiles()
         m_alt_files.clear();
         for (const auto& file : *m_files)
             m_alt_files.emplace_back(file);
+
+        // Rebuild the file positions list.
+        std::map<const WCHAR*, ScrollPosition> alt_positions;
+        for (size_t i = 0; i < m_files->size(); ++i)
+        {
+            auto& fpos = m_file_positions.find((*m_files)[i].Text());
+            if (fpos != m_file_positions.end())
+                alt_positions.emplace(m_alt_files[i].Text(), fpos->second);
+        }
+
+        // Switch to using the modifiable list.
         m_files = &m_alt_files;
+        m_file_positions = std::move(alt_positions);
     }
 }
 
@@ -1706,13 +1731,38 @@ void Viewer::SetFile(intptr_t index, ContentCache* context)
     if (index == m_index)
         return;
 
+    if (m_index >= 0)
+    {
+        auto& oldfpos = m_file_positions.find((*m_files)[m_index].Text());
+        if (oldfpos != m_file_positions.end())
+        {
+            oldfpos->second.top = m_top;
+            oldfpos->second.left = m_left;
+            oldfpos->second.hex_top = m_hex_top;
+            oldfpos->second.hex_pos = m_hex_pos;
+        }
+    }
+
+    auto& newfpos = m_file_positions.find((*m_files)[index].Text());
+    if (newfpos != m_file_positions.end())
+    {
+        m_top = newfpos->second.top;
+        m_left = newfpos->second.left;
+        m_hex_top = newfpos->second.hex_top;
+        m_hex_pos = newfpos->second.hex_pos;
+    }
+    else
+    {
+        m_file_positions.emplace((*m_files)[index].Text(), ScrollPosition());
+        m_top = 0;
+        m_left = 0;
+        m_hex_top = 0;
+        m_hex_pos = 0;
+    }
+
     m_errmsg.Clear();
     m_index = index;
-    m_top = 0;
-    m_left = 0;
-    m_hex_top = 0;
     m_hex_edit = false;
-    m_hex_pos = 0;
     m_hex_high_nybble = true;
     m_force_update = true;
 
@@ -2151,6 +2201,8 @@ ViewerOutcome Viewer::CloseCurrentFile()
 {
     if (m_text || m_files->size() <= 1)
         return ViewerOutcome::RETURN;
+
+    m_file_positions.erase((*m_files)[m_index].Text());
 
     EnsureAltFiles();
     m_alt_files.erase(m_alt_files.begin() + m_index);
