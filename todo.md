@@ -82,6 +82,7 @@
     - [x] next/prev change
     - [x] discard changes
     - [x] save changes
+    - [ ] ability to undo saving edited bytes (restore to original bytes)
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
   - [x] Binary files **_and hex mode_** use OEM CP.
