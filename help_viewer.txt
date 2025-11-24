@@ -28,6 +28,12 @@ Shift-S or /  Search for text (case sensitive).
        Alt-C  Close the current file.
        Alt-O  Open a new file.
 
+HEX EDITING KEYS:
+      0 .. 9  Change value at byte.
+      A .. F  Change value at byte.
+          F7  Jump to previous row with edits.
+          F8  Jump to next row with edits.
+
 MODE KEYS:
 
            C  Toggle how control characters are shown.

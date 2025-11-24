@@ -77,8 +77,9 @@
   - [ ] modify file
     - [x] navigate through bytes
     - [ ] navigate through characters
-    - [ ] change bytes
+    - [x] change bytes
     - [ ] change characters
+    - [x] next/prev change
     - [ ] discard changes
     - [ ] save changes
 - Encodings:

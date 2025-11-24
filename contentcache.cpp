@@ -112,6 +112,42 @@ void FoundOffset::Found(FileOffset found_offset, unsigned found_len)
 }
 
 #pragma endregion // FoundOffset
+#pragma region // PatchBlock
+
+PatchBlock::PatchBlock(FileOffset offset)
+: m_offset(offset)
+, m_mask(0)
+{
+    assert((offset % sizeof(m_bytes)) == 0);
+    ZeroMemory(m_bytes, sizeof(m_bytes));
+}
+
+bool PatchBlock::IsSet(FileOffset offset) const
+{
+    assert(offset >= m_offset);
+    assert(offset < m_offset + sizeof(m_bytes));
+    const unsigned index = unsigned(offset - m_offset);
+    const unsigned mask = 1 << index;
+    return !!(m_mask & mask);
+}
+
+BYTE PatchBlock::GetByte(FileOffset offset) const
+{
+    assert(IsSet(offset));
+    const unsigned index = unsigned(offset - m_offset);
+    return m_bytes[index];
+}
+
+void PatchBlock::SetByte(FileOffset offset, BYTE value)
+{
+    assert(offset >= m_offset);
+    assert(offset < m_offset + sizeof(m_bytes));
+    const unsigned index = unsigned(offset - m_offset);
+    m_bytes[index] = value;
+    m_mask |= 1 << index;
+}
+
+#pragma endregion // PatchBlock
 #pragma region // PipeChunk
 
 PipeChunk::PipeChunk()
@@ -1337,6 +1373,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     assert(ptr + len <= m_data + m_data_length);
 
     StrW tmp;
+    StrW tmp2;
     m_map.GetLineText(ptr, len, tmp, true/*hex_mode*/);
     assert(tmp.Length() == len);
     if (tmp.Length() != len)
@@ -1388,11 +1425,28 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         }
         if (ii < len)
         {
-            const bool hilite_newline = (!highlighting_found_text && ptr[ii] == '\n' && !marked_color);
-            if (hilite_newline)
-                s.AppendColor(GetColor(ColorElement::CtrlCode));
-            s.Printf(L"%02X", ptr[ii]);
-            s.AppendNormalIf(hilite_newline);
+            BYTE value = ptr[ii];
+            bool colored = false;
+            if (IsByteDirty(offset + ii, value))
+            {
+                colored = true;
+                s.AppendColor(GetColor(ColorElement::EditByte));
+            }
+            else
+            {
+                colored = (!highlighting_found_text && ptr[ii] == '\n' && !marked_color);
+                if (colored)
+                    s.AppendColor(GetColor(ColorElement::CtrlCode));
+            }
+            s.Printf(L"%02X", value);
+            s.AppendNormalIf(colored);
+            if (colored)
+            {
+                if (highlighting_found_text)
+                    s.AppendColor(GetColor(ColorElement::SearchFound));
+                else if (marked_color)
+                    s.AppendColor(marked_color);
+            }
         }
         else
         {
@@ -1414,8 +1468,16 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     highlighting_found_text = false;
     for (unsigned ii = 0; ii < len; ++ii)
     {
-        const BYTE c = ptr[ii];
-        if (marked_color)
+        BYTE c = ptr[ii];
+        bool edited = false;
+        if (IsByteDirty(offset + ii, c))
+        {
+            edited = true;
+            s.AppendColor(GetColor(ColorElement::EditByte));
+            tmp2.SetFromCodepage(m_map.GetCodePage(true), reinterpret_cast<const char*>(&c), 1);
+            tmp.SetAt(tmp.Text() + ii, *tmp2.Text());
+        }
+        else if (marked_color)
         {
             if (found_line->len && offset + ii == found_line->offset)
             {
@@ -1425,12 +1487,13 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             else if (highlighting_found_text && offset + ii == found_line->offset + found_line->len)
             {
                 highlighting_found_text = false;
-                s.Append(c_norm), s.AppendColor(marked_color);
+                s.Append(c_norm);
+                s.AppendColor(marked_color);
             }
         }
         if (c > 0 && c < ' ')
         {
-            const bool hilite_newline = (!highlighting_found_text && c == '\n' && !marked_color);
+            const bool hilite_newline = (!highlighting_found_text && c == '\n' && !edited && !marked_color);
             if (hilite_newline)
                 s.AppendColor(GetColor(ColorElement::CtrlCode));
             s.Append(c_oem437[c], 1);
@@ -1438,14 +1501,19 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         }
         else if (!c || wcwidth(tmp.Text()[ii]) != 1)
         {
-            if (!marked_color)
+            if (!edited && !marked_color)
                 s.AppendColor(GetColor(ColorElement::Divider));
             s.Append(L".", 1);
-            s.AppendNormalIf(!marked_color);
+            s.AppendNormalIf(!edited && !marked_color);
         }
         else
         {
             s.Append(tmp.Text() + ii, 1);
+        }
+        if (edited)
+        {
+            s.Append(c_norm);
+            s.AppendColor(marked_color);
         }
     }
     if (marked_color)
@@ -2043,6 +2111,113 @@ bool ContentCache::LoadData(const FileOffset offset, DWORD& end_slop, Error& e)
     if (bytes_read < to_read)
         m_eof = true;
     return true;
+}
+
+void ContentCache::SetByte(FileOffset offset, BYTE value, bool high_nybble)
+{
+    const FileOffset block_offset = offset & ~(PatchBlock::c_size - 1);
+    const unsigned index = offset & (PatchBlock::c_size - 1);
+
+    Error e;
+    if (!EnsureHexData(block_offset, PatchBlock::c_size, e))
+        return;
+
+    auto f = m_patch_blocks.find(block_offset);
+    if (f == m_patch_blocks.end())
+    {
+        m_patch_blocks.emplace(block_offset, block_offset);
+        f = m_patch_blocks.find(block_offset);
+    }
+
+    value &= 0x0f;
+    if (high_nybble)
+        value <<= 4;
+
+    BYTE b;
+    if (!IsByteDirty(offset, b))
+    {
+        const BYTE* ptr = m_data + (block_offset - m_data_offset);
+        b = ptr[index];
+    }
+
+    value |= b & (high_nybble ? 0x0f : 0xf0);
+
+    f->second.SetByte(offset, value);
+}
+
+bool ContentCache::SaveBytes(Error& e)
+{
+// TODO:  Save pending bytes.
+    e.Set(E_NOTIMPL);
+    return false;
+}
+
+bool ContentCache::IsByteDirty(FileOffset offset, BYTE& value) const
+{
+    const FileOffset block_offset = offset & ~(PatchBlock::c_size - 1);
+    auto f = m_patch_blocks.find(block_offset);
+    if (f == m_patch_blocks.end())
+        return false;
+    if (!f->second.IsSet(offset))
+        return false;
+    value = f->second.GetByte(offset);
+    return true;
+}
+
+bool ContentCache::NextEditedByteRow(FileOffset here, FileOffset& there, unsigned hex_width, bool next) const
+{
+    if (m_patch_blocks.empty())
+        return false;
+
+    here &= ~(FileOffset(hex_width) - 1);
+
+    auto& f = m_patch_blocks.lower_bound(here);
+    if (next)
+    {
+        while (f != m_patch_blocks.end())
+        {
+            const FileOffset rowofs = f->first & ~(FileOffset(hex_width) - 1);
+            if (here < rowofs)
+            {
+                there = f->first;
+                for (unsigned index = 0; index < f->second.c_size; ++index)
+                {
+                    if (f->second.IsSet(there + index))
+                    {
+                        there += index;
+                        break;
+                    }
+                }
+                return true;
+            }
+            ++f;
+        }
+        return false;
+    }
+    else
+    {
+        while (true)
+        {
+            const FileOffset rowofs = f->first & ~(FileOffset(hex_width) - 1);
+            if (here > rowofs)
+            {
+                there = f->first;
+                for (unsigned index = f->second.c_size; index--;)
+                {
+                    if (f->second.IsSet(there + index))
+                    {
+                        there += index;
+                        break;
+                    }
+                }
+                return true;
+            }
+            if (f == m_patch_blocks.begin())
+                break;
+            --f;
+        }
+        return false;
+    }
 }
 
 #pragma endregion // ContentCache

@@ -1156,6 +1156,7 @@ key_down:
         case Key::RIGHT:
             if (m_hex_mode)
             {
+hex_right:
                 if ((m_hex_pos + 1 < m_context.GetFileSize()) ||
                     (m_hex_high_nybble && m_context.GetFileSize()))
                 {
@@ -1199,8 +1200,24 @@ key_down:
             }
             break;
         case Key::F4:
-            m_multifile_search = !m_multifile_search;
-            m_force_update_footer = true;
+            if (input.modifier == Modifier::None)
+            {
+                m_multifile_search = !m_multifile_search;
+                m_force_update_footer = true;
+            }
+            break;
+        case Key::F7:
+        case Key::F8:
+            if (m_hex_mode && input.modifier == Modifier::None)
+            {
+                FileOffset offset;
+                const bool next = (input.key == Key::F8);
+                if (m_context.NextEditedByteRow(m_hex_pos, offset, m_hex_width, next))
+                {
+                    m_hex_pos = offset;
+                    m_hex_high_nybble = next;
+                }
+            }
             break;
 
         case Key::MouseWheel:
@@ -1257,6 +1274,34 @@ key_down:
             }
             break;
 
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case 'a':
+        case 'b':
+        case 'f':
+hex_digit:
+            if (m_hex_mode && input.modifier == Modifier::None)
+            {
+                BYTE value;
+                if (input.key_char >= '0' && input.key_char <= '9')
+                    value = input.key_char - '0';
+                else if (input.key_char >= 'a' && input.key_char <= 'f')
+                    value = input.key_char - 'a' + 10;
+                else
+                    assert(false);
+                m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
+                m_force_update = true;
+                goto hex_right;
+            }
+            break;
         case 'c':
             if (input.modifier == Modifier::ALT)
             {
@@ -1265,6 +1310,10 @@ key_down:
             else if (input.modifier != Modifier::None)
             {
                 break;
+            }
+            else if (m_hex_mode)
+            {
+                goto hex_digit;
             }
             __fallthrough;
         case '^':
@@ -1284,11 +1333,19 @@ key_down:
                 g_options.show_debug_info = !g_options.show_debug_info;
                 m_force_update = true;
             }
+            else if (input.modifier == Modifier::None && m_hex_mode)
+            {
+                goto hex_digit;
+            }
             break;
         case 'e':
             if (input.modifier == Modifier::None)
             {
-                if (!m_hex_mode)
+                if (m_hex_mode)
+                {
+                    goto hex_digit;
+                }
+                else
                 {
                     g_options.show_line_endings = !g_options.show_line_endings;
                     m_force_update = true;

@@ -10,6 +10,7 @@
 #include "wcwidth_iter.h"
 
 #include <vector>
+#include <map>
 
 typedef unsigned __int64 FileOffset;
 
@@ -24,6 +25,20 @@ struct FoundOffset
     FileOffset      offset;         // Offset where text was found.
     unsigned        len;            // Length of found text in line (NOTE: may extend past end of line if a line break occurred).
     bool            is_valid;       // True when offset is valid, False otherwise.
+};
+
+class PatchBlock
+{
+public:
+    static const DWORD c_size = 8;
+                    PatchBlock(FileOffset offset);
+    bool            IsSet(FileOffset offset) const;
+    BYTE            GetByte(FileOffset offset) const;
+    void            SetByte(FileOffset offset, BYTE value);
+private:
+    FileOffset      m_offset;
+    BYTE            m_bytes[c_size];
+    BYTE            m_mask;
 };
 
 struct PipeChunk
@@ -209,12 +224,19 @@ public:
     FileOffset      GetBufferOffset() const { return m_data_offset; }
     unsigned        GetBufferLength() const { return m_data_length; }
 
+    bool            IsDirty() const { return !m_patch_blocks.empty(); }
+    void            SetByte(FileOffset offset, BYTE value, bool high_nybble);
+    bool            SaveBytes(Error& e);
+    void            DiscardBytes() { m_patch_blocks.clear(); }
+    bool            NextEditedByteRow(FileOffset here, FileOffset& there, unsigned hex_width, bool next) const;
+
 private:
     void            SetSize(FileOffset size);
     bool            EnsureDataBuffer(Error& e);
     bool            LoadData(FileOffset offset, DWORD& end_slop, Error& e);
     bool            EnsureFileData(size_t line, Error& e);
     bool            EnsureHexData(FileOffset offset, unsigned length, Error& e);
+    bool            IsByteDirty(FileOffset offset, BYTE& value) const;
 
 private:
     const ViewerOptions& m_options;
@@ -234,5 +256,7 @@ private:
     FileOffset      m_data_offset = 0;
     DWORD           m_data_length = 0;
     DWORD           m_data_slop = 0;
+
+    std::map<FileOffset, PatchBlock> m_patch_blocks;
 };
 
