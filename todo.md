@@ -79,6 +79,7 @@
     - [ ] navigate through characters
     - [x] change bytes
     - [ ] change characters
+      - [ ] This may require removing `r`, `h`, and any other ASCII hotkeys in hex mode.
     - [x] next/prev change
     - [x] discard changes
     - [x] save changes
