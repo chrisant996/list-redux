@@ -52,6 +52,7 @@ HEX EDIT MODE KEYS:
 
   Hex digits  Change the current byte in the hex columns.
 Letters, etc  Change the current byte in the characters column.
+         TAB  Toggle editing in hex columns or characters column.
 
           F7  Jump to previous row with edits.
           F8  Jump to next row with edits.

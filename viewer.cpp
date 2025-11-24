@@ -169,6 +169,7 @@ private:
     bool            m_hex_edit = false;
     FileOffset      m_hex_pos = 0;
     bool            m_hex_high_nybble = true;
+    bool            m_hex_characters = false;
 
     intptr_t        m_last_index = -1;
     size_t          m_last_top = 0;
@@ -877,17 +878,28 @@ LAutoFitContentWidth:
         if (m_hex_edit)
         {
             unsigned pos_in_row = (m_hex_pos % m_hex_width);
-            cursor_x = 1;                               // One-based.
-            cursor_x += m_context.GetHexOffsetColumnWidth();
-            cursor_x += 2;                              // Padding.
-            cursor_x += pos_in_row * 2;
-            cursor_x += pos_in_row / (1 << g_options.hex_grouping);
-            cursor_x += pos_in_row / 8;
-            cursor_x += !m_hex_high_nybble;
             cursor_y = 1;                               // One-based.
             cursor_y += 1;                              // Header row.
             cursor_y += 1;                              // Hex ruler.
             cursor_y += unsigned(m_hex_pos - m_hex_top) / m_hex_width;
+            cursor_x = 1;                               // One-based.
+            cursor_x += m_context.GetHexOffsetColumnWidth();
+            cursor_x += 2;                              // Padding.
+            if (m_hex_characters)
+            {
+                cursor_x += m_hex_width * 2;
+                cursor_x += (1 << (3 - g_options.hex_grouping)) * (m_hex_width / 8);
+                cursor_x += m_hex_width / 8;
+                cursor_x += 1;
+                cursor_x += pos_in_row;
+            }
+            else
+            {
+                cursor_x += pos_in_row * 2;
+                cursor_x += pos_in_row / (1 << g_options.hex_grouping);
+                cursor_x += pos_in_row / 8;
+                cursor_x += !m_hex_high_nybble;
+            }
         }
         else
         {
@@ -1217,7 +1229,12 @@ key_down:
             }
             else if (m_hex_edit)
             {
-                if (m_hex_pos > 0 || !m_hex_high_nybble)
+                if (m_hex_characters)
+                {
+                    if (m_hex_pos > 0)
+                        --m_hex_pos;
+                }
+                else if (m_hex_pos > 0 || !m_hex_high_nybble)
                 {
                     m_hex_high_nybble = !m_hex_high_nybble;
                     if (!m_hex_high_nybble)
@@ -1236,8 +1253,13 @@ key_down:
             else if (m_hex_edit)
             {
 hex_edit_right:
-                if ((m_hex_pos + 1 < m_context.GetFileSize()) ||
-                    (m_hex_high_nybble && m_context.GetFileSize()))
+                if (m_hex_characters)
+                {
+                    if (m_hex_pos + 1 < m_context.GetFileSize())
+                        ++m_hex_pos;
+                }
+                else if ((m_hex_pos + 1 < m_context.GetFileSize()) ||
+                         (m_hex_high_nybble && m_context.GetFileSize()))
                 {
                     m_hex_high_nybble = !m_hex_high_nybble;
                     if (m_hex_high_nybble)
@@ -1292,6 +1314,14 @@ hex_edit_right:
             }
             break;
 
+        case Key::TAB:
+            if (m_hex_edit)
+            {
+                m_hex_characters = !m_hex_characters;
+                m_hex_high_nybble = true;
+            }
+            break;
+
         case Key::MouseWheel:
             // FUTURE:  Respect the amount (in addition to the direction)?
             // FUTURE:  Acceleration?
@@ -1310,31 +1340,48 @@ hex_edit_right:
     {
         if (m_hex_edit)
         {
-// TODO:  Interpret typeable characters as input.
-// TODO:  Different interpretation if cursor in hex columns vs character columns.
-            switch (input.key_char)
+            if (!m_hex_characters)
             {
-            case '0':   case '1':   case '2':   case '3':   case '4':
-            case '5':   case '6':   case '7':   case '8':   case '9':
-                if (input.modifier == Modifier::None)
+                // Interpret hex digits as input.
+                switch (input.key_char)
                 {
-                    const BYTE value = input.key_char - '0';
-                    m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
-                    m_force_update = true;
+                case '0':   case '1':   case '2':   case '3':   case '4':
+                case '5':   case '6':   case '7':   case '8':   case '9':
+                    if (input.modifier == Modifier::None)
+                    {
+                        const BYTE value = input.key_char - '0';
+                        m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
+                        m_force_update = true;  // TODO:  Doesn't need to update the whole screen!
+                        goto hex_edit_right;
+                    }
+                    break;
+                case 'a':   case 'b':   case 'c':   case 'd':   case 'e':   case 'f':
+                case 'A':   case 'B':   case 'C':   case 'D':   case 'E':   case 'F':
+                    if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
+                    {
+                        const BYTE ten_char = (input.key_char >= 'a' && input.key_char <= 'f') ? 'a' : 'A';
+                        const BYTE value = input.key_char - ten_char + 10;
+                        m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
+                        m_force_update = true;  // TODO:  Doesn't need to update the whole screen!
+                        goto hex_edit_right;
+                    }
+                    break;
+                }
+            }
+            else if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
+            {
+                // Interpret typeable characters as input.
+                char multibyte[32];
+                BOOL used_default = false;
+                const UINT cp = m_context.GetCodePage(m_hex_mode);
+                const int len = WideCharToMultiByte(cp, 0, &input.key_char, 1, multibyte, _countof(multibyte), nullptr, &used_default);
+                if (!used_default && len == 1)
+                {
+                    m_context.SetByte(m_hex_pos, multibyte[0] >> 4, true);
+                    m_context.SetByte(m_hex_pos, multibyte[0] & 0xf, false);
+                    m_force_update = true;  // TODO:  Doesn't need to update the whole screen!
                     goto hex_edit_right;
                 }
-                break;
-            case 'a':   case 'b':   case 'c':   case 'd':   case 'e':   case 'f':
-            case 'A':   case 'B':   case 'C':   case 'D':   case 'E':   case 'F':
-                if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
-                {
-                    const BYTE ten_char = (input.key_char >= 'a' && input.key_char <= 'f') ? 'a' : 'A';
-                    const BYTE value = input.key_char - ten_char + 10;
-                    m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
-                    m_force_update = true;
-                    goto hex_edit_right;
-                }
-                break;
             }
         }
 
@@ -1366,6 +1413,16 @@ hex_edit_right:
             if (input.modifier == Modifier::CTRL)
             {
                 SetFile(m_index - 1);
+            }
+            break;
+        case 'S'-'@':   // CTRL-S
+            if (input.modifier == Modifier::CTRL)
+            {
+                if (m_hex_edit && m_context.IsDirty())
+                {
+                    m_context.SaveBytes(e);
+                    m_force_update = true;
+                }
             }
             break;
 

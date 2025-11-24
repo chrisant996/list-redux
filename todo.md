@@ -63,6 +63,7 @@
 - [x] `/@` to supply a file with a list of names to view
 - [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
 - [ ] `F5` to reprocess/reload the file
+- [ ] remember scroll position in each file
 - searching
   - [x] search in text mode (/ for case sensitive, \ for caseless)
   - [x] search in hex mode
@@ -78,13 +79,13 @@
   - [x] go to line
   - [x] `Alt-E` toggle hex edit mode
     - [x] navigate through bytes
-    - [ ] navigate through characters (`Tab` to toggle between bytes and characters)
+    - [x] navigate through characters (`TAB` to toggle between bytes and characters)
     - [x] change bytes
-    - [ ] change characters
+    - [x] change characters
     - [x] in hex exit mode, interpret typeable keys as edits instead of commands (and add Alt-key versions)
     - [x] `F7`/`F8` prev/next change
     - [x] `Esc` prompt to save or discard changes
-    - [ ] `Ctrl-S` to save changes
+    - [x] `Ctrl-S` to save changes
     - [ ] discard edited byte at cursor
     - [ ] ability to undo saving edited bytes (restore to original bytes)
 - Encodings:
