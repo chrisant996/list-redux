@@ -185,8 +185,9 @@ private:
     size_t          m_last_left = 0;
     StrW            m_last_feedback = 0;
     FileOffset      m_last_hex_top = 0;
-    FileOffset      m_last_hex_pos = 0;
     bool            m_last_hex_edit = false;
+    FileOffset      m_last_hex_pos = 0;
+    bool            m_last_hex_characters = false;
     FileOffset      m_last_processed = FileOffset(-1);
     bool            m_last_completed = false;
     bool            m_force_update = false;
@@ -422,6 +423,7 @@ LAutoFitContentWidth:
     const bool pos_changed = (m_hex_edit && m_last_hex_pos != m_hex_pos);
     const bool processed_changed = (m_last_processed != m_context.Processed() || m_last_completed != m_context.Completed());
     const bool feedback_changed = (!m_last_feedback.Equal(m_feedback));
+    const bool hex_characters_changed = (m_last_hex_characters != m_hex_characters);
 
     // Decide what needs to be updated.
     const bool update_header = (m_force_update || file_changed || top_changed || pos_changed || processed_changed);
@@ -437,7 +439,9 @@ LAutoFitContentWidth:
     m_last_top = m_top;
     m_last_left = m_left;
     m_last_hex_top = m_hex_top;
+    m_last_hex_edit = m_hex_edit;
     m_last_hex_pos = m_hex_pos;
+    m_last_hex_characters = m_hex_characters;
     m_last_index = m_index;
     m_last_feedback.Set(m_feedback);
     m_last_processed = m_context.Processed();
@@ -882,7 +886,7 @@ LAutoFitContentWidth:
         MakeCommandLine(s, left.Text());
     }
 
-    if (s.Length())
+    if (s.Length() || hex_characters_changed)
     {
         unsigned cursor_y;
         unsigned cursor_x;
