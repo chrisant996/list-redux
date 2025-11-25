@@ -112,8 +112,8 @@
 - improve input routine
   - [x] scrollable bounds
   - [x] arrow keys
-  - [ ] Ctrl-arrow keys
-  - [ ] Ctrl-BACK and Ctrl-DEL keys
+  - [x] Ctrl-arrow keys
+  - [x] Ctrl-BACK and Ctrl-DEL keys
   - [ ] CUA keys
 - [ ] `S` configure sort order
 - detect certain file types and render with formatting/color

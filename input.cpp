@@ -401,10 +401,156 @@ InputRecord SelectInput(DWORD timeout)
     return input;
 }
 
-static void BackUpByAmount(int32& left, const WCHAR* s, unsigned len, unsigned backup)
+struct GraphemeInfo
 {
-    while (left && __wcswidth(s + left, len - left) < backup)
-        left = FitsInWcwidth(s, left, __wcswidth(s, left) - 1);
+    unsigned short index;
+    unsigned short length;
+    unsigned short width;
+};
+
+static std::vector<GraphemeInfo> ParseGraphemes(const WCHAR* s, const unsigned len, const unsigned short pos, size_t& index_pos)
+{
+    std::vector<GraphemeInfo> characters;
+
+    wcwidth_iter iter(s, len);
+    unsigned short char_index = 0;
+    size_t i_p = 0;
+    while (iter.next())
+    {
+        if (char_index <= pos)
+            i_p = characters.size();
+        const unsigned short char_length = iter.character_length();
+        characters.push_back(GraphemeInfo { char_index, char_length, (unsigned short)iter.character_wcwidth_onectrl() });
+        char_index += char_length;
+    }
+    assert(char_index == len);
+
+    index_pos = i_p;
+    return characters;
+}
+
+static void BackUpByAmount(unsigned short& pos, const WCHAR* s, unsigned len, unsigned backup)
+{
+    if (pos)
+    {
+        size_t index_pos = 0;
+        std::vector<GraphemeInfo> characters = ParseGraphemes(s, len, pos, index_pos);
+        if (!characters.size())
+            return;
+
+        if (!index_pos)
+        {
+            pos = 0;
+            return;
+        }
+
+        if (index_pos >= characters.size() || characters[index_pos].index == pos)
+            --index_pos;
+
+        bool at_least_one = true;
+        while (at_least_one || characters[index_pos].width <= backup)
+        {
+            at_least_one = false;
+            pos = characters[index_pos].index;
+            backup -= characters[index_pos].width;
+            if (!index_pos)
+                break;
+            --index_pos;
+        }
+    }
+}
+
+static unsigned short PosMover(const WCHAR* s, const unsigned len, unsigned short& pos, const bool forward, const bool word)
+{
+    size_t index_pos = 0;
+    std::vector<GraphemeInfo> characters = ParseGraphemes(s, len, pos, index_pos);
+
+    if (pos && index_pos < characters.size() && pos != characters[index_pos].index)
+    {
+        if (forward)
+            --index_pos;
+        else
+            ++index_pos;
+    }
+
+    const size_t orig_index_pos = index_pos;
+
+    if (forward)
+    {
+        if (pos < len)
+        {
+            if (!word)
+            {
+                if (index_pos < characters.size())
+                    ++index_pos;
+            }
+            else
+            {
+                while (index_pos < characters.size())
+                {
+                    const auto& g = characters[index_pos];
+                    if (!(g.length == 1 && iswspace(s[g.index])))
+                        break;
+                    ++index_pos;
+                }
+                while (index_pos < characters.size())
+                {
+                    const auto& g = characters[index_pos];
+                    if (g.length == 1 && iswspace(s[g.index]))
+                        break;
+                    ++index_pos;
+                }
+            }
+
+            if (index_pos < characters.size())
+                pos = characters[index_pos].index;
+            else
+                pos = len;
+        }
+    }
+    else
+    {
+        if (pos > 0)
+        {
+            if (!word)
+            {
+                if (index_pos)
+                    --index_pos;
+            }
+            else
+            {
+                assert(index_pos);
+                while (index_pos)
+                {
+                    const size_t test_index = index_pos - 1;
+                    const auto& g = characters[test_index];
+                    if (!(g.length == 1 && iswspace(s[g.index])))
+                        break;
+                    index_pos = test_index;
+                }
+                while (index_pos)
+                {
+                    const size_t test_index = index_pos - 1;
+                    const auto& g = characters[test_index];
+                    if (g.length == 1 && iswspace(s[g.index]))
+                        break;
+                    index_pos = test_index;
+                }
+            }
+
+            if (index_pos < characters.size())
+                pos = characters[index_pos].index;
+            else
+                pos = 0;
+        }
+    }
+
+    unsigned short moved = 0;
+    const size_t begin = min(index_pos, orig_index_pos);
+    const size_t end = max(index_pos, orig_index_pos);
+    for (size_t i = begin; i < end; ++i)
+        moved += characters[i].length;
+    return moved;
 }
 
 bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
@@ -422,7 +568,6 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     GetConsoleScreenBufferInfo(hout, &csbi);
 
-    // FUTURE:  Allow horizontal scrolling and fit into the terminal width.
     if (unsigned(csbi.dwCursorPosition.X) + 8 >= unsigned(csbi.dwSize.X))
         return false;
     if (unsigned(csbi.dwCursorPosition.X) + max_width >= unsigned(csbi.dwSize.X))
@@ -432,13 +577,15 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
     size_t history_index = history ? history->size() : 0;
 
     StrW tmp;
-    int32 left = 0;
-    int32 pos = 0;
+    unsigned short left = 0;
+    unsigned short pos = 0;
     while (true)
     {
         tmp.Clear();
         tmp.Printf(L"%s\x1b[%uG", c_hide_cursor, csbi.dwCursorPosition.X + 1);
         OutputConsole(hout, tmp.Text(), tmp.Length());
+
+        left = min(left, pos);
 
         // Auto-scroll horizontally forward.
         while (__wcswidth(out.Text() + left, pos - left) >= max_width)
@@ -451,7 +598,12 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
 
         // Auto-scroll horizontally backward.
         assert(pos >= left);
-        BackUpByAmount(left, out.Text(), pos, 4);
+        {
+            unsigned short backup_left = pos;
+            BackUpByAmount(backup_left, out.Text(), pos, 4);
+            if (left > backup_left)
+                left = backup_left;
+        }
 
         // Print the visible part of the input string.
         tmp.Set(out.Text() + left, out.Length() - left);
@@ -490,43 +642,47 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
                 out.Clear();
                 return false;
             case Key::BACK:
-// TODO:  Ctrl-BACK
-                if (input.modifier == Modifier::None)
+                if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
                 {
                     if (pos > 0)
                     {
-                        if (pos == out.Length())
+                        const bool word = ((input.modifier & Modifier::CTRL) == Modifier::CTRL);
+                        const unsigned short old_pos = pos;
+                        const unsigned short moved = PosMover(out.Text(), out.Length(), pos, false/*forward*/, word);
+                        if (old_pos == out.Length())
                         {
-                            const uint32 old_length = out.Length();
-                            const uint32 old_width = __wcswidth(out.Text());
-                            TruncateWcwidth(out, old_width - 1, 0);
-                            pos -= (old_length - out.Length());
+                            out.SetLength(pos);
                         }
                         else
                         {
-                            const int32 i = pos;
-                            tmp.Set(out.Text(), i);
-                            TruncateWcwidth(tmp, __wcswidth(tmp.Text(), i) - 1, 0);
-                            pos = tmp.Length();
-                            tmp.Append(out.Text() + pos, out.Length() - pos);
+                            const unsigned short pos_keep = (pos + moved);
+                            tmp.Set(out.Text(), pos);
+                            tmp.Append(out.Text() + pos_keep, out.Length() - pos_keep);
                             out = std::move(tmp);
                         }
-                        left = min(left, pos);
                     }
                 }
                 break;
             case Key::DEL:
-// TODO:  Ctrl-DEL
-                if (input.modifier == Modifier::None)
+                if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
                 {
                     if (unsigned(pos) < out.Length())
                     {
-                        wcwidth_iter iter(out.Text() + pos, out.Length() - pos);
-                        if (!iter.next())
-                            break;
-                        tmp.Set(out.Text(), pos);
-                        tmp.Append(out.Text() + pos + iter.character_length());
-                        out = std::move(tmp);
+                        const bool word = ((input.modifier & Modifier::CTRL) == Modifier::CTRL);
+                        unsigned short del_pos = pos;
+                        const unsigned short moved = PosMover(out.Text(), out.Length(), del_pos, true/*forward*/, word);
+                        pos = del_pos - moved;
+                        if (pos + moved == out.Length())
+                        {
+                            out.SetLength(pos);
+                        }
+                        else
+                        {
+                            const unsigned short pos_keep = (pos + moved);
+                            tmp.Set(out.Text(), pos);
+                            tmp.Append(out.Text() + pos_keep, out.Length() - pos_keep);
+                            out = std::move(tmp);
+                        }
                     }
                 }
                 break;
@@ -569,20 +725,19 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
                 }
                 continue; // Avoid resetting history_index.
             case Key::LEFT:
-// TODO:  Ctrl-LEFT
 // TODO:  CUA (Shift-LEFT, Ctrl-Shift-LEFT)
                 if (pos > 0)
-                    pos = FitsInWcwidth(out.Text(), pos, __wcswidth(out.Text(), pos) - 1);
+                {
+                    const bool word = ((input.modifier & Modifier::CTRL) == Modifier::CTRL);
+                    PosMover(out.Text(), out.Length(), pos, false/*forward*/, word);
+                }
                 break;
             case Key::RIGHT:
-// TODO:  Ctrl-RIGHT:
 // TODO:  CUA (Shift-RIGHT, Ctrl-Shift-RIGHT)
                 if (unsigned(pos) < out.Length())
                 {
-                    wcwidth_iter iter(out.Text() + pos, out.Length() - pos);
-                    if (!iter.next())
-                        break;
-                    pos += iter.character_length();
+                    const bool word = ((input.modifier & Modifier::CTRL) == Modifier::CTRL);
+                    PosMover(out.Text(), out.Length(), pos, true/*forward*/, word);
                 }
                 break;
             }
