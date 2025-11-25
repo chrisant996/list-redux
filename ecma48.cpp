@@ -312,11 +312,10 @@ int32 str_iter::peek()
 //------------------------------------------------------------------------------
 int32 str_iter::next()
 {
-    if (!more())
-        return 0;
-
     int32 ax = 0;
-    while (int32 c = *m_ptr++)
+    int32 c = 0;
+
+    while (more() && (c = *m_ptr++))
     {
         // Decode surrogate pairs.
         if ((c & 0xfc00) == 0xd800)
@@ -324,13 +323,18 @@ int32 str_iter::next()
             ax = c << 10;
             continue;
         }
-        else if ((c & 0xfc00) == 0xdc00 && ax >= (1 << 10))
-            return ax + c - 0x35fdc00;
-        else
-            return c;
+        else if ((c & 0xfc00) == 0xdc00)
+        {
+            if (ax >= (1 << 10))
+                c = ax + c - 0x35fdc00;
+            else
+                c = 0xfffd;
+            ax = 0;
+        }
+        return c;
     }
 
-    return 0;
+    return ax ? 0xfffd : 0;
 }
 
 //------------------------------------------------------------------------------

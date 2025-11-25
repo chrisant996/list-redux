@@ -472,6 +472,7 @@ void initialize_wcwidth(const wcwidth_modes* modes)
             s_win10 = (ver.dwMajorVersion >= 10);
             s_win11 = (ver.dwMajorVersion > 10 || (ver.dwMajorVersion == 10 && ver.dwBuildNumber >= 22000));
         }
+// FUTURE:  WT_SESSION produces both false positives and false negatives.
         const bool winterm = !!_wgetenv(L"WT_SESSION");
         s_color_emoji = winterm;
         s_only_ucs2 = !s_win10 || !winterm;
