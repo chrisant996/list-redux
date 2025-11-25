@@ -1,5 +1,5 @@
 
-BASIC KEYS:
+GENERAL KEYS:
 
            ESC  Exit the file viewer.
 
@@ -52,6 +52,7 @@ HEX EDIT MODE KEYS:
 
     Hex digits  Change the current byte in the hex columns.
   Letters, etc  Change the current byte in the characters column.
+        Ctrl-U  Revert changed byte at cursor.
            TAB  Toggle editing in hex columns or characters column.
 
             F7  Jump to previous row with edits.

@@ -1,5 +1,5 @@
 
-BASIC KEYS:
+GENERAL KEYS:
 
            ESC  Exit the file chooser (and exits the LIST program).
 

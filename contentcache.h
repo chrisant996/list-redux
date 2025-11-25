@@ -32,12 +32,15 @@ class PatchBlock
 public:
     static const DWORD c_size = 8;
                     PatchBlock(FileOffset offset);
+    bool            IsDirty() const { return !!m_mask; }
     bool            IsSet(FileOffset offset) const;
     BYTE            GetByte(FileOffset offset) const;
-    void            SetByte(FileOffset offset, BYTE value);
+    void            SetByte(FileOffset offset, BYTE value, const BYTE* original);
+    void            RevertByte(FileOffset offset);
 private:
     FileOffset      m_offset;
     BYTE            m_bytes[c_size];
+    BYTE            m_original[c_size];
     BYTE            m_mask;
 };
 
@@ -226,6 +229,7 @@ public:
 
     bool            IsDirty() const { return !m_patch_blocks.empty(); }
     void            SetByte(FileOffset offset, BYTE value, bool high_nybble);
+    bool            RevertByte(FileOffset offset);
     bool            SaveBytes(Error& e);
     void            DiscardBytes() { m_patch_blocks.clear(); }
     bool            NextEditedByteRow(FileOffset here, FileOffset& there, unsigned hex_width, bool next) const;

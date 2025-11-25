@@ -47,7 +47,7 @@ enum class ColorElement
     PopupContent,
     PopupContentDim,
     PopupSelect,
-    EditByte,
+    EditedByte,
     MAX
 };
 

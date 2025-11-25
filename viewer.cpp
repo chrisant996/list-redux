@@ -71,6 +71,7 @@ static int ConfirmSaveChanges(HANDLE hout)
         case InputType::None:
         case InputType::Error:
             continue;
+        // InputType::Resize falls through to the break and return -1.
         }
 
         if (input.type == InputType::Char)
@@ -90,6 +91,41 @@ static int ConfirmSaveChanges(HANDLE hout)
     }
 
     return -1;
+}
+
+static bool ConfirmDiscardBytes(HANDLE hout)
+{
+    const WCHAR* const msg = L"Do you want to discard all unsaved changes to this file?";
+    const WCHAR* const directive = L"Press Y to discard, or any other key to cancel...";
+    // TODO:  ColorElement::Command might not be the most appropriate color.
+    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
+    OutputConsole(hout, s.Text(), s.Length());
+
+    while (true)
+    {
+        const InputRecord input = SelectInput();
+        switch (input.type)
+        {
+        case InputType::None:
+        case InputType::Error:
+            continue;
+        // InputType::Resize falls through to the break and return false.
+        }
+
+        if (input.type == InputType::Char)
+        {
+            switch (input.key_char)
+            {
+            case 'y':
+            case 'Y':
+                return true;
+            }
+        }
+
+        break;
+    }
+
+    return false;
 }
 
 class Viewer;
@@ -191,6 +227,7 @@ private:
     FileOffset      m_last_processed = FileOffset(-1);
     bool            m_last_completed = false;
     bool            m_force_update = false;
+    FileOffset      m_force_update_hex_edit_offset = FileOffset(-1);
     bool            m_force_update_footer = false;
     bool            m_searching = false;
     StrW            m_searching_file;
@@ -428,6 +465,8 @@ LAutoFitContentWidth:
     // Decide what needs to be updated.
     const bool update_header = (m_force_update || file_changed || top_changed || pos_changed || processed_changed);
     const bool update_content = (m_force_update || top_changed);
+    const bool update_hex_edit = (m_force_update_hex_edit_offset != FileOffset(-1));
+    const FileOffset update_hex_edit_offset = m_force_update_hex_edit_offset;
     const bool update_debug_row = (g_options.show_debug_info);
     update_command_line |= (m_force_update || m_force_update_footer || feedback_changed);
     if (!update_header && !update_content && !update_debug_row && !update_command_line)
@@ -447,6 +486,7 @@ LAutoFitContentWidth:
     m_last_processed = m_context.Processed();
     m_last_completed = m_context.Completed();
     m_force_update = false;
+    m_force_update_hex_edit_offset = FileOffset(-1);
     m_force_update_footer = false;
 
     // Compute scrollbar metrics.
@@ -595,7 +635,7 @@ LAutoFitContentWidth:
     }
 
     // Content.
-    if (update_content)
+    if (update_content || update_hex_edit)
     {
         s.Printf(L"\x1b[%uH", 2);
 
@@ -648,50 +688,60 @@ LAutoFitContentWidth:
         }
         else if (m_hex_mode)
         {
-            StrW ruler;
-            ruler.AppendColor(GetColor(ColorElement::Header));
-            ruler.AppendSpaces(m_context.GetHexOffsetColumnWidth());
-            for (unsigned ii = 0; ii < m_hex_width; ++ii)
+            if (update_content)
             {
-                if (ii % (1 << g_options.hex_grouping) == 0)
-                    ruler.Append(L"  ", ((ii % 8) == 0) ? 2 : 1);
-                ruler.Printf(L"%02x", ii);
+                StrW ruler;
+                ruler.AppendColor(GetColor(ColorElement::Header));
+                ruler.AppendSpaces(m_context.GetHexOffsetColumnWidth());
+                for (unsigned ii = 0; ii < m_hex_width; ++ii)
+                {
+                    if (ii % (1 << g_options.hex_grouping) == 0)
+                        ruler.Append(L"  ", ((ii % 8) == 0) ? 2 : 1);
+                    ruler.Printf(L"%02x", ii);
+                }
+                ruler.AppendSpaces(3);
+                for (unsigned ii = 0; ii < m_hex_width; ++ii)
+                {
+                    ruler.Printf(L"%x", ii & 0xf);
+                }
+                PadToWidth(ruler, m_terminal_width);
+                ruler.Append(c_norm);
+                s.Append(ruler);
             }
-            ruler.AppendSpaces(3);
-            for (unsigned ii = 0; ii < m_hex_width; ++ii)
+            else
             {
-                ruler.Printf(L"%x", ii & 0xf);
+                s.Append(L"\n");
             }
-            PadToWidth(ruler, m_terminal_width);
-            ruler.Append(c_norm);
-            s.Append(ruler);
 
             const FoundOffset* found_line = m_found_line.Empty() ? nullptr : &m_found_line;
             for (unsigned row = 0; row < m_content_height; ++row)
             {
-                const uint32 orig_length = s.Length();
-                m_context.FormatHexData(m_hex_top, row, m_hex_width, s, e, found_line);
-
-                if (scroll_car.has_car())
+                if (update_content || (update_hex_edit && m_hex_top + (row * m_hex_width) == update_hex_edit_offset))
                 {
-                    s.AppendSpaces(m_content_width - cell_count(s.Text() + orig_length));
-                    const WCHAR* car = scroll_car.get_char(int32(row), c_floating);
-                    if (c_floating)
+                    const uint32 orig_length = s.Length();
+                    m_context.FormatHexData(m_hex_top, row, m_hex_width, s, e, found_line);
+
+                    if (scroll_car.has_car())
                     {
-                        s.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                        s.AppendSpaces(m_content_width - cell_count(s.Text() + orig_length));
+                        const WCHAR* car = scroll_car.get_char(int32(row), c_floating);
+                        if (c_floating)
+                        {
+                            s.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                        }
+                        else
+                        {
+                            if (car)
+                                s.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
+                            s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                        }
+                        s.Append(car ? car : L" ");
+                        s.Append(c_norm);
                     }
                     else
                     {
-                        if (car)
-                            s.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
-                        s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                        s.Append(c_clreol);
                     }
-                    s.Append(car ? car : L" ");
-                    s.Append(c_norm);
-                }
-                else
-                {
-                    s.Append(c_clreol);
                 }
 
                 s.Append(L"\n");
@@ -1370,7 +1420,7 @@ hex_edit_right:
                     {
                         const BYTE value = input.key_char - '0';
                         m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
-                        m_force_update = true;  // TODO:  Doesn't need to update the whole screen!
+                        m_force_update_hex_edit_offset = m_hex_pos & ~FileOffset(m_hex_width - 1);
                         goto hex_edit_right;
                     }
                     break;
@@ -1381,7 +1431,7 @@ hex_edit_right:
                         const BYTE ten_char = (input.key_char >= 'a' && input.key_char <= 'f') ? 'a' : 'A';
                         const BYTE value = input.key_char - ten_char + 10;
                         m_context.SetByte(m_hex_pos, value, m_hex_high_nybble);
-                        m_force_update = true;  // TODO:  Doesn't need to update the whole screen!
+                        m_force_update_hex_edit_offset = m_hex_pos & ~FileOffset(m_hex_width - 1);
                         goto hex_edit_right;
                     }
                     break;
@@ -1398,7 +1448,7 @@ hex_edit_right:
                 {
                     m_context.SetByte(m_hex_pos, multibyte[0] >> 4, true);
                     m_context.SetByte(m_hex_pos, multibyte[0] & 0xf, false);
-                    m_force_update = true;  // TODO:  Doesn't need to update the whole screen!
+                    m_force_update_hex_edit_offset = m_hex_pos & ~FileOffset(m_hex_width - 1);
                     goto hex_edit_right;
                 }
             }
@@ -1443,6 +1493,32 @@ hex_edit_right:
                 {
                     m_context.SaveBytes(e);
                     m_force_update = true;
+                }
+            }
+            break;
+        case 'U'-'@':   // CTRL-U
+            if (input.modifier == Modifier::CTRL)
+            {
+                if (m_hex_edit)
+                {
+                    if (m_context.RevertByte(m_hex_pos))
+                        m_force_update_hex_edit_offset = m_hex_pos & ~FileOffset(m_hex_width - 1);
+                    goto hex_edit_right;
+                }
+            }
+            break;
+        case 'Z'-'@':   // CTRL-Z
+            if (input.modifier == Modifier::CTRL)
+            {
+                if (m_hex_edit)
+                {
+                    if (m_context.IsDirty())
+                    {
+                        m_force_update = true;
+                        if (ConfirmDiscardBytes(m_hout))
+                            m_context.DiscardBytes();
+                    }
+// TODO:  Track saved PatchBlocks, and be able to reapply the original bytes.
                 }
             }
             break;

@@ -138,13 +138,23 @@ BYTE PatchBlock::GetByte(FileOffset offset) const
     return m_bytes[index];
 }
 
-void PatchBlock::SetByte(FileOffset offset, BYTE value)
+void PatchBlock::SetByte(FileOffset offset, BYTE value, const BYTE* original)
 {
     assert(offset >= m_offset);
     assert(offset < m_offset + sizeof(m_bytes));
+    assert(implies(original, !IsSet(offset)));
     const unsigned index = unsigned(offset - m_offset);
     m_bytes[index] = value;
+    if (original)
+        m_original[index] = *original;
     m_mask |= 1 << index;
+}
+
+void PatchBlock::RevertByte(FileOffset offset)
+{
+    assert(IsSet(offset));
+    const unsigned index = unsigned(offset - m_offset);
+    m_mask &= ~(1 << index);
 }
 
 #pragma endregion // PatchBlock
@@ -1424,7 +1434,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             if (IsByteDirty(offset + ii, value))
             {
                 colored = true;
-                s.AppendColor(GetColor(ColorElement::EditByte));
+                s.AppendColor(GetColor(ColorElement::EditedByte));
             }
             else
             {
@@ -1467,7 +1477,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         if (IsByteDirty(offset + ii, c))
         {
             edited = true;
-            s.AppendColor(GetColor(ColorElement::EditByte));
+            s.AppendColor(GetColor(ColorElement::EditedByte));
             tmp2.SetFromCodepage(m_map.GetCodePage(true), reinterpret_cast<const char*>(&c), 1);
             tmp.SetAt(tmp.Text() + ii, *tmp2.Text());
         }
@@ -2128,7 +2138,8 @@ void ContentCache::SetByte(FileOffset offset, BYTE value, bool high_nybble)
         value <<= 4;
 
     BYTE b;
-    if (!IsByteDirty(offset, b))
+    const bool dirty = IsByteDirty(offset, b);
+    if (!dirty)
     {
         const BYTE* ptr = m_data + (block_offset - m_data_offset);
         b = ptr[index];
@@ -2136,7 +2147,23 @@ void ContentCache::SetByte(FileOffset offset, BYTE value, bool high_nybble)
 
     value |= b & (high_nybble ? 0x0f : 0xf0);
 
-    f->second.SetByte(offset, value);
+    f->second.SetByte(offset, value, dirty ? nullptr : &b);
+}
+
+bool ContentCache::RevertByte(FileOffset offset)
+{
+    const FileOffset block_offset = offset & ~(PatchBlock::c_size - 1);
+    auto f = m_patch_blocks.find(block_offset);
+    if (f == m_patch_blocks.end())
+        return false;
+
+    if (!f->second.IsSet(offset))
+        return false;
+
+    f->second.RevertByte(offset);
+    if (!f->second.IsDirty())
+        m_patch_blocks.erase(block_offset);
+    return true;
 }
 
 bool ContentCache::SaveBytes(Error& e)

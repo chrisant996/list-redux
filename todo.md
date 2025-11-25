@@ -86,7 +86,7 @@
     - [x] `F7`/`F8` prev/next change
     - [x] `Esc` prompt to save or discard changes
     - [x] `Ctrl-S` to save changes
-    - [ ] discard edited byte at cursor
+    - [x] `Ctrl-U` discard edited byte at cursor
     - [ ] ability to undo saving edited bytes (restore to original bytes)
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
