@@ -2160,7 +2160,7 @@ void Viewer::GoTo()
         OutputConsole(m_hout, s.Text(), s.Length());
 
         done = true;
-        ReadInput(s, History::Goto, 32, callback);
+        ReadInput(s, History::Goto, 32, 32, callback);
 
         OutputConsole(m_hout, c_norm);
         if (done)

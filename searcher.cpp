@@ -231,7 +231,7 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned terminal_width, bool caseless
         OutputConsole(hout, s.Text(), s.Length());
 
         done = true;
-        ReadInput(s, History::Search, 32, callback);
+        ReadInput(s, History::Search, 1024, 32, callback);
 
         OutputConsole(hout, c_norm);
     }

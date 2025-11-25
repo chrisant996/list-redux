@@ -187,6 +187,41 @@ unsigned TruncateWcwidth(StrW& s, const unsigned truncate_width, const WCHAR tru
     return width;
 }
 
+unsigned FitsInWcwidth(const WCHAR* s, const unsigned len, const unsigned truncate_width, unsigned* truncated_width)
+{
+    unsigned length_fits = 0;
+    unsigned width_fits = 0;
+    unsigned width = 0;
+
+    wcwidth_iter iter(s, len);
+    while (true)
+    {
+        const WCHAR* const p = iter.get_pointer();
+        const char32_t c = iter.next();
+        if (!c)
+            break;
+
+        if (width <= truncate_width)
+        {
+            length_fits = unsigned(p - s);
+            width_fits = width;
+        }
+
+        const int32 w = iter.character_wcwidth_onectrl();
+
+        if (width + w > truncate_width)
+        {
+            if (truncated_width)
+                *truncated_width = width_fits;
+            return length_fits;
+        }
+
+        width += w;
+    }
+
+    return length_fits;
+}
+
 bool SortCase::operator()(const WCHAR* a, const WCHAR* b) const noexcept
 {
     return wcscmp(a, b) < 0;

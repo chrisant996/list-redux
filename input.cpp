@@ -401,10 +401,18 @@ InputRecord SelectInput(DWORD timeout)
     return input;
 }
 
-bool ReadInput(StrW& out, History hindex, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
+static void BackUpByAmount(int32& left, const WCHAR* s, unsigned len, unsigned backup)
+{
+    while (left && __wcswidth(s + left, len - left) < backup)
+        left = FitsInWcwidth(s, left, __wcswidth(s, left) - 1);
+}
+
+bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
 {
     static std::vector<StrW> s_histories[size_t(History::MAX)];
     std::vector<StrW>* const history = (size_t(hindex) < _countof(s_histories)) ? &s_histories[size_t(hindex)] : nullptr;
+    max_length = max<DWORD>(max_length, 1);
+    max_length = min<DWORD>(max_length, 1024);
 
     out.Clear();
 
@@ -415,23 +423,41 @@ bool ReadInput(StrW& out, History hindex, DWORD max_width, std::optional<std::fu
     GetConsoleScreenBufferInfo(hout, &csbi);
 
     // FUTURE:  Allow horizontal scrolling and fit into the terminal width.
-    if (unsigned(csbi.dwCursorPosition.X) + max_width >= unsigned(csbi.dwSize.X))
+    if (unsigned(csbi.dwCursorPosition.X) + 8 >= unsigned(csbi.dwSize.X))
         return false;
+    if (unsigned(csbi.dwCursorPosition.X) + max_width >= unsigned(csbi.dwSize.X))
+        max_width = csbi.dwSize.X - csbi.dwCursorPosition.X;
 
     StrW curr_input_history;
     size_t history_index = history ? history->size() : 0;
 
     StrW tmp;
+    int32 left = 0;
+    int32 pos = 0;
     while (true)
     {
         tmp.Clear();
         tmp.Printf(L"%s\x1b[%uG", c_hide_cursor, csbi.dwCursorPosition.X + 1);
         OutputConsole(hout, tmp.Text(), tmp.Length());
 
-        const unsigned width = TruncateWcwidth(out, max_width, 0);
-        tmp.Set(out);
+        // Auto-scroll horizontally forward.
+        while (__wcswidth(out.Text() + left, pos - left) >= max_width)
+        {
+            wcwidth_iter iter(out.Text() + left, out.Length() - left);
+            if (!iter.next())
+                break;
+            left += iter.character_length();
+        }
+
+        // Auto-scroll horizontally backward.
+        assert(pos >= left);
+        BackUpByAmount(left, out.Text(), pos, 4);
+
+        // Print the visible part of the input string.
+        tmp.Set(out.Text() + left, out.Length() - left);
+        const unsigned width = TruncateWcwidth(tmp, max_width, 0);
         tmp.AppendSpaces(max_width - width);
-        tmp.Printf(L"\x1b[%uG%s", csbi.dwCursorPosition.X + 1 + width, c_show_cursor);
+        tmp.Printf(L"\x1b[%uG%s", csbi.dwCursorPosition.X + 1 + __wcswidth(out.Text() + left, pos - left), c_show_cursor);
         OutputConsole(hout, tmp.Text(), tmp.Length());
 
         const InputRecord input = SelectInput();
@@ -464,13 +490,59 @@ bool ReadInput(StrW& out, History hindex, DWORD max_width, std::optional<std::fu
                 out.Clear();
                 return false;
             case Key::BACK:
-                if (out.Length())
-                    TruncateWcwidth(out, __wcswidth(out.Text()) - 1, 0);
+// TODO:  Ctrl-BACK
+                if (input.modifier == Modifier::None)
+                {
+                    if (pos > 0)
+                    {
+                        if (pos == out.Length())
+                        {
+                            const uint32 old_length = out.Length();
+                            const uint32 old_width = __wcswidth(out.Text());
+                            TruncateWcwidth(out, old_width - 1, 0);
+                            pos -= (old_length - out.Length());
+                        }
+                        else
+                        {
+                            const int32 i = pos;
+                            tmp.Set(out.Text(), i);
+                            TruncateWcwidth(tmp, __wcswidth(tmp.Text(), i) - 1, 0);
+                            pos = tmp.Length();
+                            tmp.Append(out.Text() + pos, out.Length() - pos);
+                            out = std::move(tmp);
+                        }
+                        left = min(left, pos);
+                    }
+                }
+                break;
+            case Key::DEL:
+// TODO:  Ctrl-DEL
+                if (input.modifier == Modifier::None)
+                {
+                    if (unsigned(pos) < out.Length())
+                    {
+                        wcwidth_iter iter(out.Text() + pos, out.Length() - pos);
+                        if (!iter.next())
+                            break;
+                        tmp.Set(out.Text(), pos);
+                        tmp.Append(out.Text() + pos + iter.character_length());
+                        out = std::move(tmp);
+                    }
+                }
                 break;
             case Key::ENTER:
                 if (history && out.Length())
                     history->emplace_back(out);
                 return true;
+            case Key::HOME:
+                pos = 0;
+                left = 0;
+                continue;
+            case Key::END:
+                pos = out.Length();
+                left = pos;
+                BackUpByAmount(left, out.Text(), pos, max_width - 1);
+                continue;
             case Key::UP:
                 if (history && history_index)
                 {
@@ -478,6 +550,9 @@ bool ReadInput(StrW& out, History hindex, DWORD max_width, std::optional<std::fu
                         curr_input_history.Set(out);
                     --history_index;
                     out.Set((*history)[history_index]);
+                    pos = out.Length();
+                    left = pos;
+                    BackUpByAmount(left, out.Text(), pos, max_width - 1);
                 }
                 continue; // Avoid resetting history_index.
             case Key::DOWN:
@@ -488,14 +563,54 @@ bool ReadInput(StrW& out, History hindex, DWORD max_width, std::optional<std::fu
                         out.Set(curr_input_history);
                     else
                         out.Set((*history)[history_index]);
+                    pos = out.Length();
+                    left = pos;
+                    BackUpByAmount(left, out.Text(), pos, max_width - 1);
                 }
                 continue; // Avoid resetting history_index.
+            case Key::LEFT:
+// TODO:  Ctrl-LEFT
+// TODO:  CUA (Shift-LEFT, Ctrl-Shift-LEFT)
+                if (pos > 0)
+                    pos = FitsInWcwidth(out.Text(), pos, __wcswidth(out.Text(), pos) - 1);
+                break;
+            case Key::RIGHT:
+// TODO:  Ctrl-RIGHT:
+// TODO:  CUA (Shift-RIGHT, Ctrl-Shift-RIGHT)
+                if (unsigned(pos) < out.Length())
+                {
+                    wcwidth_iter iter(out.Text() + pos, out.Length() - pos);
+                    if (!iter.next())
+                        break;
+                    pos += iter.character_length();
+                }
+                break;
             }
         }
         else if (input.type == InputType::Char)
         {
             if (input.key_char >= ' ')
-                out.Append(&input.key_char, 1);
+            {
+                // Limit the length.
+                if (out.Length() >= max_length)
+                    continue;
+
+                // Append or insert the character.
+                if (pos == out.Length())
+                {
+                    out.Append(&input.key_char, 1);
+                    pos = out.Length();
+                }
+                else
+                {
+                    const int32 i = pos;
+                    tmp.Set(out.Text(), i);
+                    tmp.Append(&input.key_char, 1);
+                    pos = tmp.Length();
+                    tmp.Append(out.Text() + i, out.Length() - i);
+                    out = std::move(tmp);
+                }
+            }
         }
 
         if (history && history_index < history->size())

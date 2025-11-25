@@ -110,9 +110,11 @@
   - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
   - [ ] mouse wheel should scroll by _N_ lines
 - improve input routine
-  - [ ] arrow keys
+  - [x] scrollable bounds
+  - [x] arrow keys
+  - [ ] Ctrl-arrow keys
+  - [ ] Ctrl-BACK and Ctrl-DEL keys
   - [ ] CUA keys
-  - [ ] scrollable bounds
 - [ ] `S` configure sort order
 - detect certain file types and render with formatting/color
   - [ ] detect git patches and render some lines with color
