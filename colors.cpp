@@ -55,6 +55,7 @@ static const WCHAR* c_default_colors[] =
     L"38;5;242",        // PopupContentDim
     L"7",               // PopupSelect
     L"97;45",           // EditedByte
+    L"97;42",           // SavedByte
 };
 static_assert(_countof(c_default_colors) == size_t(ColorElement::MAX));
 
@@ -768,6 +769,7 @@ static const WCHAR* const c_reg_color_name[] =
     L"PopupContentDim",
     L"PopupSelect",
     L"EditedByte",
+    L"SavedByte",
 };
 static_assert(_countof(c_reg_color_name) == _countof(s_colors));
 static_assert(_countof(c_reg_color_name) == size_t(ColorElement::MAX));

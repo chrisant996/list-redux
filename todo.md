@@ -87,7 +87,8 @@
     - [x] `Esc` prompt to save or discard changes
     - [x] `Ctrl-S` to save changes
     - [x] `Ctrl-U` discard edited byte at cursor
-    - [ ] ability to undo saving edited bytes (restore to original bytes)
+    - [x] `Ctrl-Z` discard unsaved edited bytes
+    - [x] `Ctrl-Z` undo saved bytes (restore to original bytes)
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
   - [x] Binary files **_and hex mode_** use OEM CP.

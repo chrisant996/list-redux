@@ -128,6 +128,41 @@ static bool ConfirmDiscardBytes(HANDLE hout)
     return false;
 }
 
+static bool ConfirmUndoSave(HANDLE hout)
+{
+    const WCHAR* const msg = L"Do you want to undo all saved changes to this file?";
+    const WCHAR* const directive = L"Press Y to undo, or any other key to cancel...";
+    // TODO:  ColorElement::Command might not be the most appropriate color.
+    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
+    OutputConsole(hout, s.Text(), s.Length());
+
+    while (true)
+    {
+        const InputRecord input = SelectInput();
+        switch (input.type)
+        {
+        case InputType::None:
+        case InputType::Error:
+            continue;
+        // InputType::Resize falls through to the break and return false.
+        }
+
+        if (input.type == InputType::Char)
+        {
+            switch (input.key_char)
+            {
+            case 'y':
+            case 'Y':
+                return true;
+            }
+        }
+
+        break;
+    }
+
+    return false;
+}
+
 class Viewer;
 class ScopedWorkingIndicator;
 
@@ -1390,6 +1425,17 @@ hex_edit_right:
                 m_hex_high_nybble = true;
             }
             break;
+        case Key::BACK:
+            if (input.modifier == Modifier::None)
+            {
+                if (m_hex_edit && m_hex_characters && m_hex_pos)
+                {
+                    --m_hex_pos;
+                    if (m_context.RevertByte(m_hex_pos))
+                        m_force_update_hex_edit_offset = m_hex_pos & ~FileOffset(m_hex_width - 1);
+                }
+            }
+            break;
 
         case Key::MouseWheel:
             // FUTURE:  Respect the amount (in addition to the direction)?
@@ -1518,7 +1564,12 @@ hex_edit_right:
                         if (ConfirmDiscardBytes(m_hout))
                             m_context.DiscardBytes();
                     }
-// TODO:  Track saved PatchBlocks, and be able to reapply the original bytes.
+                    else if (m_context.IsSaved())
+                    {
+                        m_force_update = true;
+                        if (ConfirmUndoSave(m_hout))
+                            m_context.UndoSave(e);
+                    }
                 }
             }
             break;

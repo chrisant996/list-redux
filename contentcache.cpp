@@ -157,6 +157,56 @@ void PatchBlock::RevertByte(FileOffset offset)
     m_mask &= ~(1 << index);
 }
 
+void PatchBlock::MergeFrom(const PatchBlock& other)
+{
+    for (unsigned i = 0; i < c_size; ++i)
+    {
+        const unsigned mask = (1 << i);
+        if (other.m_mask & mask)
+        {
+            if (!(m_mask & mask))
+                m_original[i] = other.m_original[i];
+            m_bytes[i] = other.m_bytes[i];
+        }
+    }
+
+    m_mask |= other.m_mask;
+}
+
+bool PatchBlock::Save(HANDLE hfile, bool original, Error& e)
+{
+    FileOffset offset;
+    BYTE bytes[c_size];
+    unsigned len = 0;
+
+    bool past_end = false;
+    for (unsigned index = 0; !past_end; ++index)
+    {
+        past_end = (index >= c_size);
+        if (!past_end && IsSet(m_offset + index))
+        {
+            if (!len)
+                offset = m_offset + index;
+            bytes[len++] = original ? m_original[index] : m_bytes[index];
+        }
+        else if (len)
+        {
+            DWORD wrote;
+            LARGE_INTEGER liSeek;
+            liSeek.QuadPart = offset;
+            if (!SetFilePointerEx(hfile, liSeek, nullptr, FILE_BEGIN) ||
+                !WriteFile(hfile, bytes, len, &wrote, nullptr))
+            {
+                e.Sys();
+                return false;
+            }
+            len = 0;
+        }
+    }
+
+    return true;
+}
+
 #pragma endregion // PatchBlock
 #pragma region // PipeChunk
 
@@ -1431,10 +1481,11 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         {
             BYTE value = ptr[ii];
             bool colored = false;
-            if (IsByteDirty(offset + ii, value))
+            ColorElement byte_color;
+            if (IsByteDirty(offset + ii, value, byte_color))
             {
                 colored = true;
-                s.AppendColor(GetColor(ColorElement::EditedByte));
+                s.AppendColor(GetColor(byte_color));
             }
             else
             {
@@ -1474,10 +1525,11 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     {
         BYTE c = ptr[ii];
         bool edited = false;
-        if (IsByteDirty(offset + ii, c))
+        ColorElement byte_color;
+        if (IsByteDirty(offset + ii, c, byte_color))
         {
             edited = true;
-            s.AppendColor(GetColor(ColorElement::EditedByte));
+            s.AppendColor(GetColor(byte_color));
             tmp2.SetFromCodepage(m_map.GetCodePage(true), reinterpret_cast<const char*>(&c), 1);
             tmp.SetAt(tmp.Text() + ii, *tmp2.Text());
         }
@@ -2138,7 +2190,8 @@ void ContentCache::SetByte(FileOffset offset, BYTE value, bool high_nybble)
         value <<= 4;
 
     BYTE b;
-    const bool dirty = IsByteDirty(offset, b);
+    ColorElement color;
+    const bool dirty = IsByteDirty(offset, b, color);
     if (!dirty)
     {
         const BYTE* ptr = m_data + (block_offset - m_data_offset);
@@ -2173,33 +2226,14 @@ bool ContentCache::SaveBytes(Error& e)
 
     for (auto& p : m_patch_blocks)
     {
-        FileOffset offset;
-        BYTE bytes[p.second.c_size];
-        unsigned len = 0;
+        if (!p.second.Save(m_file, false/*original*/, e))
+            return false;
 
-        bool past_end = false;
-        for (unsigned index = 0; !past_end; ++index)
-        {
-            past_end = (index >= p.second.c_size);
-            if (!past_end && p.second.IsSet(p.first + index))
-            {
-                if (!len)
-                    offset = p.first + index;
-                bytes[len++] = p.second.GetByte(p.first + index);
-            }
-            else if (len)
-            {
-                DWORD wrote;
-                LARGE_INTEGER liSeek;
-                liSeek.QuadPart = offset;
-                if (!SetFilePointerEx(m_file, liSeek, nullptr, FILE_BEGIN) ||
-                    !WriteFile(m_file, bytes, len, &wrote, nullptr))
-                {
-                    e.Sys();
-                    return false;
-                }
-            }
-        }
+        auto saved = m_patch_blocks_saved.find(p.first);
+        if (saved != m_patch_blocks_saved.end())
+            saved->second.MergeFrom(p.second);
+        else
+            m_patch_blocks_saved.emplace(p.first, p.second);
     }
 
     DiscardBytes();
@@ -2207,16 +2241,41 @@ bool ContentCache::SaveBytes(Error& e)
     return true;
 }
 
-bool ContentCache::IsByteDirty(FileOffset offset, BYTE& value) const
+void ContentCache::UndoSave(Error& e)
+{
+    assert(!IsDirty());
+
+    if (!IsOpen() || IsDirty() || m_patch_blocks_saved.empty())
+        return;
+
+    for (auto& p : m_patch_blocks_saved)
+    {
+        if (!p.second.Save(m_file, true/*original*/, e))
+            return;
+    }
+
+    m_patch_blocks_saved.clear();
+    ClearProcessed();  // Make sure to reread the file.
+}
+
+bool ContentCache::IsByteDirty(FileOffset offset, BYTE& value, ColorElement& color) const
 {
     const FileOffset block_offset = offset & ~(PatchBlock::c_size - 1);
-    auto f = m_patch_blocks.find(block_offset);
-    if (f == m_patch_blocks.end())
-        return false;
-    if (!f->second.IsSet(offset))
-        return false;
-    value = f->second.GetByte(offset);
-    return true;
+    auto edited = m_patch_blocks.find(block_offset);
+    if (edited != m_patch_blocks.end() && edited->second.IsSet(offset))
+    {
+        value = edited->second.GetByte(offset);
+        color = ColorElement::EditedByte;
+        return true;
+    }
+    auto saved = m_patch_blocks_saved.find(block_offset);
+    if (saved != m_patch_blocks_saved.end() && saved->second.IsSet(offset))
+    {
+        value = saved->second.GetByte(offset);
+        color = ColorElement::SavedByte;
+        return true;
+    }
+    return false;
 }
 
 bool ContentCache::NextEditedByteRow(FileOffset here, FileOffset& there, unsigned hex_width, bool next) const

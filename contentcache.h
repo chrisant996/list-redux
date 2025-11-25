@@ -8,6 +8,7 @@
 #include "searcher.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
+#include "colors.h"
 
 #include <vector>
 #include <map>
@@ -37,6 +38,8 @@ public:
     BYTE            GetByte(FileOffset offset) const;
     void            SetByte(FileOffset offset, BYTE value, const BYTE* original);
     void            RevertByte(FileOffset offset);
+    void            MergeFrom(const PatchBlock& other);
+    bool            Save(HANDLE hfile, bool original, Error& e);
 private:
     FileOffset      m_offset;
     BYTE            m_bytes[c_size];
@@ -228,10 +231,12 @@ public:
     unsigned        GetBufferLength() const { return m_data_length; }
 
     bool            IsDirty() const { return !m_patch_blocks.empty(); }
+    bool            IsSaved() const { return !m_patch_blocks_saved.empty(); }
     void            SetByte(FileOffset offset, BYTE value, bool high_nybble);
     bool            RevertByte(FileOffset offset);
     bool            SaveBytes(Error& e);
     void            DiscardBytes() { m_patch_blocks.clear(); }
+    void            UndoSave(Error& e);
     bool            NextEditedByteRow(FileOffset here, FileOffset& there, unsigned hex_width, bool next) const;
 
 private:
@@ -240,7 +245,7 @@ private:
     bool            LoadData(FileOffset offset, DWORD& end_slop, Error& e);
     bool            EnsureFileData(size_t line, Error& e);
     bool            EnsureHexData(FileOffset offset, unsigned length, Error& e);
-    bool            IsByteDirty(FileOffset offset, BYTE& value) const;
+    bool            IsByteDirty(FileOffset offset, BYTE& value, ColorElement& color) const;
 
 private:
     const ViewerOptions& m_options;
@@ -262,5 +267,6 @@ private:
     DWORD           m_data_slop = 0;
 
     std::map<FileOffset, PatchBlock> m_patch_blocks;
+    std::map<FileOffset, PatchBlock> m_patch_blocks_saved;
 };
 
