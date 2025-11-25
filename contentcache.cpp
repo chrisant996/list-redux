@@ -2278,17 +2278,12 @@ bool ContentCache::IsByteDirty(FileOffset offset, BYTE& value, ColorElement& col
     return false;
 }
 
-bool ContentCache::NextEditedByteRow(FileOffset here, FileOffset& there, unsigned hex_width, bool next) const
+static bool NextEditedByteRow(const std::map<FileOffset, PatchBlock>& patch_blocks, FileOffset here, FileOffset& there, unsigned hex_width, bool next)
 {
-    if (m_patch_blocks.empty())
-        return false;
-
-    here &= ~(FileOffset(hex_width) - 1);
-
-    auto& f = m_patch_blocks.lower_bound(here);
+    auto f = patch_blocks.lower_bound(here);
     if (next)
     {
-        while (f != m_patch_blocks.end())
+        while (f != patch_blocks.end())
         {
             const FileOffset rowofs = f->first & ~(FileOffset(hex_width) - 1);
             if (here < rowofs)
@@ -2306,10 +2301,12 @@ bool ContentCache::NextEditedByteRow(FileOffset here, FileOffset& there, unsigne
             }
             ++f;
         }
-        return false;
     }
     else
     {
+        if (f == patch_blocks.end())
+            --f;
+
         while (true)
         {
             const FileOffset rowofs = f->first & ~(FileOffset(hex_width) - 1);
@@ -2326,12 +2323,39 @@ bool ContentCache::NextEditedByteRow(FileOffset here, FileOffset& there, unsigne
                 }
                 return true;
             }
-            if (f == m_patch_blocks.begin())
+            if (f == patch_blocks.begin())
                 break;
             --f;
         }
-        return false;
     }
+
+    return false;
+}
+
+bool ContentCache::NextEditedByteRow(FileOffset here, FileOffset& there, unsigned hex_width, bool next) const
+{
+    here &= ~(FileOffset(hex_width) - 1);
+
+    FileOffset there1 = -1;
+    FileOffset there2 = -1;
+    const bool found1 = !m_patch_blocks.empty() && ::NextEditedByteRow(m_patch_blocks, here, there1, hex_width, next);
+    const bool found2 = !m_patch_blocks_saved.empty() && ::NextEditedByteRow(m_patch_blocks_saved, here, there2, hex_width, next);
+
+    if (found1 && found2)
+    {
+        if (next)
+            there = min(there1, there2);
+        else
+            there = max(there1, there2);
+    }
+    else if (found1)
+        there = there1;
+    else if (found2)
+        there = there2;
+    else
+        return false;
+
+    return true;
 }
 
 #pragma endregion // ContentCache
