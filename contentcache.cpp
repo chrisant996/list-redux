@@ -1346,8 +1346,6 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                     }
                     else
                     {
-// TODO:  Figure out what should happen for this assert now...
-//                        assert(clen == 1);
                         bool white = false;
                         if (!left_offset)
                         {
