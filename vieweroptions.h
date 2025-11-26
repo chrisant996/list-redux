@@ -40,6 +40,7 @@ struct ViewerOptions
     unsigned tab_width = c_default_tab_width;
     CtrlMode ctrl_mode = CtrlMode::OEM437;
     bool expand_tabs = true;
+    bool ascii_filter = false;
     bool show_whitespace = false;
     bool show_line_endings = false;
     bool show_line_numbers = false;
@@ -48,6 +49,7 @@ struct ViewerOptions
     bool show_ruler = false;
     bool show_scrollbar = true;
     uint8 hex_grouping = 0;             // Power of 2.
+    WCHAR filter_byte_char = '.';
 
 #ifdef DEBUG
     bool show_debug_info = true;

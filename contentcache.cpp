@@ -1296,7 +1296,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                         const bool apply_color = (ctrl_color && !left_offset);
                         if (apply_color)
                             s.AppendColor(ctrl_color);
-                        append_text(L".", 1);
+                        append_text(m_options.filter_byte_char);
                         s.AppendNormalIf(apply_color);
                     }
 #endif
@@ -1438,8 +1438,10 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             if (ptr[ii] < 0x7f)
                 tmp.Append(ptr[ii]);
             else
-                // TODO:  Maybe apply color?
-                tmp.Append(L".", 1);
+            {
+                tmp.AppendColor(GetColor(ColorElement::FilteredByte));
+                tmp.Append(m_options.filter_byte_char);
+            }
         }
     }
 
@@ -1549,17 +1551,25 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         }
         if (c > 0 && c < ' ')
         {
-            const bool hilite_newline = (!highlighting_found_text && c == '\n' && !edited && !marked_color);
-            if (hilite_newline)
-                s.AppendColor(GetColor(ColorElement::CtrlCode));
-            s.Append(c_oem437[c], 1);
-            s.AppendNormalIf(hilite_newline);
+            if (m_options.ascii_filter)
+            {
+                goto filter_byte;
+            }
+            else
+            {
+                const bool hilite_newline = (!highlighting_found_text && c == '\n' && !edited && !marked_color);
+                if (hilite_newline)
+                    s.AppendColor(GetColor(ColorElement::CtrlCode));
+                s.Append(c_oem437[c], 1);
+                s.AppendNormalIf(hilite_newline);
+            }
         }
-        else if (!c || wcwidth(tmp.Text()[ii]) != 1)
+        else if (!c || wcwidth(tmp.Text()[ii]) != 1 || (m_options.ascii_filter && c > 0x7f))
         {
+filter_byte:
             if (!edited && !marked_color)
-                s.AppendColor(GetColor(ColorElement::Divider));
-            s.Append(L".", 1);
+                s.AppendColor(GetColor(ColorElement::FilteredByte));
+            s.Append(m_options.filter_byte_char);
             s.AppendNormalIf(!edited && !marked_color);
         }
         else

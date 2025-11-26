@@ -40,6 +40,7 @@ static const WCHAR* c_default_colors[] =
     L"",                // Content
     L"90",              // Whitespace
     L"33",              // CtrlCode
+    L"90",              // FilteredByte
     L"7",               // EndOfFileLine
     L"7",               // MarkedLine
     L"7;36",            // SearchFound
@@ -754,6 +755,7 @@ static const WCHAR* const c_reg_color_name[] =
     L"Content",
     L"Whitespace",
     L"CtrlCode",
+    L"FilteredByte",
     L"EndOfFileLine",
     L"MarkedLine",
     L"SearchFound",

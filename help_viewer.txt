@@ -45,6 +45,7 @@ TEXT VIEWER KEYS:
 HEX VIEWER KEYS:
 
              H  Toggle viewing content as hexadecimal values.
+         Alt-A  Toggle ASCII filter for characters column.
          Alt-H  Cycle through hex grouping widths in hex mode.
          Alt-E  Toggle edit mode.
 

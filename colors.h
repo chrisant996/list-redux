@@ -33,6 +33,7 @@ enum class ColorElement
     Content,
     Whitespace,
     CtrlCode,
+    FilteredByte,
     EndOfFileLine,
     MarkedLine,
     SearchFound,

@@ -1582,6 +1582,16 @@ hex_edit_right:
             }
             break;
 
+        case 'a':
+            if (input.modifier == Modifier::ALT)
+            {
+                if (m_hex_mode)
+                {
+                    g_options.ascii_filter = !g_options.ascii_filter;
+                    m_force_update = true;
+                }
+            }
+            break;
         case 'c':
             if (input.modifier == Modifier::ALT)
             {
