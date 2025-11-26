@@ -310,6 +310,7 @@ Viewer::Viewer(const std::vector<StrW>& files)
 , m_files(&files)
 , m_context(g_options)
 {
+    m_hex_mode = g_options.hex_mode;
 }
 
 ViewerOutcome Viewer::Go(Error& e)
@@ -1045,7 +1046,6 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
     if (m_hex_mode)
     {
         right.Append(m_hex_edit ? L"    Hex Mode (EDIT)" : L"    Hex Mode (View)");
-        right.Append(L"   ESC=End");
     }
     else
     {
@@ -1139,8 +1139,6 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
         case Key::ESC:
             if (m_hex_edit)
                 goto toggle_hex_edit;
-            if (m_hex_mode)
-                goto toggle_hex_mode;
             return ViewerOutcome::RETURN;
 
         case Key::HOME:
@@ -1659,10 +1657,10 @@ toggle_hex_edit:
         case 'h':
             if (input.modifier == Modifier::None)
             {
-toggle_hex_mode:
                 if (!m_text)
                 {
                     m_hex_mode = !m_hex_mode;
+                    g_options.hex_mode = m_hex_mode;
                     InitHexWidth();
                     if (m_hex_width)
                     {
