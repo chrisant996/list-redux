@@ -1048,6 +1048,12 @@ bool ContentCache::SetTextContent(const char* text, Error& e)
     return true;
 }
 
+void ContentCache::SetEncoding(UINT codepage)
+{
+    ClearProcessed();
+    m_map.OverrideEncoding(codepage);
+}
+
 bool ContentCache::Open(const WCHAR* name, Error& e)
 {
     Close();

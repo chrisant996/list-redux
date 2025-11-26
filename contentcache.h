@@ -199,7 +199,7 @@ public:
     const WCHAR*    GetEncodingName(bool hex_mode=false) const { return m_map.GetEncodingName(hex_mode); }
     const WCHAR*    GetDetectedEncodingName() const { return m_map.GetDetectedEncodingName(); }
     bool            SetTextContent(const char* text, Error& e);
-    void            SetEncoding(UINT codepage) { m_map.OverrideEncoding(codepage); }
+    void            SetEncoding(UINT codepage);
     bool            Open(const WCHAR* name, Error& e);
     void            Close();
 
