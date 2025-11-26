@@ -35,6 +35,8 @@ Searcher_Literal::Searcher_Literal(const WCHAR* s, bool caseless, bool /*optimiz
 
 bool Searcher_Literal::DoNext(const WCHAR* line, unsigned length, Error& e)
 {
+    // FUTURE:  Boyer-Moore?
+
     const WCHAR* const end = line + length - (m_find.Length() - 1);
     for (const WCHAR* p = line; p < end; ++p)
     {

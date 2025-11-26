@@ -1914,14 +1914,11 @@ bool ContentCache::Find(bool next, const std::unique_ptr<Searcher>& searcher, un
             }
         }
 
-// TODO:  Encodings.  But what does that even mean for hex mode?  Really it should have a hex entry mode.
 // TODO:  Non-convertible characters will make conversion go haywire.
         StrW tmp;
         m_map.GetLineText(ptr, len, tmp, true/*hex_mode*/);
         TrimLineEnding(tmp);
 
-// TODO:  Optional regex search.
-// TODO:  Boyer-Moore search.
         if (searcher->Match(tmp.Text(), tmp.Length(), e))
         {
             if (e.Test())

@@ -263,6 +263,7 @@ private:
     bool            m_last_completed = false;
     bool            m_force_update = false;
     FileOffset      m_force_update_hex_edit_offset = FileOffset(-1);
+    bool            m_force_update_header = false;
     bool            m_force_update_footer = false;
     bool            m_searching = false;
     StrW            m_searching_file;
@@ -499,7 +500,7 @@ LAutoFitContentWidth:
     const bool hex_characters_changed = (m_last_hex_characters != m_hex_characters);
 
     // Decide what needs to be updated.
-    const bool update_header = (m_force_update || file_changed || top_changed || pos_changed || processed_changed);
+    const bool update_header = (m_force_update || m_force_update_header || file_changed || top_changed || pos_changed || processed_changed);
     const bool update_content = (m_force_update || top_changed);
     const bool update_hex_edit = (m_force_update_hex_edit_offset != FileOffset(-1));
     const FileOffset update_hex_edit_offset = m_force_update_hex_edit_offset;
@@ -523,6 +524,7 @@ LAutoFitContentWidth:
     m_last_completed = m_context.Completed();
     m_force_update = false;
     m_force_update_hex_edit_offset = FileOffset(-1);
+    m_force_update_header = false;
     m_force_update_footer = false;
 
     // Compute scrollbar metrics.
@@ -1735,8 +1737,7 @@ toggle_hex_edit:
                 if (!m_text)
                 {
                     g_options.show_ruler = !g_options.show_ruler;
-                    // TODO:  Only the header needs to redraw.
-                    m_force_update = true;
+                    m_force_update_header = true;
                 }
             }
             break;

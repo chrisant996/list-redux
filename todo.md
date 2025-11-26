@@ -2,6 +2,7 @@
 
 - Some exotic characters are calculated as the wrong width in Windows Terminal (e.g. from dirx\icons.cpp when choosing inaccurate encodings).
 - What if codepage 437 isn't installed?  It's our fallback, but if it's not installed then choose another?
+- [ ] Mitigate width miscalculations by making the scroll bar characters always use explicit positioning escape codes.
 
 # FEATURES
 
@@ -70,7 +71,7 @@
   - [x] `F4` toggle multi-file search (next/prev cross file boundaries)
   - [x] make search interruptible with `Ctrl-Break`
   - [x] search for regex (search line by line)
-  - [ ] search for hex bytes in hex mode
+  - [ ] search for hex bytes in hex mode (or just use regex searches with numeric escapes `\xAB`, except the MSVC ECMAScript engine doesn't support them -- another reason to use RE2)
 - hex mode
   - [x] always show hex ruler on a second header row
   - [x] go to offset
@@ -91,6 +92,9 @@
     - [x] `Ctrl-U` discard edited byte at cursor
     - [x] `Ctrl-Z` discard unsaved edited bytes
     - [x] `Ctrl-Z` undo saved bytes (restore to original bytes)
+    - [ ] Viewer should open file for read with read/write sharing
+    - [ ] Saving in hex edit mode should open a new file handle for writing with read sharing
+    - [ ] Handle write errors better (say the offset, and ask about Retry)
 - Encodings:
   - [x] Control characters use symbols from OEM CP 437.
   - [x] Binary files **_and hex mode_** use OEM CP.
