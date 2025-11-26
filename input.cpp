@@ -16,6 +16,21 @@ static const int32 ALT_PRESSED = LEFT_ALT_PRESSED|RIGHT_ALT_PRESSED;
 
 const WCHAR c_prompt_char[] = L":";
 
+InputRecord::InputRecord()
+{
+#ifdef DEBUG
+    const BYTE* p = reinterpret_cast<BYTE*>(this);
+    for (size_t i = 0; i < sizeof(*this); ++i)
+        assert(0 == (*p++));
+#endif
+}
+
+InputRecord::InputRecord(InputType _type)
+: InputRecord()
+{
+    type = _type;
+}
+
 bool InputRecord::operator!=(const InputRecord& other) const
 {
     if (type != other.type)
@@ -26,6 +41,11 @@ bool InputRecord::operator!=(const InputRecord& other) const
     case InputType::Char:   return key_char != other.key_char || modifier != other.modifier;
     }
     return false;
+}
+
+void InputRecord::Clear()
+{
+    ZeroMemory(this, sizeof(*this));
 }
 
 static Modifier ModifierFromKeyFlags(int32 key_flags)
@@ -340,20 +360,26 @@ static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
     return input;
 }
 
-InputRecord SelectInput(DWORD timeout)
+InputRecord SelectInput(const DWORD timeout)
 {
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
+    static INPUT_RECORD s_cached_record;
+    static bool s_has_cached_record = false;
+
     InputRecord input;
-    while (input.type == InputType::None)
+    InputRecord lead_surrogate;
+    bool has_lead_surrogate = false;
+    while (input.type == InputType::None || has_lead_surrogate)
     {
         // Synthesize resize events by checking whether the terminal
-        // dimensions have changed.
+        // dimensions have changed.  But not while trying to read both high
+        // and low surrogates in a surrogate pair).
 
         static DWORD s_dimensions = GetConsoleColsRows(hout);
         const DWORD dimensions = GetConsoleColsRows(hout);
-        if (dimensions != s_dimensions)
+        if (dimensions != s_dimensions && !has_lead_surrogate)
         {
             initialize_wcwidth();
             s_dimensions = dimensions;
@@ -362,6 +388,7 @@ InputRecord SelectInput(DWORD timeout)
 
         // Wait for input.
 
+        if (!s_has_cached_record)
         {
             uint32 count = 1;
             HANDLE handles[3] = { hin };
@@ -377,18 +404,57 @@ InputRecord SelectInput(DWORD timeout)
 
         INPUT_RECORD record;
 
+        if (!s_has_cached_record)
         {
             DWORD count;
             if (!ReadConsoleInputW(hin, &record, 1, &count))
                 return { InputType::Error };
         }
+        else
+        {
+            assert(!has_lead_surrogate);
+            record = s_cached_record;
+            s_has_cached_record = false;
+        }
 
         // Process the input.
+
+        if (has_lead_surrogate)
+        {
+            assert(!lead_surrogate.key_char2);
+            if (record.EventType == KEY_EVENT)
+            {
+                input = ProcessInput(record.Event.KeyEvent);
+                if (input.type == InputType::None)
+                    continue;
+                if (input.type == InputType::Char && IS_LOW_SURROGATE(input.key_char))
+                    lead_surrogate.key_char2 = input.key_char;
+                else
+                    goto severed;
+            }
+            else
+            {
+severed:
+                s_cached_record = record;
+                s_has_cached_record = true;
+                lead_surrogate.key_char = 0xfffd;
+            }
+            return lead_surrogate;
+        }
 
         switch (record.EventType)
         {
         case KEY_EVENT:
             input = ProcessInput(record.Event.KeyEvent);
+            // When timeout is INFINITE, try to return both surrogate pairs at
+            // the same time.
+            if (timeout == INFINITE && input.type == InputType::Char && IS_HIGH_SURROGATE(input.key_char))
+            {
+                assert(!has_lead_surrogate);
+                lead_surrogate = input;
+                has_lead_surrogate = true;
+                continue;
+            }
             break;
         case MOUSE_EVENT:
             input = ProcessInput(record.Event.MouseEvent);
@@ -753,14 +819,14 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
                 // Append or insert the character.
                 if (pos == out.Length())
                 {
-                    out.Append(&input.key_char, 1);
+                    out.Append(&input.key_char, input.key_char2 ? 2 : 1);
                     pos = out.Length();
                 }
                 else
                 {
                     const int32 i = pos;
                     tmp.Set(out.Text(), i);
-                    tmp.Append(&input.key_char, 1);
+                    tmp.Append(&input.key_char, input.key_char2 ? 2 : 1);
                     pos = tmp.Length();
                     tmp.Append(out.Text() + i, out.Length() - i);
                     out = std::move(tmp);

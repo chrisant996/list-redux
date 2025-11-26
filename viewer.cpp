@@ -1489,7 +1489,7 @@ hex_edit_right:
                 char multibyte[32];
                 BOOL used_default = false;
                 const UINT cp = m_context.GetCodePage(m_hex_mode);
-                const int len = WideCharToMultiByte(cp, 0, &input.key_char, 1, multibyte, _countof(multibyte), nullptr, &used_default);
+                const int len = WideCharToMultiByte(cp, 0, &input.key_char, input.key_char2 ? 2 : 1, multibyte, _countof(multibyte), nullptr, &used_default);
                 if (!used_default && len == 1)
                 {
                     m_context.SetByte(m_hex_pos, multibyte[0] >> 4, true);

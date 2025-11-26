@@ -323,6 +323,8 @@ navigated:
         else
         {
             m_needle.Append(input.key_char);
+            if (input.key_char2)
+                m_needle.Append(input.key_char2);
             need_display = true;
         }
 

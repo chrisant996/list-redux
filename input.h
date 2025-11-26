@@ -80,11 +80,15 @@ DEFINE_ENUM_FLAG_OPERATORS(Modifier);
 
 struct InputRecord
 {
+                    InputRecord();
+                    InputRecord(InputType type);
     bool            operator!=(const InputRecord& other) const;
+    void            Clear();
 
     InputType       type = InputType::None;
     Key             key = Key::Invalid;
     WCHAR           key_char = 0;
+    WCHAR           key_char2 = 0;  // If key_char2 is a high surrogate, then key_char2 is the low surrogate (or 0 if invalid input).
     Modifier        modifier = Modifier::None;
     COORD           mouse_pos = {0,0};
     int32           mouse_wheel_amount = 0;
