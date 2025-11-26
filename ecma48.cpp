@@ -331,6 +331,14 @@ int32 str_iter::next()
                 c = 0xfffd;
             ax = 0;
         }
+        else
+        {
+            if (ax)
+            {
+                c = 0xfffd;
+                ax = 0;
+            }
+        }
         return c;
     }
 
