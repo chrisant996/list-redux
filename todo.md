@@ -61,7 +61,7 @@
 - [x] `Alt-O` open a new file
 - [x] `Alt-C` close current file
 - [x] `/@` to supply a file with a list of names to view
-- [x] `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
+- [x] `'` or `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
 - [x] `F5` to reprocess/reload the file (but not documented, since the file is opened with deny shared writing)
 - [x] remember scroll position in each file
 - searching
@@ -77,6 +77,8 @@
   - [x] highlight newline characters in hex mode
   - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [x] go to line
+  - [x] `Alt-A` toggle ASCII filter in characters column
+  - [x] remember hex mode across viewers
   - [x] `Alt-E` toggle hex edit mode
     - [x] navigate through bytes
     - [x] navigate through characters (`TAB` to toggle between bytes and characters)
