@@ -426,7 +426,7 @@ void wcwidth_iter::consume_emoji_sequence()
 //------------------------------------------------------------------------------
 void wcwidth_iter::unnext()
 {
-    assert(m_iter.get_pointer() > m_chr_ptr);
+    assert(m_iter.get_pointer() > m_chr_ptr || !m_iter.more());
     reset_pointer(m_chr_ptr);
 }
 
