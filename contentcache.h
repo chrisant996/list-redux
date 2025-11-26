@@ -249,6 +249,7 @@ private:
 
 private:
     const ViewerOptions& m_options;
+    StrW            m_name;
     HANDLE          m_file = INVALID_HANDLE_VALUE;
     FileOffset      m_size = 0;
     unsigned        m_hex_size_width = 0;

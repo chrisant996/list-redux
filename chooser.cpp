@@ -167,13 +167,13 @@ ChooserOutcome Chooser::Go(Error& e)
             {
                 e.Clear();
                 const ChooserOutcome outcome = HandleInput(input, e);
-                if (outcome != ChooserOutcome::CONTINUE)
-                    return outcome;
                 if (e.Test())
                 {
                     ReportError(e);
                     ForceUpdateAll();
                 }
+                if (outcome != ChooserOutcome::CONTINUE)
+                    return outcome;
             }
             break;
         }

@@ -344,6 +344,11 @@ ViewerOutcome Viewer::Go(Error& e)
         case InputType::Mouse:
             {
                 const ViewerOutcome outcome = HandleInput(input, e);
+                if (e.Test())
+                {
+                    ReportError(e);
+                    m_force_update = true;
+                }
                 if (outcome != ViewerOutcome::CONTINUE)
                     return outcome;
             }

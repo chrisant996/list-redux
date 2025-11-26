@@ -191,13 +191,21 @@ bool PatchBlock::Save(HANDLE hfile, bool original, Error& e)
         }
         else if (len)
         {
-            DWORD wrote;
+            DWORD num_io;
             LARGE_INTEGER liSeek;
             liSeek.QuadPart = offset;
+            // IMPORTANT:  It's tempting to want to read the current values
+            // first, to improve accuracy of UndoSave in case concurrent file
+            // writes might be happening.  BUT IT'S A TRAP!  It risks reading
+            // values that were already previously written, if a previous save
+            // fails partway through and the user retries the save.
             if (!SetFilePointerEx(hfile, liSeek, nullptr, FILE_BEGIN) ||
-                !WriteFile(hfile, bytes, len, &wrote, nullptr))
+                !WriteFile(hfile, bytes, len, &num_io, nullptr))
             {
                 e.Sys();
+                StrW msg;
+                msg.Printf(L"Error writing %u byte(s) at offset %08.8lx.", len, offset);
+                e.Set(msg.Text());
                 return false;
             }
             len = 0;
@@ -971,6 +979,7 @@ ContentCache::ContentCache(const ViewerOptions& options)
 ContentCache& ContentCache::operator=(ContentCache&& other)
 {
     // m_options can't be updated, and it doesn't need to be.
+    m_name = std::move(other.m_name);
     m_file = other.m_file;
     m_size = other.m_size;
     m_hex_size_width = other.m_hex_size_width;
@@ -1048,12 +1057,13 @@ bool ContentCache::Open(const WCHAR* name, Error& e)
     if (!m_redirected)
     {
         // Open for write as well, in case the file is edited in hex mode.
-        m_file = CreateFileW(name, GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, 0);
+        m_file = CreateFileW(name, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, 0);
         if (m_file == INVALID_HANDLE_VALUE)
         {
             e.Sys();
             return false;
         }
+        m_name.Set(name);
 
         LARGE_INTEGER liSize;
         if (GetFileSizeEx(m_file, &liSize))
@@ -1120,6 +1130,7 @@ void ContentCache::Close()
     {
         CloseHandle(m_file);
         m_file = INVALID_HANDLE_VALUE;
+        m_name.Clear();
     }
 
     SetSize(0);
@@ -2226,13 +2237,27 @@ bool ContentCache::RevertByte(FileOffset offset)
 
 bool ContentCache::SaveBytes(Error& e)
 {
-    if (!IsOpen() || !IsDirty())
+    assert(IsOpen());
+    assert(!IsPipe());
+    if (!IsOpen() || IsPipe() || !IsDirty())
         return false;
 
+    HANDLE h = CreateFileW(m_name.Text(), GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, 0);
+    if (h == INVALID_HANDLE_VALUE)
+    {
+        e.Sys();
+        e.Set(L"Unable to open file for writing.");
+        return false;
+    }
+
+    bool ok = true;
     for (auto& p : m_patch_blocks)
     {
-        if (!p.second.Save(m_file, false/*original*/, e))
-            return false;
+        if (!p.second.Save(h, false/*original*/, e))
+        {
+            ok = false;
+            break;
+        }
 
         auto saved = m_patch_blocks_saved.find(p.first);
         if (saved != m_patch_blocks_saved.end())
@@ -2241,9 +2266,16 @@ bool ContentCache::SaveBytes(Error& e)
             m_patch_blocks_saved.emplace(p.first, p.second);
     }
 
-    DiscardBytes();
-    ClearProcessed();  // Make sure to reread the file.
-    return true;
+    CloseHandle(h);
+    h = INVALID_HANDLE_VALUE;
+
+    if (ok)
+    {
+        DiscardBytes();
+        ClearProcessed();  // Make sure to reread the file.
+    }
+
+    return ok;
 }
 
 void ContentCache::UndoSave(Error& e)
