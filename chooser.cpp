@@ -724,6 +724,7 @@ LNext:
             }
             break;
 
+        case '\'':
         case '@':
             if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
             {

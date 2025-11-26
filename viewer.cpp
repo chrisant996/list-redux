@@ -1574,6 +1574,7 @@ hex_edit_right:
             }
             break;
 
+        case '\'':
         case '@':
             if ((input.modifier & ~(Modifier::SHIFT|Modifier::ALT)) == Modifier::None)
             {

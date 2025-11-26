@@ -25,7 +25,7 @@ GENERAL KEYS:
 ACTION KEYS:
 
              .  Navigate to parent directory.
-       F2 or @  Incremental file name search, jump to selected file.
+       F2 or '  Incremental file name search, jump to selected file.
        F5 or *  Refresh list of files.
              P  New path or file mask.
 

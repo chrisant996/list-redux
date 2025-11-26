@@ -22,7 +22,7 @@ GENERAL KEYS:
     Alt-M or M  Mark line (or file offset in hex mode).
     Alt-U or U  Clear marked line (unmark).
 
-       F2 or @  Show list of files, jump to selected file.
+       F2 or '  Show list of files, jump to selected file.
         Ctrl-N  Next file.
         Ctrl-P  Previous file.
          Alt-C  Close the current file.
