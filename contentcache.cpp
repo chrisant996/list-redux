@@ -393,7 +393,10 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
         for (const BYTE* walk = m_bytes; can_consume < max_consume;)
         {
             if (can_consume + 2 > m_available)
+            {
+                can_consume = uint32(m_available);
                 break;
+            }
             const WCHAR c = m_decoder->NextChar(walk);
             if (c == '\r' && can_consume + 4 <= m_available && m_decoder->NextChar(walk + 2) == '\n')
             {
