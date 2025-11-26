@@ -804,20 +804,15 @@ LAutoFitContentWidth:
                 if (msg_text)
                 {
                     s2.Clear();
-                    const uint32 content_width = m_terminal_width - 1;
+                    const uint32 content_width = m_terminal_width - !!show_scrollbar;
                     const unsigned cells = ellipsify_ex(msg_text, content_width, ellipsify_mode::RIGHT, s2, L"");
                     if (msg_color)
                         s.AppendColor(msg_color);
                     s.Append(s2);
                     if (msg_color)
                         s.Append(c_norm);
-                    if (cells < content_width)
-                    {
-                        if (show_scrollbar)
-                            s.AppendSpaces(content_width - cells);
-                        else
-                            s.Append(c_clreol);
-                    }
+                    if (cells < content_width || show_scrollbar)
+                        s.Append(c_clreol);
                     msg_text = nullptr;
                     msg_color = nullptr;
                 }
@@ -853,19 +848,10 @@ LAutoFitContentWidth:
                     if (color)
                         s.AppendColor(color);
                     const unsigned width = m_context.FormatLineData(m_top + row, m_left, s, m_content_width, e, color, found_line);
-                    if (width < m_content_width)
-                    {
-                        if (!color && !show_scrollbar)
-                            s.Append(c_clreol);
-                        else if (width < m_content_width)
-                            s.AppendSpaces(m_content_width - width);
-                    }
+                    if (width < m_content_width || show_scrollbar)
+                        s.Append(c_clreol);
                     if (color)
                         s.Append(c_norm);
-                }
-                else if (show_scrollbar)
-                {
-                    s.AppendSpaces(m_margin_width + m_content_width);
                 }
                 else
                 {
@@ -875,6 +861,7 @@ LAutoFitContentWidth:
                 if (show_scrollbar)
                 {
                     const WCHAR* car;
+                    s.Printf(L"\x1b[%u;%uH", 2 + row, m_terminal_width);
                     if (scroll_car.has_car())
                     {
                         car = scroll_car.get_char(int32(row), c_floating);
