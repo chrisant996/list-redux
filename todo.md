@@ -3,6 +3,7 @@
 - Some exotic characters are calculated as the wrong width in Windows Terminal (e.g. from dirx\icons.cpp when choosing inaccurate encodings).
 - What if codepage 437 isn't installed?  It's our fallback, but if it's not installed then choose another?
 - [x] Mitigate width miscalculations by making the scroll bar characters always use explicit positioning escape codes.
+- Sometimes detects `clink.log` file as Binary when `debug.log_terminal` is enabled, but it's really UTF8.
 
 # FEATURES
 
