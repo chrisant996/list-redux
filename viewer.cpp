@@ -205,7 +205,7 @@ private:
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
     void            OnLeftClick(const InputRecord& input, Error &e);
     void            EnsureAltFiles();
-    void            SetFile(intptr_t index, ContentCache* context=nullptr);
+    void            SetFile(intptr_t index, ContentCache* context=nullptr, bool force=false);
     size_t          CountForDisplay() const;
     void            DoSearch(bool next, bool caseless);
     void            FindNext(bool next=true);
@@ -1393,8 +1393,18 @@ hex_edit_right:
             }
             break;
         case Key::F5:
-            m_context.ClearProcessed();
-            m_force_update = true;
+            if (input.modifier == Modifier::None)
+            {
+                if (m_text || m_context.IsPipe())
+                {
+                    m_context.ClearProcessed();
+                    m_force_update = true;
+                }
+                else
+                {
+                    SetFile(m_index, nullptr, true/*force*/);
+                }
+            }
             break;
         case Key::F7:
         case Key::F8:
@@ -1852,7 +1862,7 @@ StrW Viewer::GetCurrentFile() const
     return s;
 }
 
-void Viewer::SetFile(intptr_t index, ContentCache* context)
+void Viewer::SetFile(intptr_t index, ContentCache* context, bool force)
 {
     assert(context != &m_context);
 
@@ -1865,7 +1875,7 @@ void Viewer::SetFile(intptr_t index, ContentCache* context)
     if (index < 0)
         index = 0;
 
-    if (index == m_index)
+    if (index == m_index && !force)
         return;
 
     if (m_index >= 0)
