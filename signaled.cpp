@@ -75,7 +75,8 @@ void CRestoreConsole::Restore()
         {
             DWORD dummy;
             if (m_hout && GetConsoleMode(m_hout, &dummy))
-                OutputConsole(m_hout, L"\x1b[m", 3);
+// TODO:  Terminal should handle this natively, to make sure there are no thread synchronization issues.
+                OutputConsole(L"\x1b[m", 3);
         }
         SetConsoleMode(m_hout, m_mode_out);
     }

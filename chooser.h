@@ -74,7 +74,6 @@ private:
     void            SearchAndTag(Error& e, bool caseless);
 
 private:
-    const HANDLE    m_hout;
     const Interactive* const m_interactive;
     unsigned        m_terminal_width = 0;
     unsigned        m_terminal_height = 0;

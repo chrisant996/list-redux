@@ -363,7 +363,6 @@ static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
 InputRecord SelectInput(const DWORD timeout)
 {
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
-    const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
     static INPUT_RECORD s_cached_record;
     static bool s_has_cached_record = false;
@@ -377,8 +376,8 @@ InputRecord SelectInput(const DWORD timeout)
         // dimensions have changed.  But not while trying to read both high
         // and low surrogates in a surrogate pair).
 
-        static DWORD s_dimensions = GetConsoleColsRows(hout);
-        const DWORD dimensions = GetConsoleColsRows(hout);
+        static DWORD s_dimensions = GetConsoleColsRows();
+        const DWORD dimensions = GetConsoleColsRows();
         if (dimensions != s_dimensions && !has_lead_surrogate)
         {
             initialize_wcwidth();
@@ -649,7 +648,7 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
     {
         tmp.Clear();
         tmp.Printf(L"%s\x1b[%uG", c_hide_cursor, csbi.dwCursorPosition.X + 1);
-        OutputConsole(hout, tmp.Text(), tmp.Length());
+        OutputConsole(tmp.Text(), tmp.Length());
 
         left = min(left, pos);
 
@@ -676,7 +675,7 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
         const unsigned width = TruncateWcwidth(tmp, max_width, 0);
         tmp.AppendSpaces(max_width - width);
         tmp.Printf(L"\x1b[%uG%s", csbi.dwCursorPosition.X + 1 + __wcswidth(out.Text() + left, pos - left), c_show_cursor);
-        OutputConsole(hout, tmp.Text(), tmp.Length());
+        OutputConsole(tmp.Text(), tmp.Length());
 
         const InputRecord input = SelectInput();
         switch (input.type)

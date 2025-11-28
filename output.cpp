@@ -8,6 +8,7 @@
 #include "output.h"
 #include "colors.h"
 #include "ecma48.h"
+#include "terminal.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
 
@@ -15,6 +16,9 @@ const WORD c_cxTab = 8;
 
 const WCHAR c_hide_cursor[] = L"\x1b[?25l";
 const WCHAR c_show_cursor[] = L"\x1b[?25h";
+
+static HANDLE s_hout = GetStdHandle(STD_OUTPUT_HANDLE);
+static Terminal s_terminal;
 
 bool IsConsole(HANDLE h)
 {
@@ -131,92 +135,25 @@ int ValidateColor(const WCHAR* p)
  * OutputConsole.
  */
 
-static HANDLE s_hConsoleMutex = CreateMutex(0, false, 0);
-
-static void AcquireConsoleMutex()
+DWORD GetConsoleColsRows()
 {
-    if (s_hConsoleMutex)
-        WaitForSingleObject(s_hConsoleMutex, INFINITE);
-}
+    assert(s_hout);
 
-static void ReleaseConsoleMutex()
-{
-    if (s_hConsoleMutex)
-        ReleaseMutex(s_hConsoleMutex);
-}
-
-class AutoConsoleMutex
-{
-public:
-    AutoConsoleMutex() { AcquireConsoleMutex(); }
-    ~AutoConsoleMutex() { ReleaseConsoleMutex(); }
-};
-
-DWORD GetConsoleColsRows(HANDLE hout)
-{
-    assert(hout);
-
-    static BOOL s_initialized = false;
-    static HANDLE s_hout = INVALID_HANDLE_VALUE;
-    static HANDLE s_console = INVALID_HANDLE_VALUE;
-    static BOOL s_is_console;
     static WORD s_num_cols = 80;
     static WORD s_num_rows = 25;
 
-    if (hout != s_hout)
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (GetConsoleScreenBufferInfo(s_hout, &csbi))
     {
-        s_initialized = false;
-        s_hout = hout;
-        if (s_console != INVALID_HANDLE_VALUE)
-            CloseHandle(s_console);
-        s_console = INVALID_HANDLE_VALUE;
-    }
-
-    if (!s_initialized)
-    {
-        s_is_console = IsConsole(hout);
-
-        if (s_is_console)
-        {
-            s_console = hout;
-        }
-        else
-        {
-            s_num_cols = 0;
-            s_num_rows = 0;
-            s_console = CreateFileW(L"CONOUT$", GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, 0);
-        }
-
-        s_initialized = true;
-    }
-
-    if (s_is_console || s_console != INVALID_HANDLE_VALUE)
-    {
-        CONSOLE_SCREEN_BUFFER_INFO csbi;
-        if (GetConsoleScreenBufferInfo(s_console, &csbi))
-        {
-            s_num_cols = (csbi.srWindow.Right - csbi.srWindow.Left) + 1;
-            s_num_rows = (csbi.srWindow.Bottom - csbi.srWindow.Top) + 1;
-        }
+        s_num_cols = (csbi.srWindow.Right - csbi.srWindow.Left) + 1;
+        s_num_rows = (csbi.srWindow.Bottom - csbi.srWindow.Top) + 1;
     }
 
     return (s_num_rows << 16) | s_num_cols;
 }
 
-static bool WriteConsoleInternal(HANDLE h, const WCHAR* p, unsigned len, const WCHAR* color=nullptr)
+static bool WriteConsoleInternal(const WCHAR* p, unsigned len, const WCHAR* color=nullptr)
 {
-    static HANDLE s_h = 0;
-    static bool s_console = false;
-    DWORD written;
-
-    if (s_h != h)
-    {
-        s_console = IsConsole(h);
-        s_h = h;
-    }
-
-    AutoConsoleMutex acm;
-
     if (color)
     {
         if (ValidateColor(color) <= 0)
@@ -227,18 +164,8 @@ static bool WriteConsoleInternal(HANDLE h, const WCHAR* p, unsigned len, const W
     {
         StrW tmp;
         tmp.Printf(L"\x1b[0;%sm", color);
-        if (s_console)
-        {
-            if (!WriteConsoleW(h, tmp.Text(), tmp.Length(), &written, nullptr))
-                return false;
-        }
-        else
-        {
-            StrA tmp2;
-            tmp2.SetW(tmp);
-            if (!WriteFile(h, tmp2.Text(), tmp2.Length(), &written, nullptr))
-                return false;
-        }
+        if (!s_terminal.WriteConsole(tmp.Text(), tmp.Length()))
+            return false;
     }
 
     StrA tmp;
@@ -246,16 +173,8 @@ static bool WriteConsoleInternal(HANDLE h, const WCHAR* p, unsigned len, const W
     {
         if (p[0] == '\n')
         {
-            if (s_console)
-            {
-                if (!WriteConsoleW(h, L"\r\n", 2, &written, nullptr))
-                    return false;
-            }
-            else
-            {
-                if (!WriteFile(h, "\r\n", 2, &written, nullptr))
-                    return false;
-            }
+            if (!s_terminal.WriteConsole(L"\r\n", 2))
+                return false;
             --len;
             ++p;
         }
@@ -266,25 +185,8 @@ static bool WriteConsoleInternal(HANDLE h, const WCHAR* p, unsigned len, const W
 
         if (run)
         {
-            if (s_console)
-            {
-                if (!WriteConsoleW(h, p, run, &written, nullptr))
-                    return false;
-            }
-            else
-            {
-                const UINT cp = GetConsoleOutputCP();
-                const size_t needed = WideCharToMultiByte(cp, 0, p, int(run), 0, 0, 0, 0);
-                char* out = tmp.Reserve(needed + 1);
-                int used = WideCharToMultiByte(cp, 0, p, int(run), out, int(needed), 0, 0);
-
-                assert(unsigned(used) < tmp.Capacity());
-                out[used] = '\0';
-                tmp.ResyncLength();
-
-                if (!WriteFile(h, tmp.Text(), tmp.Length(), &written, nullptr))
-                    return false;
-            }
+            if (!s_terminal.WriteConsole(p, run))
+                return false;
         }
 
         len -= run;
@@ -293,30 +195,22 @@ static bool WriteConsoleInternal(HANDLE h, const WCHAR* p, unsigned len, const W
 
     if (color)
     {
-        if (s_console)
-        {
-            if (!WriteConsoleW(h, L"\x1b[m", 3, &written, nullptr))
-                return false;
-        }
-        else
-        {
-            if (!WriteFile(h, "\x1b[m", 3, &written, nullptr))
-                return false;
-        }
+        if (!s_terminal.WriteConsole(L"\x1b[m", 3))
+            return false;
     }
 
     assert(!len);
     return true;
 }
 
-void OutputConsole(HANDLE h, const WCHAR* p, unsigned len, const WCHAR* color)
+void OutputConsole(const WCHAR* p, unsigned len, const WCHAR* color)
 {
     if (len == unsigned(-1))
         len = unsigned(wcslen(p));
     if (!len)
         return;
 
-    if (!WriteConsoleInternal(h, p, len, color))
+    if (!WriteConsoleInternal(p, len, color))
     {
         // TODO: error handling...
         exit(1);
@@ -330,7 +224,7 @@ void ExpandTabs(const WCHAR* s, StrW& out, unsigned max_width)
 
     if (!max_width)
     {
-        const DWORD dwColsRows = GetConsoleColsRows(GetStdHandle(STD_OUTPUT_HANDLE));
+        const DWORD dwColsRows = GetConsoleColsRows();
         max_width = LOWORD(dwColsRows);
         // max_width is always non-zero, but the code below in this function
         // recognizes 0 as meaning unlimited width.
@@ -408,7 +302,7 @@ public:
     {
         if (!max_width)
         {
-            const DWORD dwColsRows = GetConsoleColsRows(GetStdHandle(STD_OUTPUT_HANDLE));
+            const DWORD dwColsRows = GetConsoleColsRows();
             max_width = LOWORD(dwColsRows);
         }
         // IMPORTANT:  The minimum wrapping width is 80 because some sections
@@ -595,7 +489,7 @@ void PrintfV(const WCHAR* format, va_list args)
 {
     StrW s;
     s.PrintfV(format, args);
-    OutputConsole(GetStdHandle(STD_OUTPUT_HANDLE), s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 }
 
 void Printf(const WCHAR* format, ...)
@@ -632,7 +526,7 @@ StrW MakeMsgBoxText(const WCHAR* message, const WCHAR* directive, ColorElement c
     assert(message && *message);
     assert(directive && *directive);
 
-    const DWORD colsrows = GetConsoleColsRows(GetStdHandle(STD_OUTPUT_HANDLE));
+    const DWORD colsrows = GetConsoleColsRows();
     const unsigned terminal_width = LOWORD(colsrows);
     const unsigned terminal_height = HIWORD(colsrows);
 
@@ -712,8 +606,7 @@ bool ReportError(Error& e, ReportErrorFlags flags)
         s = MakeMsgBoxText(tmp.Text(), directive, ColorElement::Error);
     }
 
-    HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
-    OutputConsole(hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     while (true)
     {
@@ -782,7 +675,7 @@ void Interactive::Begin()
     const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
     if (m_inverted)
-        OutputConsole(hout, c_swap_to_primary);
+        OutputConsole(c_swap_to_primary);
 
     GetConsoleMode(hin, &m_end_mode_in);
     GetConsoleMode(hout, &m_end_mode_out);
@@ -797,7 +690,7 @@ void Interactive::Begin()
     SetConsoleMode(hout, m_begin_mode_out);
 
     if (!m_inverted)
-        OutputConsole(hout, c_swap_to_alternate_and_clear);
+        OutputConsole(c_swap_to_alternate_and_clear);
 
     m_active = true;
 }
@@ -813,7 +706,7 @@ void Interactive::End()
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
-    OutputConsole(hout, m_inverted ? c_swap_to_alternate_and_clear : c_swap_to_primary);
+    OutputConsole(m_inverted ? c_swap_to_alternate_and_clear : c_swap_to_primary);
 
     SetConsoleMode(hout, m_end_mode_out);
     SetConsoleMode(hin, m_end_mode_in);

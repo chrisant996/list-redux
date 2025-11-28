@@ -186,7 +186,6 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned terminal_width, bool caseless
 {
     StrW s;
     bool done = false;
-    HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
     auto callback = [&](const InputRecord& input)
     {
@@ -230,12 +229,12 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned terminal_width, bool caseless
         s.Clear();
         s.AppendColor(GetColor(ColorElement::Command));
         s.Printf(L"\r\x1b[K\x1b[%uG%s\rSearch%s ", terminal_width + 1 - right.Length(), right.Text(), c_prompt_char);
-        OutputConsole(hout, s.Text(), s.Length());
+        OutputConsole(s.Text(), s.Length());
 
         done = true;
         ReadInput(s, History::Search, 1024, 32, callback);
 
-        OutputConsole(hout, c_norm);
+        OutputConsole(c_norm);
     }
 
     std::unique_ptr<Searcher> searcher;

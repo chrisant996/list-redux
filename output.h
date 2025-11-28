@@ -12,11 +12,11 @@ class Error;
 
 bool IsConsole(HANDLE h);
 
-DWORD GetConsoleColsRows(HANDLE hout);
+DWORD GetConsoleColsRows();
 
 void ExpandTabs(const WCHAR* s, StrW& out, unsigned max_width=0);
 void WrapText(const WCHAR* s, StrW& out, unsigned max_width=0);
-void OutputConsole(HANDLE h, const WCHAR* p, unsigned len=unsigned(-1), const WCHAR* color=nullptr);
+void OutputConsole(const WCHAR* p, unsigned len=unsigned(-1), const WCHAR* color=nullptr);
 
 void PrintfV(const WCHAR* format, va_list args);
 void Printf(const WCHAR* format, ...);

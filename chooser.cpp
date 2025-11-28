@@ -117,8 +117,7 @@ bool MarkedList::AllMarked() const
 }
 
 Chooser::Chooser(const Interactive* interactive)
-: m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
-, m_interactive(interactive)
+: m_interactive(interactive)
 {
 }
 
@@ -411,10 +410,10 @@ void Chooser::UpdateDisplay()
                 x += m_col_widths[ii] + m_padding;
         }
 
-        OutputConsole(m_hout, c_hide_cursor);
+        OutputConsole(c_hide_cursor);
         s.Printf(L"\x1b[%u;%uH", y, x);
         s.Append(c_show_cursor);
-        OutputConsole(m_hout, s.Text(), s.Length());
+        OutputConsole(s.Text(), s.Length());
     }
 
     m_prev_visible_rows = m_visible_rows;
@@ -431,7 +430,7 @@ void Chooser::Relayout()
 
 void Chooser::EnsureColumnWidths()
 {
-    const DWORD colsrows = GetConsoleColsRows(m_hout);
+    const DWORD colsrows = GetConsoleColsRows();
     const unsigned terminal_width = LOWORD(colsrows);
     const unsigned terminal_height = HIWORD(colsrows);
     if (!m_terminal_width || terminal_width != m_terminal_width ||
@@ -1009,7 +1008,7 @@ bool Chooser::AskForConfirmation(const WCHAR* msg)
     const WCHAR* const directive = L"Press Y to confirm, or any other key to cancel...";
     // TODO:  ColorElement::Command might not be the most appropriate color.
     const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     bool confirmed = false;
     while (true)
@@ -1064,7 +1063,7 @@ void Chooser::WaitToContinue(bool erase_after, bool new_line)
         ++lines;
     }
 
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     while (true)
     {
@@ -1106,11 +1105,11 @@ LDone:
             if (lines)
                 s.Append(L"\x1b[A");
         }
-        OutputConsole(m_hout, s.Text(), s.Length());
+        OutputConsole(s.Text(), s.Length());
     }
     else
     {
-        OutputConsole(m_hout, L"\r\n");
+        OutputConsole(L"\r\n");
     }
 }
 
@@ -1120,11 +1119,11 @@ void Chooser::NewFileMask(Error& e)
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\r\x1b[KEnter new file mask or path%s ", c_prompt_char);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     ReadInput(s, History::FileMask);
 
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
     ForceUpdateAll();
 
     s.TrimRight();
@@ -1169,11 +1168,11 @@ void Chooser::ChangeAttributes(Error& e)
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\r\x1b[KChange attributes ('ashr' to set or '-a-s-h-r' to clear)%s ", c_prompt_char);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     ReadInput(s, History::ChangeAttr);
 
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
     ForceUpdateAll();
 
     DWORD mask = 0;
@@ -1243,11 +1242,11 @@ void Chooser::NewDirectory(Error& e)
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rEnter new directory name%s ", c_prompt_char);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     ReadInput(s, History::NewDirectory);
 
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
     ForceUpdateAll();
 
     if (!s.Length())
@@ -1280,11 +1279,11 @@ void Chooser::RenameEntry(Error& e)
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rEnter new name%s ", c_prompt_char);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     ReadInput(s, History::RenameEntry);
 
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
     ForceUpdateAll();
 
     if (!s.Length())
@@ -1426,14 +1425,14 @@ void Chooser::RunFile(bool edit, Error& e)
         return
 
     // Clear the current (alternate) screen in case programs switch to it.
-    OutputConsole(m_hout, L"\x1b[J");
+    OutputConsole(L"\x1b[J");
 
     // Swap back to original screen and console modes.
     std::unique_ptr<Interactive> inverted = m_interactive->MakeReverseInteractive();
 
     StrW msg;
     msg.Printf(L"\r\n%s '%s'...\r\n", edit ? L"Editing" : L"Running", file.Text());
-    OutputConsole(m_hout, msg.Text(), msg.Length());
+    OutputConsole(msg.Text(), msg.Length());
 
     RunProgram(s.Text(), e);
 
@@ -1478,9 +1477,9 @@ void Chooser::SweepFiles(Error& e)
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rEnter program to run%s ", c_prompt_char);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
     ReadInput(program, History::SweepProgram);
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
     ForceUpdateAll();
 
     program.TrimRight();
@@ -1493,9 +1492,9 @@ void Chooser::SweepFiles(Error& e)
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rArguments before file name%s ", c_prompt_char);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
     ok = ReadInput(args_before, History::SweepArgsBefore);
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
     ForceUpdateAll();
     if (!ok)
         return;
@@ -1506,15 +1505,15 @@ void Chooser::SweepFiles(Error& e)
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\rArguments after file name%s ", c_prompt_char);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
     ok = ReadInput(args_after, History::SweepArgsAfter);
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
     ForceUpdateAll();
     if (!ok)
         return;
 
     // Clear the current (alternate) screen in case programs switch to it.
-    OutputConsole(m_hout, L"\x1b[J");
+    OutputConsole(L"\x1b[J");
 
     // Swap back to original screen and console modes.
     std::unique_ptr<Interactive> inverted = m_interactive->MakeReverseInteractive();
@@ -1525,7 +1524,7 @@ void Chooser::SweepFiles(Error& e)
     const WCHAR* const c_div = sweepdivider.Text();
     s.Clear();
     s.Printf(L"\r\n%s---- Sweep %zu File(s) ----%s\r\n", c_div, files.size(), c_norm);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     bool completed = true;
     size_t errors = 0;
@@ -1534,7 +1533,7 @@ void Chooser::SweepFiles(Error& e)
         // Report each file.
         s.Clear();
         s.Printf(L"%s%s%s\r\n", sweepfile.Text(), file.Text(), c_norm);
-        OutputConsole(m_hout, s.Text(), s.Length());
+        OutputConsole(s.Text(), s.Length());
 
         bool ok = false;
 #ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
@@ -1563,7 +1562,7 @@ void Chooser::SweepFiles(Error& e)
             e.Set(L"Error running program for '%1'.") << file.Text();
             ok = ReportError(e, ReportErrorFlags::CANABORT|ReportErrorFlags::INLINE);
             e.Clear();
-            OutputConsole(m_hout, L"\r\n");
+            OutputConsole(L"\r\n");
             if (!ok)
             {
                 completed = false;
@@ -1580,7 +1579,7 @@ void Chooser::SweepFiles(Error& e)
         s.Printf(L"%s---- Completed with %zu error(s) ----%s\r\n", c_div, errors, c_norm);
     else
         s.Printf(L"%s---- %zu error(s) ----%s\r\n", c_div, errors, c_norm);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     // Wait for ENTER, SPACE, or ESC.
     WaitToContinue(true/*erase_after*/, true/*new_line*/);
@@ -1614,11 +1613,11 @@ void Chooser::SearchAndTag(Error& e, bool caseless)
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\r\x1b[KSearch%s ", c_prompt_char);
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     auto searcher = ReadSearchInput(m_terminal_width, caseless, false, e);
 
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
     m_dirty_footer = true;
 
     if (e.Test())

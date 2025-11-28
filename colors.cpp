@@ -736,7 +736,7 @@ void ReportColorlessError(Error& e)
         e.Format(tmp);
         tmp.Append(L"\n");
         // Use normal text color instead of error color.
-        OutputConsole(GetStdHandle(STD_OUTPUT_HANDLE), tmp.Text(), tmp.Length());
+        OutputConsole(tmp.Text(), tmp.Length());
         e.Clear();
     }
 }

@@ -40,7 +40,6 @@ private:
     bool            filter_items();
 
     // Layout.
-    HANDLE          m_hout = 0;
     int32           m_terminal_width = 0;
     int32           m_terminal_height = 0;
 #if 0
@@ -101,12 +100,11 @@ PopupResult PopupList::Go(const WCHAR* title, const std::vector<StrW>& items, in
     m_result.Clear();
     m_flags = flags;
 
-    m_hout = GetStdHandle(STD_OUTPUT_HANDLE);
 #if 0
     m_scroll_helper.clear();
 #endif
 
-    const DWORD colsrows = GetConsoleColsRows(m_hout);
+    const DWORD colsrows = GetConsoleColsRows();
     m_terminal_width = LOWORD(colsrows);
     m_terminal_height = HIWORD(colsrows);
 
@@ -476,9 +474,6 @@ void PopupList::update_display()
     const bool is_filter_active = (m_items->size() && !m_filter_string.Empty());
     if (m_visible_rows > 0 || is_filter_active)
     {
-        CONSOLE_SCREEN_BUFFER_INFO csbi;
-        GetConsoleScreenBufferInfo(m_hout, &csbi);
-
         // Display list.
         const intptr_t count = m_count;
         StrW line;
@@ -489,7 +484,7 @@ void PopupList::update_display()
 
         update_top();
 
-        OutputConsole(m_hout, c_hide_cursor);
+        OutputConsole(c_hide_cursor);
 
         const bool draw_border = (m_prev_displayed < 0) || (m_title != m_orig_title);
         const uint32 extra = 2 * (1 + m_margin);
@@ -509,7 +504,7 @@ void PopupList::update_display()
 
         line.Clear();
         line.Printf(L"\x1b[%uH", y + 1);
-        OutputConsole(m_hout, line.Text(), line.Length());
+        OutputConsole(line.Text(), line.Length());
 
         // Display border.
         if (draw_border)
@@ -527,7 +522,7 @@ void PopupList::update_display()
             line.Append(horzline);                                  // ─
             line.Append(L"\u2510");                                 // ┐
             line.AppendNormalIf(true);
-            OutputConsole(m_hout, line.Text(), line.Length());
+            OutputConsole(line.Text(), line.Length());
         }
 
         const int32 car_top = calc_scroll_car_offset(m_top, content_height, count, m_vert_scroll_car, c_sbstyle);
@@ -541,7 +536,7 @@ void PopupList::update_display()
         {
             const intptr_t i = m_top + row;
 
-            OutputConsole(m_hout, L"\r\n", 2);
+            OutputConsole(L"\r\n", 2);
 
             if (m_prev_displayed < 0 ||
                 is_selected(i) ||
@@ -587,14 +582,14 @@ void PopupList::update_display()
                     line.Append(L"\u2502");                         // │
                 }
                 line.AppendNormalIf(true);
-                OutputConsole(m_hout, line.Text(), line.Length());
+                OutputConsole(line.Text(), line.Length());
             }
         }
 
         // Display border.
         if (draw_border)
         {
-            OutputConsole(m_hout, L"\r\n", 2);
+            OutputConsole(L"\r\n", 2);
             make_horz_border(L"ENTER=View, ESC=Cancel", content_width + (2 * m_margin), true/*bars*/, horzline,
                              GetColor(ColorElement::PopupFooter), GetColor(ColorElement::PopupBorder));
             line.Clear();
@@ -604,7 +599,7 @@ void PopupList::update_display()
             line.Append(horzline);                                  // ─
             line.Append(L"\u2518");                                 // ┘
             line.AppendNormalIf(true);
-            OutputConsole(m_hout, line.Text(), line.Length());
+            OutputConsole(line.Text(), line.Length());
         }
 
         m_prev_displayed = m_index;
@@ -612,12 +607,12 @@ void PopupList::update_display()
         // Move cursor.
         line.Clear();
         line.Printf(L"\x1b[%u;%uH", 1+y+1+(m_index-m_top), 1+x+1);
-        OutputConsole(m_hout, line.Text(), line.Length());
+        OutputConsole(line.Text(), line.Length());
 #if 0
         m_mouse_offset = 1 + y + 1;
 #endif
 
-        OutputConsole(m_hout, c_show_cursor);
+        OutputConsole(c_show_cursor);
     }
 }
 

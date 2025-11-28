@@ -5,7 +5,6 @@
 
 #include "pch.h"
 #include "error.h"
-#include "output.h"
 
 void ErrorStr::Set(const WCHAR* message)
 {
@@ -219,16 +218,7 @@ bool Error::Report()
     StrW s;
     Format(s);
 
-    HANDLE herr = GetStdHandle(c_std_error_handle);
-    if (IsConsole(herr))
-    {
-        s.TrimRight();
-        OutputConsole(herr, s.Text(), s.Length(), L"0;91");
-    }
-    else
-    {
-        fputws(s.Text(), stderr);
-    }
+    fputws(s.Text(), stderr);
 
     Clear();
     return true;

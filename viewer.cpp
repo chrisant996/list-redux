@@ -55,13 +55,13 @@ void SetViewerScrollbar(bool scrollbar)
 }
 
 // 1 = yes, 0 = no, -1 = cancel.
-static int ConfirmSaveChanges(HANDLE hout)
+static int ConfirmSaveChanges()
 {
     const WCHAR* const msg = L"Do you want to save your changes to this file?";
     const WCHAR* const directive = L"Press Y to save, N to discard, or any other key to cancel...";
     // TODO:  ColorElement::Command might not be the most appropriate color.
     const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
-    OutputConsole(hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     while (true)
     {
@@ -93,13 +93,13 @@ static int ConfirmSaveChanges(HANDLE hout)
     return -1;
 }
 
-static bool ConfirmDiscardBytes(HANDLE hout)
+static bool ConfirmDiscardBytes()
 {
     const WCHAR* const msg = L"Do you want to discard all unsaved changes to this file?";
     const WCHAR* const directive = L"Press Y to discard, or any other key to cancel...";
     // TODO:  ColorElement::Command might not be the most appropriate color.
     const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
-    OutputConsole(hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     while (true)
     {
@@ -128,13 +128,13 @@ static bool ConfirmDiscardBytes(HANDLE hout)
     return false;
 }
 
-static bool ConfirmUndoSave(HANDLE hout)
+static bool ConfirmUndoSave()
 {
     const WCHAR* const msg = L"Do you want to undo all saved changes to this file?";
     const WCHAR* const directive = L"Press Y to undo, or any other key to cancel...";
     // TODO:  ColorElement::Command might not be the most appropriate color.
     const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
-    OutputConsole(hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     while (true)
     {
@@ -219,7 +219,6 @@ private:
     ViewerOutcome   CloseCurrentFile();
 
 private:
-    const HANDLE    m_hout;
     unsigned        m_terminal_width = 0;
     unsigned        m_terminal_height = 0;
     unsigned        m_content_height = 0;
@@ -281,18 +280,16 @@ void ScopedWorkingIndicator::ShowFeedback(bool completed, unsigned __int64 proce
     if (!m_needs_cleanup && viewer && !completed && processed + c_threshold < target)
     {
         StrW msg;
-        HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
-        const DWORD colsrows = GetConsoleColsRows(hout);
+        const DWORD colsrows = GetConsoleColsRows();
         msg.Printf(L"\x1b[%uH", HIWORD(colsrows));
         viewer->MakeCommandLine(msg, L"Working...");
-        OutputConsole(hout, msg.Text(), msg.Length());
+        OutputConsole(msg.Text(), msg.Length());
         m_needs_cleanup = true;
     }
 }
 
 Viewer::Viewer(const char* text, const WCHAR* title)
-: m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
-, m_title(title)
+: m_title(title)
 , m_text(text)
 , m_context(g_options)
 {
@@ -307,8 +304,7 @@ Viewer::Viewer(const char* text, const WCHAR* title)
 }
 
 Viewer::Viewer(const std::vector<StrW>& files)
-: m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
-, m_files(&files)
+: m_files(&files)
 , m_context(g_options)
 {
     m_hex_mode = g_options.hex_mode;
@@ -410,7 +406,7 @@ void Viewer::UpdateDisplay()
     // the highest, i.e. widest, file number or file offset).
     const unsigned debug_row = !!g_options.show_debug_info;
     const unsigned hex_ruler = !!m_hex_mode;
-    const DWORD colsrows = GetConsoleColsRows(m_hout);
+    const DWORD colsrows = GetConsoleColsRows();
     m_terminal_width = LOWORD(colsrows);
     m_terminal_height = HIWORD(colsrows);
     if (m_terminal_height > 1 + hex_ruler + debug_row + 1)
@@ -669,9 +665,9 @@ LAutoFitContentWidth:
 #ifdef DEBUG
         if (s_no_accumulate && s.Length())
         {
-            OutputConsole(m_hout, c_hide_cursor);
+            OutputConsole(c_hide_cursor);
             s.Append(c_show_cursor);
-            OutputConsole(m_hout, s.Text(), s.Length());
+            OutputConsole(s.Text(), s.Length());
             s.Clear();
         }
 #endif
@@ -890,9 +886,9 @@ LAutoFitContentWidth:
 #ifdef DEBUG
                 if (s_no_accumulate && s.Length())
                 {
-                    OutputConsole(m_hout, c_hide_cursor);
+                    OutputConsole(c_hide_cursor);
                     s.Append(c_show_cursor);
-                    OutputConsole(m_hout, s.Text(), s.Length());
+                    OutputConsole(s.Text(), s.Length());
                     s.Clear();
                 }
 #endif
@@ -1002,11 +998,11 @@ LAutoFitContentWidth:
             cursor_x = cell_count(left.Text()) + 1;
         }
 
-        OutputConsole(m_hout, c_hide_cursor);
+        OutputConsole(c_hide_cursor);
         s.Printf(L"\x1b[%u;%uH", cursor_y, cursor_x);
         s.Append(c_norm);
         s.Append(c_show_cursor);
-        OutputConsole(m_hout, s.Text(), s.Length());
+        OutputConsole(s.Text(), s.Length());
     }
 
     m_feedback.Clear();
@@ -1563,13 +1559,13 @@ hex_edit_right:
                     if (m_context.IsDirty())
                     {
                         m_force_update = true;
-                        if (ConfirmDiscardBytes(m_hout))
+                        if (ConfirmDiscardBytes())
                             m_context.DiscardBytes();
                     }
                     else if (m_context.IsSaved())
                     {
                         m_force_update = true;
-                        if (ConfirmUndoSave(m_hout))
+                        if (ConfirmUndoSave())
                             m_context.UndoSave(e);
                     }
                 }
@@ -1630,7 +1626,7 @@ hex_edit_right:
 toggle_hex_edit:
                     if (m_hex_edit && m_context.IsDirty())
                     {
-                        const int confirm = ConfirmSaveChanges(m_hout);
+                        const int confirm = ConfirmSaveChanges();
                         m_force_update = true;
                         if (confirm < 0)
                             break;
@@ -1956,12 +1952,12 @@ void Viewer::DoSearch(bool next, bool caseless)
     StrW tmp;
     tmp.Printf(L"Search%s ", c_prompt_char);
     MakeCommandLine(s, tmp.Text());
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     Error e;
     auto searcher = ReadSearchInput(m_terminal_width, caseless, false, e);
 
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
     m_force_update = true;
 
     if (e.Test())
@@ -2169,12 +2165,12 @@ void Viewer::GoTo()
         s.Clear();
         s.AppendColor(GetColor(ColorElement::Command));
         s.Printf(L"\r%s\x1b[%uG%s\r%s%s ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), !lineno ? L"Offset" : L"Line #", c_prompt_char);
-        OutputConsole(m_hout, s.Text(), s.Length());
+        OutputConsole(s.Text(), s.Length());
 
         done = true;
         ReadInput(s, History::Goto, 32, 32, callback);
 
-        OutputConsole(m_hout, c_norm);
+        OutputConsole(c_norm);
         if (done)
             m_force_update = true;
     }
@@ -2320,11 +2316,11 @@ void Viewer::OpenNewFile(Error& e)
     tmp.Printf(L"Enter file to open%s ", c_prompt_char);
     s.AppendColor(GetColor(ColorElement::Command));
     s.Printf(L"\r%s", tmp.Text());
-    OutputConsole(m_hout, s.Text(), s.Length());
+    OutputConsole(s.Text(), s.Length());
 
     ReadInput(s, History::OpenFile, m_terminal_width - 1 - tmp.Length());
 
-    OutputConsole(m_hout, c_norm);
+    OutputConsole(c_norm);
 
     StrW full;
     if (!OS::GetFullPathName(s.Text(), full, e))
