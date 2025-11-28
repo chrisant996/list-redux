@@ -127,7 +127,9 @@
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
   - [ ] detect C++, Lua, etc and render syntax coloring
+  - [ ] allow showing CSI SGR codes inline?  (but wrapping and max line length are problematic)
 - [ ] option to sort horizontally instead of vertically
+- [ ] option or toggle showing scrollbar in viewer?
 
 ### Maybe
 
