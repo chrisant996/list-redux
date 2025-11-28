@@ -431,28 +431,20 @@ static unsigned GetSizeFieldWidthByStyle(WCHAR chStyle)
 
 void FormatSize(StrW& s, unsigned __int64 cbSize, unsigned max_width, WCHAR chStyle, const WCHAR* color, const WCHAR* fallback_color)
 {
-    // FUTURE: CMD shows size for FILE_ATTRIBUTE_OFFLINE files in parentheses
-    // to indicate it could take a while to retrieve them.
-
-    if (!CanUseEscapeCodes())
-        color = nullptr;
-    else
+#if 0
+    if (!color)
+        color = GetSizeColor(cbSize);
+#endif
+    if (!color)
+        color = fallback_color;
+#if 0
+    if (s_gradient && (s_scale_fields & SCALE_SIZE))
     {
-#if 0
-        if (!color)
-            color = GetSizeColor(cbSize);
-#endif
-        if (!color)
-            color = fallback_color;
-#if 0
-        if (s_gradient && (s_scale_fields & SCALE_SIZE))
-        {
-            const WCHAR* gradient = ApplyGradient(color ? color : L"", cbSize, settings.m_min_size[*which], settings.m_max_size[*which]);
-            if (gradient)
-                color = gradient;
-        }
-#endif
+        const WCHAR* gradient = ApplyGradient(color ? color : L"", cbSize, settings.m_min_size[*which], settings.m_max_size[*which]);
+        if (gradient)
+            color = gradient;
     }
+#endif
 
     const WCHAR* unit_color = nullptr;
     s.AppendColorNoLineStyles(color);
@@ -619,9 +611,7 @@ static void FormatFileSize(StrW& s, const FileInfo* pfi, WCHAR chStyle=0, const 
 
     if (tag)
     {
-        const bool can_use_color = CanUseEscapeCodes();
-        if (s_no_dir_tag ||
-            (can_use_color && (s_scale_fields & SCALE_SIZE)))
+        if (s_no_dir_tag || (s_scale_fields & SCALE_SIZE))
         {
             const unsigned trailing = (chStyle == 's');
             s.AppendSpaces(max_width - 1 - trailing);
@@ -637,8 +627,6 @@ static void FormatFileSize(StrW& s, const FileInfo* pfi, WCHAR chStyle=0, const 
         }
         else
         {
-            if (!can_use_color)
-                fallback_color = nullptr;
             s.AppendColorNoLineStyles(fallback_color);
             if (s_mini_decimal)
             {
@@ -945,14 +933,9 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
     if (max_width < 3)
         return 0;
 
-    const WCHAR* color = nullptr;
-    if (CanUseEscapeCodes())
-    {
-        color = GetColor(selected ?
-                         (tagged ? ColorElement::SelectedTagged : ColorElement::Selected) :
-                         (tagged ? ColorElement::Tagged : ColorElement::File));
-    }
-
+    const WCHAR* color = GetColor(selected ?
+                                  (tagged ? ColorElement::SelectedTagged : ColorElement::Selected) :
+                                  (tagged ? ColorElement::Tagged : ColorElement::File));
     const unsigned orig_len = s.Length();
 
     s.AppendColor(color);
@@ -1004,11 +987,8 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
         s.Append(c_tag_char);
     else
     {
-        if (CanUseEscapeCodes())
-        {
-            div_color = ConvertColorParams(ColorElement::Divider, ColorConversion::TextOnly);
-            s.AppendColorOverlay(nullptr, div_color);
-        }
+        div_color = ConvertColorParams(ColorElement::Divider, ColorConversion::TextOnly);
+        s.AppendColorOverlay(nullptr, div_color);
         s.Append(c_div_char);
     }
 

@@ -219,7 +219,7 @@ bool Error::Report()
     StrW s;
     Format(s);
 
-    HANDLE herr = GetStdHandle(STD_ERROR_HANDLE);
+    HANDLE herr = GetStdHandle(c_std_error_handle);
     if (IsConsole(herr))
     {
         s.TrimRight();

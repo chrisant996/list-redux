@@ -12,12 +12,6 @@ class Error;
 
 bool IsConsole(HANDLE h);
 
-void SetUtf8Output(bool utf8);
-void SetRedirectedStdOut(bool redirected);
-
-bool SetUseEscapeCodes(const WCHAR* s);
-bool CanUseEscapeCodes();
-
 DWORD GetConsoleColsRows(HANDLE hout);
 
 void ExpandTabs(const WCHAR* s, StrW& out, unsigned max_width=0);

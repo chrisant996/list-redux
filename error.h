@@ -5,6 +5,10 @@
 
 #pragma once
 
+#ifndef c_std_error_handle
+#define c_std_error_handle STD_ERROR_HANDLE
+#endif
+
 #include "str.h"
 
 class ErrorStr

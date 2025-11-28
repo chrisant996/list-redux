@@ -11,21 +11,7 @@
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
 
-#include <VersionHelpers.h>
-
 const WORD c_cxTab = 8;
-
-enum class EscapeCodesMode
-{
-    not_initialized,
-    prohibit,
-    allow,
-    automatic,  // When not redirected.
-};
-
-static EscapeCodesMode s_escape_codes = EscapeCodesMode::not_initialized;
-static bool s_utf8 = false;
-static bool s_redirected_stdout = false;
 
 const WCHAR c_hide_cursor[] = L"\x1b[?25l";
 const WCHAR c_show_cursor[] = L"\x1b[?25h";
@@ -34,70 +20,6 @@ bool IsConsole(HANDLE h)
 {
     DWORD dummy;
     return !!GetConsoleMode(h, &dummy);
-}
-
-void SetUtf8Output(bool utf8)
-{
-    s_utf8 = utf8;
-}
-
-void SetRedirectedStdOut(bool redirected)
-{
-    if (redirected)
-        SetUseEscapeCodes(L"never");
-}
-
-bool SetUseEscapeCodes(const WCHAR* s)
-{
-    if (!s)
-        return false;
-    else if (!_wcsicmp(s, L"") || !_wcsicmp(s, L"always"))
-        s_escape_codes = EscapeCodesMode::allow;
-    else if (!_wcsicmp(s, L"never"))
-        s_escape_codes = EscapeCodesMode::prohibit;
-    else if (!_wcsicmp(s, L"auto"))
-        s_escape_codes = EscapeCodesMode::automatic;
-    else
-        return false;
-    return true;
-}
-
-bool CanUseEscapeCodes()
-{
-    switch (s_escape_codes)
-    {
-    case EscapeCodesMode::prohibit:
-        return false;
-    case EscapeCodesMode::allow:
-        return true;
-    case EscapeCodesMode::automatic:
-        break;
-    case EscapeCodesMode::not_initialized:
-        s_escape_codes = EscapeCodesMode::automatic;
-        break;
-    default:
-        assert(false);
-        return false;
-    }
-
-    assert(s_escape_codes == EscapeCodesMode::automatic);
-
-    // See https://no-color.org/.
-    const WCHAR* env = _wgetenv(L"NO_COLOR");
-    if (env && *env)
-    {
-        s_escape_codes = EscapeCodesMode::prohibit;
-        return false;
-    }
-
-    if (!IsWindows10OrGreater())
-    {
-        s_escape_codes = EscapeCodesMode::prohibit;
-        return false;
-    }
-
-    s_escape_codes = EscapeCodesMode::allow;
-    return true;
 }
 
 int ValidateColor(const WCHAR* p)
@@ -297,7 +219,7 @@ static bool WriteConsoleInternal(HANDLE h, const WCHAR* p, unsigned len, const W
 
     if (color)
     {
-        if (!CanUseEscapeCodes() || ValidateColor(color) <= 0)
+        if (ValidateColor(color) <= 0)
             color = nullptr;
     }
 
@@ -351,7 +273,7 @@ static bool WriteConsoleInternal(HANDLE h, const WCHAR* p, unsigned len, const W
             }
             else
             {
-                const UINT cp = s_utf8 ? CP_UTF8 : GetConsoleOutputCP();
+                const UINT cp = GetConsoleOutputCP();
                 const size_t needed = WideCharToMultiByte(cp, 0, p, int(run), 0, 0, 0, 0);
                 char* out = tmp.Reserve(needed + 1);
                 int used = WideCharToMultiByte(cp, 0, p, int(run), out, int(needed), 0, 0);

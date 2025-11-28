@@ -34,6 +34,9 @@ typedef unsigned __int32 uint32;
 template<class T> T min(T a, T b) { return (a <= b) ? a : b; }
 template<class T> T max(T a, T b) { return (a >= b) ? a : b; }
 
+// This project never uses STD_ERROR_HANDLE.
+#define c_std_error_handle STD_OUTPUT_HANDLE
+
 #include "str.h"
 #include "path.h"
 #include "error.h"

@@ -7,6 +7,8 @@
 #include "signaled.h"
 #include "output.h"
 
+#include <VersionHelpers.h>
+
 static bool s_signaled = false;
 
 class CRestoreConsole
@@ -23,9 +25,7 @@ private:
 
 private:
     HANDLE              m_hout = 0;
-    HANDLE              m_herr = 0;
     DWORD               m_mode_out;
-    DWORD               m_mode_err;
     bool                m_graceful = false;
 };
 
@@ -49,25 +49,17 @@ void ClearSignaled()
 CRestoreConsole::CRestoreConsole()
 {
     HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
-    HANDLE herr = GetStdHandle(STD_ERROR_HANDLE);
-
     if (hout && !GetConsoleMode(hout, &m_mode_out))
         hout = 0;
-    if (herr && !GetConsoleMode(herr, &m_mode_err))
-        herr = 0;
-
-    if (!hout && !herr)
+    if (!hout)
         return;
 
     m_hout = hout;
-    m_herr = herr;
 
     SetConsoleCtrlHandler(BreakHandler, true);
 
     if (hout)
         SetConsoleMode(hout, m_mode_out|ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-    if (herr)
-        SetConsoleMode(herr, m_mode_err|ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 }
 
 CRestoreConsole::~CRestoreConsole()
@@ -77,25 +69,17 @@ CRestoreConsole::~CRestoreConsole()
 
 void CRestoreConsole::Restore()
 {
-    if (m_hout || m_herr)
+    if (m_hout)
     {
         if (!m_graceful)
         {
             DWORD dummy;
-            if (m_hout && CanUseEscapeCodes() && GetConsoleMode(m_hout, &dummy))
-                WriteConsoleW(m_hout, L"\x1b[m", 3, &dummy, nullptr);
-            if (m_herr && CanUseEscapeCodes() && GetConsoleMode(m_herr, &dummy))
-                WriteConsoleW(m_herr, L"\x1b[m", 3, &dummy, nullptr);
+            if (m_hout && GetConsoleMode(m_hout, &dummy))
+                OutputConsole(m_hout, L"\x1b[m", 3);
         }
-    }
-
-    if (m_hout)
         SetConsoleMode(m_hout, m_mode_out);
-    if (m_herr)
-        SetConsoleMode(m_herr, m_mode_err);
-
+    }
     m_hout = 0;
-    m_herr = 0;
 }
 
 BOOL CRestoreConsole::BreakHandler(DWORD CtrlType)
