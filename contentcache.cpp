@@ -983,7 +983,7 @@ ContentCache& ContentCache::operator=(ContentCache&& other)
 {
     // m_options can't be updated, and it doesn't need to be.
     m_name = std::move(other.m_name);
-    m_file = other.m_file;
+    m_file = std::move(other.m_file);
     m_size = other.m_size;
     m_hex_size_width = other.m_hex_size_width;
     m_redirected = other.m_redirected;
@@ -1135,12 +1135,8 @@ bool ContentCache::Open(const WCHAR* name, Error& e)
 
 void ContentCache::Close()
 {
-    if (m_file != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle(m_file);
-        m_file = INVALID_HANDLE_VALUE;
-        m_name.Clear();
-    }
+    m_name.Clear();
+    m_file.Close();
 
     SetSize(0);
     m_chunks.swap(PipeChunks {});
@@ -2251,7 +2247,7 @@ bool ContentCache::SaveBytes(Error& e)
     if (!IsOpen() || IsPipe() || !IsDirty())
         return false;
 
-    HANDLE h = CreateFileW(m_name.Text(), GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, 0);
+    SHFile h = CreateFileW(m_name.Text(), GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, 0);
     if (h == INVALID_HANDLE_VALUE)
     {
         e.Sys();
@@ -2274,9 +2270,6 @@ bool ContentCache::SaveBytes(Error& e)
         else
             m_patch_blocks_saved.emplace(p.first, p.second);
     }
-
-    CloseHandle(h);
-    h = INVALID_HANDLE_VALUE;
 
     if (ok)
     {
