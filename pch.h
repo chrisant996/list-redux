@@ -18,7 +18,7 @@
 
 // Define this to include an ECMA-48 compliant terminal emulator, to allow
 // running on Windows versions before 10 build 15063.
-//#define INCLUDE_TERMINAL_EMULATOR
+#define INCLUDE_TERMINAL_EMULATOR
 
 #define implies(x, y)           (!(x) || (y))
 

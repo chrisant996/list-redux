@@ -9,6 +9,8 @@
 #include "ecma48.h"
 #include "palette.h"
 
+#include <vector>
+
 #undef WriteConsole
 
 class attributes;
@@ -19,7 +21,7 @@ enum class clear_line { right, left, all };
 class Terminal
 {
 public:
-                        Terminal();
+                        Terminal(int emulate=-1);
                         ~Terminal();
 
     void                WriteConsole(const WCHAR* chars, unsigned length);
@@ -28,6 +30,9 @@ private:
     const HANDLE        m_hout;
 
 #ifdef INCLUDE_TERMINAL_EMULATOR
+public:
+    void                SetEmulation(int emulate=-1);
+
 private:
 #pragma region Emulation Methods
     void                write_c1(const ecma48_code& code);
@@ -61,7 +66,7 @@ private:
 
 private:
     CRITICAL_SECTION    m_cs;
-    const bool          m_emulate;
+    bool                m_emulate;
 
 #pragma region Emulation State
     enum : WORD
@@ -81,8 +86,7 @@ private:
     bool                m_alternate_screen = false;
     COORD               m_saved_cursor = { -1, -1 };
 
-    CHAR_INFO*          m_screen_pointer = nullptr;
-    size_t              m_screen_capacity = 0;
+    std::vector<CHAR_INFO> m_screen_buffer;
     COORD               m_screen_dimensions = {};
     COORD               m_screen_cursor = {};
 #pragma endregion Emulation State

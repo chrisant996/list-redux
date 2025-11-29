@@ -9,7 +9,7 @@
 
 #ifndef INCLUDE_TERMINAL_EMULATOR
 
-Terminal::Terminal()
+Terminal::Terminal(int /*emulate*/)
 : m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
 {
 }
@@ -30,8 +30,15 @@ void Terminal::WriteConsole(const WCHAR* chars, unsigned length)
 
 static const uint8 s_rgb_cube[] = { 0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff };
 
-static bool IsEmulationNeeded()
+static bool IsEmulationNeeded(int emulate=-1)
 {
+    if (emulate > 0)
+        return true;
+    if (emulate == 0)
+        return false;
+
+    // 'emulate' < 0 means automatically detect whether emulation is needed.
+
     if (!IsWindows10OrGreater())
         return true;
 
@@ -359,19 +366,22 @@ static bool find_best_palette_match(HANDLE hout, attributes& attr)
 
 #define SCOPED_LOCK ScopedEnterCritSec scoped_lock(m_cs)
 
-Terminal::Terminal()
+Terminal::Terminal(int emulate)
 : m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
-, m_emulate(IsEmulationNeeded())
+, m_emulate(IsEmulationNeeded(emulate))
 {
     InitializeCriticalSection(&m_cs);
 }
 
 Terminal::~Terminal()
 {
-    delete [] m_screen_pointer;
-    m_screen_pointer = nullptr;
-    m_screen_capacity = 0;
     DeleteCriticalSection(&m_cs);
+}
+
+void Terminal::SetEmulation(int emulate)
+{
+    m_emulate = IsEmulationNeeded(emulate);
+    m_screen_buffer = std::move(std::vector<CHAR_INFO>());
 }
 
 void Terminal::WriteConsole(const WCHAR* chars, unsigned length)
@@ -795,35 +805,35 @@ bool Terminal::do_alternate_screen(bool alternate)
 
     // Get current screen info.
     const DWORD capacity = csbi.dwSize.X * csbi.dwSize.Y;
-    CHAR_INFO* buffer = new CHAR_INFO[capacity];
-    if (buffer)
+    std::vector<CHAR_INFO> buffer;
+    try
+    {
+        buffer.reserve(capacity);
+    } catch (...)
     {
         SMALL_RECT region = {};
         region.Right = csbi.dwSize.X - 1;
         region.Bottom = csbi.dwSize.Y - 1;
-        ReadConsoleOutputW(m_hout, buffer, csbi.dwSize, origin, &region);
+        ReadConsoleOutputW(m_hout, &*buffer.begin(), csbi.dwSize, origin, &region);
     }
 
     // Apply screen info for the screen being activated.
-    if (m_screen_pointer)
+    if (m_screen_buffer.empty())
+    {
+        do_clear(clear::all);
+    }
+    else
     {
         SMALL_RECT region = {};
         region.Right = csbi.dwSize.X - 1;
         region.Bottom = csbi.dwSize.Y - 1;
-        WriteConsoleOutput(m_hout, m_screen_pointer, m_screen_dimensions, origin, &region);
-        delete [] m_screen_pointer;
-        m_screen_pointer = nullptr;
-        m_screen_capacity = 0;
-    }
-    else
-    {
-        do_clear(clear::all);
+        WriteConsoleOutput(m_hout, &*m_screen_buffer.begin(), m_screen_dimensions, origin, &region);
+        m_screen_buffer.clear();
     }
     SetConsoleCursorPosition(m_hout, m_screen_cursor);
 
     // Remember the screen info.
-    m_screen_pointer = buffer;
-    m_screen_capacity = buffer ? capacity : 0;
+    m_screen_buffer = std::move(buffer);
     m_screen_dimensions = csbi.dwSize;
     m_screen_cursor = csbi.dwCursorPosition;
 

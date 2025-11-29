@@ -27,6 +27,11 @@ bool IsConsole(HANDLE h)
     return !!GetConsoleMode(h, &dummy);
 }
 
+void SetEmulation(int emulate)
+{
+    s_terminal->SetEmulation(emulate);
+}
+
 int ValidateColor(const WCHAR* p)
 {
     // NOTE:  The caller is responsible for stripping leading/trailing spaces.

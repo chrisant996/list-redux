@@ -104,6 +104,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     enum
     {
         LOI_UNIQUE_IDS              = 0x7FFF,
+        LOI_EMULATE,
+        LOI_NO_EMULATE,
         LOI_MAX_LINE_LENGTH,
         LOI_MULTIBYTE,
         LOI_NO_MULTIBYTE,
@@ -112,7 +114,10 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     static LongOption<WCHAR> long_opts[] =
     {
         { L"help",                  nullptr,            '?' },
+        { L"input-file",            nullptr,            '@', LOHA_REQUIRED },
         { L"version",               nullptr,            'V' },
+        { L"emulate",               nullptr,            LOI_EMULATE, LOHA_OPTIONAL },
+        { L"no-emulate",            nullptr,            LOI_NO_EMULATE },
         { L"max-line-length",       nullptr,            LOI_MAX_LINE_LENGTH, LOHA_REQUIRED },
         { L"multibyte",             nullptr,            LOI_MULTIBYTE },
         { L"no-multibyte",          nullptr,            LOI_NO_MULTIBYTE },
@@ -168,7 +173,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     const LongOption<WCHAR>* long_opt;
     std::vector<StrW> files;
 
-    for (unsigned ii = 0; opts.GetValue(ii, ch, opt_value, &long_opt); ii++)
+    for (unsigned ii = 0; !e.Test() && opts.GetValue(ii, ch, opt_value, &long_opt); ii++)
     {
         switch (ch)
         {
@@ -220,6 +225,22 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                 continue; // Other flags are handled separately further below.
             switch (long_opt->value)
             {
+            case LOI_EMULATE:
+            case LOI_NO_EMULATE:
+                {
+                    int emulate;
+                    if (!opt_value)
+                        emulate = (long_opt->value == LOI_EMULATE);
+                    else if (wcsicmp(opt_value, L"auto") == 0)
+                        emulate = -1;
+                    else if (wcsicmp(opt_value, L"on") == 0)
+                        emulate = true;
+                    else if (wcsicmp(opt_value, L"off") == 0)
+                        emulate = false;
+                    else
+                        e.Set(L"Unrecognized value '%1' for option 'emulate'.") << opt_value;
+                }
+                break;
             case LOI_MAX_LINE_LENGTH:
                 SetMaxLineLength(opt_value);
                 break;
@@ -231,6 +252,9 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
             break;
         }
     }
+
+    if (e.Test())
+        return e.Report();
 
     LoadConfig();
     TryCoInitialize();
