@@ -3,8 +3,28 @@
 // License: http://opensource.org/licenses/MIT
 
 #include "pch.h"
+
 #include "terminal.h"
 #include "output.h"
+
+#ifndef INCLUDE_TERMINAL_EMULATOR
+
+Terminal::Terminal()
+: m_hout(GetStdHandle(STD_OUTPUT_HANDLE))
+{
+}
+
+Terminal::~Terminal()
+{
+}
+
+void Terminal::WriteConsole(const WCHAR* chars, unsigned length)
+{
+    DWORD written;
+    WriteConsoleW(m_hout, chars, length, &written, nullptr);
+}
+
+#else // INCLUDE_TERMINAL_EMULATOR
 
 #include <VersionHelpers.h>
 
@@ -1085,3 +1105,5 @@ void Terminal::do_set_attributes(attributes attr)
 #pragma endregion Screen Methods
 
 #pragma endregion Terminal
+
+#endif

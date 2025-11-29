@@ -16,6 +16,10 @@
 // opted in to be controlled by this.
 //#define DISALLOW_DESTRUCTIVE_OPERATIONS
 
+// Define this to include an ECMA-48 compliant terminal emulator, to allow
+// running on Windows versions before 10 build 15063.
+//#define INCLUDE_TERMINAL_EMULATOR
+
 #define implies(x, y)           (!(x) || (y))
 
 template <typename T> T clamp(T value, T min, T max)

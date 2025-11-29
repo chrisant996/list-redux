@@ -25,6 +25,10 @@ public:
     void                WriteConsole(const WCHAR* chars, unsigned length);
 
 private:
+    const HANDLE        m_hout;
+
+#ifdef INCLUDE_TERMINAL_EMULATOR
+private:
 #pragma region Emulation Methods
     void                write_c1(const ecma48_code& code);
     void                write_c0(int32 c0);
@@ -41,7 +45,6 @@ private:
     void                set_private_mode(const ecma48_code::csi_base& csi);
     void                reset_private_mode(const ecma48_code::csi_base& csi);
 #pragma endregion Emulation Methods
-
 #pragma region Screen Methods
     void                do_write(const WCHAR* chars, unsigned length);
     bool                do_cursor_style(int /*style*/, int visible);
@@ -58,8 +61,6 @@ private:
 
 private:
     CRITICAL_SECTION    m_cs;
-
-    const HANDLE        m_hout;
     const bool          m_emulate;
 
 #pragma region Emulation State
@@ -85,6 +86,5 @@ private:
     COORD               m_screen_dimensions = {};
     COORD               m_screen_cursor = {};
 #pragma endregion Emulation State
+#endif
 };
-
-// virtual void        flush() override;

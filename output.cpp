@@ -18,6 +18,7 @@ const WCHAR c_hide_cursor[] = L"\x1b[?25l";
 const WCHAR c_show_cursor[] = L"\x1b[?25h";
 
 static HANDLE s_hout = GetStdHandle(STD_OUTPUT_HANDLE);
+
 static Terminal* s_terminal = new Terminal;
 
 bool IsConsole(HANDLE h)
