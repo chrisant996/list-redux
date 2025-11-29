@@ -11,6 +11,7 @@
 
 - [x] read color configuration from `.listredux` file
 - [x] history in ReadInput() prompts
+- [x] include terminal emulation for running on older than Windows 10 build 15063
 - [ ] some way to configure colors inside the app
 - [ ] optionally save configured colors to `.listredux` file
 - [ ] some way to revert to default colors inside the app
@@ -156,8 +157,7 @@
 
 # KNOWN ISSUES
 
-- Relies on ANSI escape code support in the terminal.  Could remove that limitation by porting Clink's terminal emulator.
-- Very large files consisting mostly of very short lines may take an excessive amount of memory to open.  This could lead to crashing the program.
+- Very large files consisting mostly of very short lines may take an excessive amount of memory to open.  This could lead to crashing the program.  For example, a 2GB file containing only 0x0A bytes would be interpreted as 2 billion lines, and take many times that much space to maintain tracking data for all 2 billion lines.
 
 ### Not Planned
 

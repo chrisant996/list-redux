@@ -18,7 +18,7 @@ const WCHAR c_hide_cursor[] = L"\x1b[?25l";
 const WCHAR c_show_cursor[] = L"\x1b[?25h";
 
 static HANDLE s_hout = GetStdHandle(STD_OUTPUT_HANDLE);
-static Terminal s_terminal;
+static Terminal* s_terminal = new Terminal;
 
 bool IsConsole(HANDLE h)
 {
@@ -152,7 +152,7 @@ DWORD GetConsoleColsRows()
     return (s_num_rows << 16) | s_num_cols;
 }
 
-static bool WriteConsoleInternal(const WCHAR* p, unsigned len, const WCHAR* color=nullptr)
+static void WriteConsoleInternal(const WCHAR* p, unsigned len, const WCHAR* color=nullptr)
 {
     if (color)
     {
@@ -164,8 +164,7 @@ static bool WriteConsoleInternal(const WCHAR* p, unsigned len, const WCHAR* colo
     {
         StrW tmp;
         tmp.Printf(L"\x1b[0;%sm", color);
-        if (!s_terminal.WriteConsole(tmp.Text(), tmp.Length()))
-            return false;
+        s_terminal->WriteConsole(tmp.Text(), tmp.Length());
     }
 
     StrA tmp;
@@ -173,8 +172,7 @@ static bool WriteConsoleInternal(const WCHAR* p, unsigned len, const WCHAR* colo
     {
         if (p[0] == '\n')
         {
-            if (!s_terminal.WriteConsole(L"\r\n", 2))
-                return false;
+            s_terminal->WriteConsole(L"\r\n", 2);
             --len;
             ++p;
         }
@@ -184,23 +182,16 @@ static bool WriteConsoleInternal(const WCHAR* p, unsigned len, const WCHAR* colo
             ++run;
 
         if (run)
-        {
-            if (!s_terminal.WriteConsole(p, run))
-                return false;
-        }
+            s_terminal->WriteConsole(p, run);
 
         len -= run;
         p += run;
     }
 
     if (color)
-    {
-        if (!s_terminal.WriteConsole(L"\x1b[m", 3))
-            return false;
-    }
+        s_terminal->WriteConsole(L"\x1b[m", 3);
 
     assert(!len);
-    return true;
 }
 
 void OutputConsole(const WCHAR* p, unsigned len, const WCHAR* color)
@@ -210,12 +201,7 @@ void OutputConsole(const WCHAR* p, unsigned len, const WCHAR* color)
     if (!len)
         return;
 
-    if (!WriteConsoleInternal(p, len, color))
-    {
-        // TODO: error handling...
-        exit(1);
-        return;
-    }
+    WriteConsoleInternal(p, len, color);
 }
 
 void ExpandTabs(const WCHAR* s, StrW& out, unsigned max_width)

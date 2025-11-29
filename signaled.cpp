@@ -7,8 +7,6 @@
 #include "signaled.h"
 #include "output.h"
 
-#include <VersionHelpers.h>
-
 static bool s_signaled = false;
 
 class CRestoreConsole
@@ -75,7 +73,6 @@ void CRestoreConsole::Restore()
         {
             DWORD dummy;
             if (m_hout && GetConsoleMode(m_hout, &dummy))
-// TODO:  Terminal should handle this natively, to make sure there are no thread synchronization issues.
                 OutputConsole(L"\x1b[m", 3);
         }
         SetConsoleMode(m_hout, m_mode_out);
