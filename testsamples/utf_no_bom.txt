@@ -1,0 +1,10 @@
+-- Ne doit pas faire
+-- é
+select PARC.CONTYP
+, PARC.CONSTA
+, count(*)
+from ParcNonCede PARC
+, PLAN P
+and PARC.CONSTA not in ('Stock', 'Détourné')
+group by CONTYP, CONSTA
+;
