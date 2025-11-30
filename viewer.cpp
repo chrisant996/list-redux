@@ -2122,18 +2122,17 @@ void Viewer::GoTo()
     {
         if (input.type != InputType::Char)
             return 0; // Accept.
-        if ((input.modifier & ~Modifier::SHIFT) != Modifier::None)
-            return 1; // Eat.
-
-        if (input.key_char >= '0' && input.key_char <= '9')
-            return 0; // Accept decimal digits for both line number and offset.
-        if ((input.key_char >= 'A' && input.key_char <= 'F') || (input.key_char >= 'a' && input.key_char <= 'f'))
-            return lineno ? 1 : 0; // Accept hexadecimal digits only for offset.
-        if (input.key_char == 'x' || input.key_char == 'X')
-            return s.Equal(L"0") ? 0 : 1; // Accept '0x' or '0X' prefix.
-        if (input.key_char == '$' || input.key_char == '#')
-            return s.Empty() ? 0 : 1; // Accept '$' or '#' prefix.
-
+        if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
+        {
+            if (input.key_char >= '0' && input.key_char <= '9')
+                return 0; // Accept decimal digits for both line number and offset.
+            if ((input.key_char >= 'A' && input.key_char <= 'F') || (input.key_char >= 'a' && input.key_char <= 'f'))
+                return lineno ? 1 : 0; // Accept hexadecimal digits only for offset.
+            if (input.key_char == 'x' || input.key_char == 'X')
+                return s.Equal(L"0") ? 0 : 1; // Accept '0x' or '0X' prefix.
+            if (input.key_char == '$' || input.key_char == '#')
+                return s.Empty() ? 0 : 1; // Accept '$' or '#' prefix.
+        }
         if (input.key_char == 'g')
         {
             // 'G' toggles between line number and offset.
