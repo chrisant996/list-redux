@@ -217,6 +217,7 @@ private:
     void            ChooseEncoding();
     void            OpenNewFile(Error& e);
     ViewerOutcome   CloseCurrentFile();
+    bool            ToggleHexEditMode(Error& e);
 
 private:
     unsigned        m_terminal_width = 0;
@@ -1128,7 +1129,10 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
 
         case Key::ESC:
             if (m_hex_edit)
-                goto toggle_hex_edit;
+            {
+                ToggleHexEditMode(e);
+                break;
+            }
             return ViewerOutcome::RETURN;
 
         case Key::HOME:
@@ -1504,7 +1508,10 @@ hex_edit_right:
             if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
             {
                 if (!m_text && ViewHelp(Help::VIEWER, e) == ViewerOutcome::EXITAPP)
-                    return ViewerOutcome::EXITAPP;
+                {
+                    if (!m_hex_edit || ToggleHexEditMode(e))
+                        return ViewerOutcome::EXITAPP;
+                }
                 m_force_update = true;
             }
             break;
@@ -1519,14 +1526,14 @@ hex_edit_right:
         case 'N'-'@':   // CTRL-N
             if (input.modifier == Modifier::CTRL)
             {
-                if (!m_hex_edit)
+                if (!m_hex_edit || ToggleHexEditMode(e))
                     SetFile(m_index + 1);
             }
             break;
         case 'P'-'@':   // CTRL-P
             if (input.modifier == Modifier::CTRL)
             {
-                if (!m_hex_edit)
+                if (!m_hex_edit || ToggleHexEditMode(e))
                     SetFile(m_index - 1);
             }
             break;
@@ -1593,7 +1600,8 @@ hex_edit_right:
         case 'c':
             if (input.modifier == Modifier::ALT)
             {
-                return CloseCurrentFile();
+                if (!m_hex_edit || ToggleHexEditMode(e))
+                    return CloseCurrentFile();
             }
             else if (input.modifier != Modifier::None)
             {
@@ -1621,23 +1629,7 @@ hex_edit_right:
         case 'e':
             if (input.modifier == Modifier::ALT)
             {
-                if (m_hex_mode && !m_text && !m_context.IsPipe())
-                {
-toggle_hex_edit:
-                    if (m_hex_edit && m_context.IsDirty())
-                    {
-                        const int confirm = ConfirmSaveChanges();
-                        m_force_update = true;
-                        if (confirm < 0)
-                            break;
-                        else if (confirm == 0)
-                            m_context.DiscardBytes();
-                        else if (!m_context.SaveBytes(e))
-                            break;
-                    }
-                    m_hex_edit = !m_hex_edit;
-                    m_force_update_footer = true;
-                }
+                ToggleHexEditMode(e);
             }
             else if (input.modifier == Modifier::None)
             {
@@ -2354,6 +2346,28 @@ ViewerOutcome Viewer::CloseCurrentFile()
     m_index = -2;
     SetFile(index);
     return ViewerOutcome::CONTINUE;
+}
+
+bool Viewer::ToggleHexEditMode(Error& e)
+{
+    if (!m_hex_mode || m_text || m_context.IsPipe())
+        return false;
+
+    if (m_hex_edit && m_context.IsDirty())
+    {
+        const int confirm = ConfirmSaveChanges();
+        m_force_update = true;
+        if (confirm < 0)
+            return false;
+        else if (confirm == 0)
+            m_context.DiscardBytes();
+        else if (!m_context.SaveBytes(e))
+            return false;
+    }
+
+    m_hex_edit = !m_hex_edit;
+    m_force_update_footer = true;
+    return true;
 }
 
 ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e)
