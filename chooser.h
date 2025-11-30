@@ -77,6 +77,7 @@ private:
     const Interactive* const m_interactive;
     unsigned        m_terminal_width = 0;
     unsigned        m_terminal_height = 0;
+    unsigned        m_content_height = 0;
     const unsigned  m_padding = 2;
 
     int             m_details = 1;
@@ -100,6 +101,9 @@ private:
 
     MarkedList      m_dirty;
     bool            m_dirty_header = false;
+#ifdef INCLUDE_MENU_ROW
+    bool            m_dirty_menu = false;
+#endif
     bool            m_dirty_footer = false;
     intptr_t        m_prev_visible_rows = 0;
     StrW            m_last_feedback;

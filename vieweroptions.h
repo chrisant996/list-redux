@@ -48,6 +48,9 @@ struct ViewerOptions
     bool show_file_offsets = false;
     bool show_endoffile_line = true;
     bool show_ruler = false;
+#ifdef INCLUDE_MENU_ROW
+    bool show_menu = false;
+#endif
     bool show_scrollbar = true;
     uint8 hex_grouping = 0;             // Power of 2.
     WCHAR filter_byte_char = '.';

@@ -46,6 +46,9 @@ static const WCHAR* c_default_colors[] =
     L"7",               // MarkedLine
     L"7;36",            // SearchFound
     L"7;36",            // DebugRow
+#ifdef INCLUDE_MENU_ROW
+    L"44;96",           // MenuRow
+#endif
     L"7",               // SweepDivider
     L"96",              // SweepFile
     L"90",              // FloatingScrollBar
@@ -811,6 +814,9 @@ static const WCHAR* const c_reg_color_name[] =
     L"MarkedLine",
     L"SearchFound",
     L"DebugRow",
+#ifdef INCLUDE_MENU_ROW
+    L"MenuRow",
+#endif
     L"SweepDivider",
     L"SweepFile",
     L"FloatingScrollBar",

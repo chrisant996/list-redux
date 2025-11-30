@@ -20,6 +20,11 @@
 // running on Windows versions before 10 build 15063.
 #define INCLUDE_TERMINAL_EMULATOR
 
+//#define INCLUDE_MENU_ROW
+
+//#define INCLUDE_CTRLMODE_PERIOD
+//#define INCLUDE_CTRLMODE_SPACE
+
 #define implies(x, y)           (!(x) || (y))
 
 template <typename T> T clamp(T value, T min, T max)

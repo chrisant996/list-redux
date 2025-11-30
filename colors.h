@@ -39,6 +39,9 @@ enum class ColorElement
     MarkedLine,
     SearchFound,
     DebugRow,
+#ifdef INCLUDE_MENU_ROW
+    MenuRow,
+#endif
     SweepDivider,
     SweepFile,
     FloatingScrollBar,

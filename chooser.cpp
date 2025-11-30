@@ -183,6 +183,7 @@ void Chooser::Reset()
 {
     m_terminal_width = 0;
     m_terminal_height = 0;
+    m_content_height = 0;
 
     m_dir.Clear();
     m_files.clear();
@@ -208,6 +209,9 @@ void Chooser::ForceUpdateAll()
 {
     m_dirty_header = true;
     m_dirty.MarkAll();
+#ifdef INCLUDE_MENU_ROW
+    m_dirty_menu = true;
+#endif
     m_dirty_footer = true;
     m_prev_visible_rows = uintptr_t(-1) >> 1;
     assert(m_prev_visible_rows > 0);
@@ -218,9 +222,17 @@ void Chooser::UpdateDisplay()
     if (!m_last_feedback.Equal(m_feedback))
         m_dirty_footer = true;
 
+#ifdef INCLUDE_MENU_ROW
+    const bool update_menu = (m_dirty_menu && g_options.show_menu);
+    m_dirty_menu = false;
+#else
+    const bool update_menu = false;
+#endif
+
     if (!m_dirty_header &&
         !m_dirty_footer &&
         !m_dirty.AnyMarked() &&
+        !update_menu &&
         m_visible_rows >= m_prev_visible_rows)
     {
         return;
@@ -366,6 +378,51 @@ void Chooser::UpdateDisplay()
         }
     }
 
+    // Menu row.
+#ifdef INCLUDE_MENU_ROW
+    if (update_menu)
+    {
+        StrW menu;
+        unsigned width = 0;
+        bool stop = false;
+
+        auto add = [&](const WCHAR* key, const WCHAR* desc, bool delimit=true) {
+            if (!stop)
+            {
+                const unsigned old_len = menu.Length();
+                if (!menu.Empty())
+                    menu.AppendSpaces(2);
+                AppendKeyName(menu, key, ColorElement::MenuRow, delimit ? desc : nullptr);
+                if (!delimit && desc)
+                    menu.Append(desc);
+                if (width + cell_count(menu.Text() + old_len) > m_terminal_width)
+                {
+                    stop = true;
+                    menu.SetLength(old_len);
+                }
+            }
+        };
+
+        add(L"F1", L"Help");
+        add(L"Enter", L"View");
+        add(L"1-4", L"Details");
+        add(L"A", L"ChangeAttr");
+        add(L"E", L"Edit");
+        add(L"R", L"Rename");
+        add(L"S", L"Search");
+        add(L"T", L"Tag");
+        add(L"U", L"Untag");
+        add(L"V", L"ViewTagged");
+        add(L"Alt-R", L"Run");
+
+        s.Printf(L"\x1b[%uH", m_terminal_height - 1);
+        s.AppendColor(GetColor(ColorElement::MenuRow));
+        s.Append(c_clreol);
+        s.Append(menu);
+        s.Append(c_norm);
+    }
+#endif
+
     // Command line.
     if (m_dirty_footer)
     {
@@ -429,6 +486,7 @@ void Chooser::Relayout()
 {
     m_terminal_width = 0;
     m_terminal_height = 0;
+    m_content_height = 0;
     m_vert_scroll_column = 0;
     ForceUpdateAll();
 }
@@ -445,6 +503,11 @@ void Chooser::EnsureColumnWidths()
         unsigned target_width = terminal_width;
         m_terminal_width = terminal_width;
         m_terminal_height = terminal_height;
+        m_content_height = terminal_height - 2;
+#ifdef INCLUDE_MENU_ROW
+        if (g_options.show_menu)
+            --m_content_height;
+#endif
 
         m_max_size_width = 0;
         if (m_details >= 3 && m_files.size())
@@ -463,7 +526,7 @@ void Chooser::EnsureColumnWidths()
         // First try columns that are the height of the terminal and don't
         // need to scroll.
         {
-            size_t rows = m_terminal_height - 2;
+            size_t rows = m_content_height;
             unsigned width = 0;
             unsigned total_width = 0;
             const size_t last = m_files.size() - 1;
@@ -474,7 +537,7 @@ void Chooser::EnsureColumnWidths()
                 width = max<unsigned>(width, WidthForFileInfo(&m_files[index], m_details, m_max_size_width));
                 if (!--rows || index == last)
                 {
-                    rows = m_terminal_height - 2;
+                    rows = m_content_height;
                     m_col_widths.emplace_back(width);
                     total_width += width + m_padding;
                     width = 0;
@@ -489,7 +552,7 @@ void Chooser::EnsureColumnWidths()
             if (!m_col_widths.empty())
             {
                 m_num_per_row = int32(std::max<intptr_t>(1, m_col_widths.size()));
-                m_num_rows = std::min<intptr_t>(m_terminal_height - 2, m_files.size());
+                m_num_rows = std::min<intptr_t>(m_content_height, m_files.size());
                 m_visible_rows = int32((terminal_height > 2) ? m_num_rows : 0);
             }
         }
@@ -543,6 +606,15 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
                 ShowFileList();
             }
             break;
+#ifdef INCLUDE_MENU_ROW
+        case Key::F10:
+            if (input.modifier == Modifier::None)
+            {
+                g_options.show_menu = !g_options.show_menu;
+                Relayout();
+            }
+            break;
+#endif
 
         case Key::ESC:
             return ChooserOutcome::EXITAPP;

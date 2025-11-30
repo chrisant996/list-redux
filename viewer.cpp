@@ -406,14 +406,16 @@ void Viewer::UpdateDisplay()
     // decided yet because it may depend on the margin width (which depends on
     // the highest, i.e. widest, file number or file offset).
     const unsigned debug_row = !!g_options.show_debug_info;
+#ifdef INCLUDE_MENU_ROW
+    const unsigned menu_row = !!g_options.show_menu;
+#else
+    const unsigned menu_row = false;
+#endif
     const unsigned hex_ruler = !!m_hex_mode;
     const DWORD colsrows = GetConsoleColsRows();
     m_terminal_width = LOWORD(colsrows);
     m_terminal_height = HIWORD(colsrows);
-    if (m_terminal_height > 1 + hex_ruler + debug_row + 1)
-        m_content_height = m_terminal_height - (1 + hex_ruler + debug_row + 1);
-    else
-        m_content_height = 0;
+    m_content_height = max(int32(m_terminal_height - (1 + hex_ruler + debug_row + menu_row + 1)), 0);
     const bool show_scrollbar = (g_options.show_scrollbar &&
                                  m_content_height >= 4 &&
                                  !(m_errmsg.Length() || !m_context.HasContent()) &&
@@ -506,10 +508,13 @@ LAutoFitContentWidth:
     const bool update_content = (m_force_update || top_changed);
     const bool update_hex_edit = (m_force_update_hex_edit_offset != FileOffset(-1));
     const FileOffset update_hex_edit_offset = m_force_update_hex_edit_offset;
-    const bool update_debug_row = (g_options.show_debug_info);
     update_command_line |= (m_force_update || m_force_update_footer || feedback_changed);
-    if (!update_header && !update_content && !update_debug_row && !update_command_line)
+    if (!update_header && !update_content && !update_command_line)
         return;
+    const bool update_debug_row = debug_row;
+#ifdef INCLUDE_MENU_ROW
+    const bool update_menu_row = (menu_row && m_force_update);
+#endif
 
     StrW s;
 
@@ -900,7 +905,7 @@ LAutoFitContentWidth:
     // Debug row.
     if (g_options.show_debug_info && update_debug_row)
     {
-        s.Printf(L"\x1b[%uH", m_terminal_height - debug_row);
+        s.Printf(L"\x1b[%uH", m_terminal_height - menu_row - debug_row);
         s.AppendColor(GetColor(ColorElement::DebugRow));
 
         StrW left;
@@ -930,6 +935,47 @@ LAutoFitContentWidth:
         s.Append(right);
         s.Append(c_norm);
     }
+
+    // Menu row.
+#ifdef INCLUDE_MENU_ROW
+    if (menu_row && update_menu_row)
+    {
+        StrW menu;
+        unsigned width = 0;
+        bool stop = false;
+
+        auto add = [&](const WCHAR* key, const WCHAR* desc) {
+            if (!stop)
+            {
+                const unsigned old_len = menu.Length();
+                if (!menu.Empty())
+                    menu.AppendSpaces(2);
+                AppendKeyName(menu, key, ColorElement::MenuRow, desc);
+                if (width + cell_count(menu.Text() + old_len) > m_terminal_width)
+                {
+                    stop = true;
+                    menu.SetLength(old_len);
+                }
+            }
+        };
+
+        add(L"F1", L"Help");
+        add(L"F3", L"FindNext");
+        add(L"Alt-G", L"GoTo");
+        if (m_hex_edit)
+        {
+            add(L"F7/F8", L"Prev/Next");
+            add(L"^S", L"Save");
+            add(L"^Z", L"Undo");
+        }
+
+        s.Printf(L"\x1b[%uH", m_terminal_height - menu_row);
+        s.AppendColor(GetColor(ColorElement::MenuRow));
+        s.Append(c_clreol);
+        s.Append(menu);
+        s.Append(c_norm);
+    }
+#endif
 
     // Command line.
     StrW left;
@@ -1127,6 +1173,15 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
                 m_force_update = true;
             }
             break;
+#ifdef INCLUDE_MENU_ROW
+        case Key::F10:
+            if (input.modifier == Modifier::None)
+            {
+                g_options.show_menu = !g_options.show_menu;
+                m_force_update = true;
+            }
+            break;
+#endif
 
         case Key::ESC:
             if (m_hex_edit)
