@@ -53,7 +53,7 @@ enum class ColorElement
     MAX
 };
 
-enum class ColorConversion { TextOnly, TextAsBack, BackAsText, SwapTextAndBack };
+enum class ColorConversion { TextOnly, TextAsBack, BackAsText, SwapTextAndBack, StylesOnly };
 
 const WCHAR* ConvertColorParams(ColorElement element, ColorConversion convert=ColorConversion::TextOnly);
 const WCHAR* GetColor(ColorElement element);

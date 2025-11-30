@@ -64,14 +64,19 @@ static WCHAR s_colors[_countof(c_default_colors)][48];
 
 const WCHAR* ConvertColorParams(ColorElement element, ColorConversion convert)
 {
-    static StrW s_color;
+    static StrW s_color[2];
+    static unsigned s_which = 0;
 
     int32 value = -1;
     uint32 eat = 0;
     bool keep_eaten = false;
+    bool keep_styles = (convert == ColorConversion::TextOnly || convert == ColorConversion::StylesOnly);
     bool select_format = false;
 
-    s_color.Clear();
+    const unsigned which = s_which;
+    s_which = !s_which;
+
+    s_color[which].Clear();
 
     int num = 0;
     for (const WCHAR* p = GetColor(element); true; ++p)
@@ -111,9 +116,9 @@ const WCHAR* ConvertColorParams(ColorElement element, ColorConversion convert)
                     value = 39;
                     break;
                 case 1:  case 2:  case 22:
-                    if (convert == ColorConversion::TextOnly)
+                    if (keep_styles)
                         value = num;
-                    // REVIEW:  Bold/intense/faint gets lost in all other
+                    // REVIEW:  Bold/intense/faint gets lost in other
                     // conversion modes.  The user must compensate through
                     // color definition choices.
                     break;
@@ -121,7 +126,7 @@ const WCHAR* ConvertColorParams(ColorElement element, ColorConversion convert)
                 case 4:  case 24:
                 case 9:  case 29:
                 case 53: case 55:
-                    if (convert == ColorConversion::TextOnly)
+                    if (keep_styles)
                         value = num;
                     break;
                 case 30: case 31: case 32: case 33: case 34: case 35: case 36: case 37:
@@ -178,7 +183,7 @@ const WCHAR* ConvertColorParams(ColorElement element, ColorConversion convert)
             }
 
             if (value >= 0)
-                s_color.Printf(L";%u", value);
+                s_color[which].Printf(L";%u", value);
 
             if (!*p)
                 break;
@@ -195,7 +200,7 @@ const WCHAR* ConvertColorParams(ColorElement element, ColorConversion convert)
         }
     }
 
-    const WCHAR* color = s_color.Text();
+    const WCHAR* color = s_color[which].Text();
     while (*color == ';')
         ++color;
     return color;
