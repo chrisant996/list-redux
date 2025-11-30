@@ -882,8 +882,8 @@ void Terminal::do_move_cursor(int dx, int dy)
         return;
 
     COORD xy = {
-        clamp<SHORT>(csbi.dwCursorPosition.X + dx, 0, csbi.dwSize.X - 1),
-        clamp<SHORT>(csbi.dwCursorPosition.Y + dy, 0, csbi.dwSize.Y - 1),
+        SHORT(clamp(csbi.dwCursorPosition.X + dx, 0, csbi.dwSize.X - 1)),
+        SHORT(clamp(csbi.dwCursorPosition.Y + dy, 0, csbi.dwSize.Y - 1)),
     };
     SetConsoleCursorPosition(m_hout, xy);
 }
