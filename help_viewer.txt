@@ -60,7 +60,7 @@ HEX EDIT MODE KEYS:
             F7  Jump to previous row with edits.
             F8  Jump to next row with edits.
         Ctrl-S  Save changes.
-        Ctrl-Z  Undo saved changes (write the original bytes back).
+        Ctrl-Z  Revert unsaved edits or undo saved changes (write the original bytes back).
   Alt-E or ESC  End edit mode (prompt whether to save or discard).
 
 MISCELLANEOUS:
