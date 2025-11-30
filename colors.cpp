@@ -417,9 +417,11 @@ static COLORREF RgbFromColor(const WCHAR* color, RgbFromColorMode mode=RgbFromCo
     static const BYTE c_cube_series[] = { 0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff };
 
     unsigned format = 0;    // 5=8-bit, 2=24-bit, 0=30..37,39
-    DWORD value = 39;
+    DWORD value = -1;
     bool bold = false;
     bool bg = false;
+
+    assert(implies(color, 0x1b != color[0]));
 
     bool start = true;
     int num = 0;
@@ -431,7 +433,7 @@ static COLORREF RgbFromColor(const WCHAR* color, RgbFromColorMode mode=RgbFromCo
             {
             case 0:
                 format = 0;
-                value = 39;
+                value = -1;
                 bold = false;
                 break;
             case 1:
@@ -545,8 +547,26 @@ static COLORREF RgbFromColor(const WCHAR* color, RgbFromColorMode mode=RgbFromCo
             return bg ? 0xffffffff : RgbFromColorTable(BYTE(value) - 30 + (bold && !bg ? 8 : 0));
         else if (value >= 90 && value <= 97)
             return bg ? 0xffffffff : RgbFromColorTable(BYTE(value) - 90 + 8);
-        else if (value == 39 || value == 49)
-            return (bg && value != 49) ? 0xffffffff : RgbFromColorTable(BYTE(value));
+        else if (value == 39 || value == 49 || value == -1)
+        {
+            if (value == -1)
+            {
+                switch (mode)
+                {
+                case RgbFromColorMode::Foreground:
+                    value = 39;
+                    break;
+                case RgbFromColorMode::PreferBackground:
+                case RgbFromColorMode::Background:
+                case RgbFromColorMode::BackgroundNotDefault:
+                    value = 49;
+                    break;
+                }
+            }
+            if (mode == RgbFromColorMode::BackgroundNotDefault && value == 49)
+                return 0xffffffff;
+            return RgbFromColorTable(BYTE(value));
+        }
         else if (value >= 40 && value <= 47)
             return RgbFromColorTable(BYTE(value) - 40 + (bold && !bg ? 8 : 0));
         else if (value >= 100 && value <= 107)
