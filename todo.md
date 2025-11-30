@@ -122,6 +122,7 @@
   - [x] arrow keys
   - [x] Ctrl-arrow keys
   - [x] Ctrl-BACK and Ctrl-DEL keys
+  - [ ] copy/paste keys
   - [ ] CUA keys
 - [ ] `S` configure sort order
 - detect certain file types and render with formatting/color
