@@ -1144,7 +1144,11 @@ void Viewer::InitHexWidth()
         else if (available >= 8*3 + 0 + 8)
             m_hex_width = 8;
         else
+        {
             m_hex_mode = false;
+// TODO:  This can lead to losing unsaved edits!
+            m_hex_edit = false;
+        }
     }
 }
 
@@ -1705,7 +1709,7 @@ hex_edit_right:
         case 'h':
             if (input.modifier == Modifier::None)
             {
-                if (!m_text)
+                if (!m_text && !m_hex_edit)
                 {
                     m_hex_mode = !m_hex_mode;
                     g_options.hex_mode = m_hex_mode;
