@@ -233,12 +233,13 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                         emulate = (long_opt->value == LOI_EMULATE);
                     else if (wcsicmp(opt_value, L"auto") == 0)
                         emulate = -1;
-                    else if (wcsicmp(opt_value, L"on") == 0)
+                    else if (!*opt_value || wcsicmp(opt_value, L"on") == 0)
                         emulate = true;
                     else if (wcsicmp(opt_value, L"off") == 0)
                         emulate = false;
                     else
                         e.Set(L"Unrecognized value '%1' for option 'emulate'.") << opt_value;
+                    SetEmulation(emulate);
                 }
                 break;
             case LOI_MAX_LINE_LENGTH:
