@@ -1169,10 +1169,13 @@ void Chooser::ChangeAttributes(Error& e)
     if (indices.empty())
         return;
 
+    StrW right;
+    right = L"('ashr' to set or '-a-s-h-r' to clear)";
+
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Printf(L"\r\x1b[KChange attributes ('ashr' to set or '-a-s-h-r' to clear)%s ", c_prompt_char);
+    s.Printf(L"\r%s\x1b[%uG%s\r%s%s ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), L"Change attributes", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 
     ReadInput(s, History::ChangeAttr);
