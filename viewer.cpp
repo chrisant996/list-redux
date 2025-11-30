@@ -1036,7 +1036,8 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
     right.Printf(L"    %-6s", m_context.GetEncodingName(m_hex_mode));
     if (m_hex_mode)
     {
-        right.Append(m_hex_edit ? L"    Hex Mode (EDIT)" : L"    Hex Mode (View)");
+        right.AppendSpaces(4);
+        AppendKeyName(right, L"Alt-E", ColorElement::Command, m_hex_edit ? L"EDITING " : L"EditMode");
     }
     else
     {

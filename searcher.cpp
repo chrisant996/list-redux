@@ -5,6 +5,7 @@
 #include "searcher.h"
 #include "input.h"
 #include "output.h"
+#include "ecma48.h"
 #include "colors.h"
 
 #include <regex>
@@ -220,16 +221,13 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned terminal_width, bool caseless
     while (!done)
     {
         right.Clear();
-        right.Append(caseless ?
-            L"IgnoreCase (^I)" :
-            L" ExactCase (^I)");
-        right.Append(regex ?
-            L"    RegExp (^X)" :
-            L"   Literal (^X)");
+        AppendKeyName(right, L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ");
+        right.AppendSpaces(3);
+        AppendKeyName(right, L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal");
 
         s.Clear();
         s.AppendColor(GetColor(ColorElement::Command));
-        s.Printf(L"\r\x1b[K\x1b[%uG%s\rSearch%s ", terminal_width + 1 - right.Length(), right.Text(), c_prompt_char);
+        s.Printf(L"\r\x1b[K\x1b[%uG%s\rSearch%s ", terminal_width + 1 - cell_count(right.Text()), right.Text(), c_prompt_char);
         OutputConsole(s.Text(), s.Length());
 
         done = true;

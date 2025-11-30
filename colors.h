@@ -18,6 +18,7 @@ void ReadColors(const WCHAR* ini_filename);
 
 const WCHAR* ApplyGradient(const WCHAR* color, ULONGLONG value, ULONGLONG min, ULONGLONG max);
 const WCHAR* StripLineStyles(const WCHAR* color);
+const WCHAR* BlendColors(const WCHAR* a, const WCHAR* b, BYTE alpha, bool back=false, bool opposite_a=false, bool opposite_b=false);
 
 enum class ColorElement
 {
@@ -50,6 +51,7 @@ enum class ColorElement
     PopupSelect,
     EditedByte,
     SavedByte,
+    KeyName,
     MAX
 };
 

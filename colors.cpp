@@ -14,6 +14,7 @@
 #include "sorting.h"
 #include "output.h"
 #include "config.h"
+#include "palette.h"
 
 #include <math.h>
 #include <unordered_map>
@@ -57,6 +58,7 @@ static const WCHAR* c_default_colors[] =
     L"7",               // PopupSelect
     L"97;45",           // EditedByte
     L"97;42",           // SavedByte
+    L"47;30",           // KeyName
 };
 static_assert(_countof(c_default_colors) == size_t(ColorElement::MAX));
 
@@ -753,6 +755,30 @@ const WCHAR* StripLineStyles(const WCHAR* color)
     return any_stripped ? s_tmp.Text() : color;
 }
 
+inline BYTE BlendValue(BYTE a, BYTE b, BYTE alpha)
+{
+    return ((WORD(a) * alpha) + (WORD(b) * (255 - alpha))) / 255;
+}
+
+const WCHAR* BlendColors(const WCHAR* a, const WCHAR* b, BYTE alpha, bool back, bool opposite_a, bool opposite_b)
+{
+    const COLORREF rgb_a = RgbFromColor(a, (back ^ opposite_a) ? RgbFromColorMode::Background : RgbFromColorMode::Foreground);
+    const COLORREF rgb_b = RgbFromColor(b, (back ^ opposite_b) ? RgbFromColorMode::Background : RgbFromColorMode::Foreground);
+    if (rgb_a == 0xffffffff || rgb_b == 0xffffffff)
+        return (alpha < 0x80) ? b : a;
+
+    const RGB_t rgb = {
+        BlendValue(GetRValue(rgb_a), GetRValue(rgb_b), alpha),
+        BlendValue(GetGValue(rgb_a), GetGValue(rgb_b), alpha),
+        BlendValue(GetBValue(rgb_a), GetBValue(rgb_b), alpha),
+    };
+
+    static StrW s_color;
+    s_color.Clear();
+    s_color.Printf(L"%c8;2;%u;%u;%u", back ? '4' : '3', rgb.r, rgb.g, rgb.b);
+    return s_color.Text();
+}
+
 void ReportColorlessError(Error& e)
 {
     if (e.Test())
@@ -797,6 +823,7 @@ static const WCHAR* const c_reg_color_name[] =
     L"PopupSelect",
     L"EditedByte",
     L"SavedByte",
+    L"KeyName",
 };
 static_assert(_countof(c_reg_color_name) == _countof(s_colors));
 static_assert(_countof(c_reg_color_name) == size_t(ColorElement::MAX));
