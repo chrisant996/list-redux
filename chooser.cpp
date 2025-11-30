@@ -376,6 +376,11 @@ void Chooser::UpdateDisplay()
         StrW left;
         StrW right;
         left.Printf(L"Files: %lu of %lu", m_index + 1, m_count);
+        if (size_t(m_index) < m_files.size())
+        {
+            right.AppendSpaces(4);
+            FormatFileData(right, m_files[m_index]);
+        }
         if (m_feedback.Length())
         {
             if (left.Length() < 20)

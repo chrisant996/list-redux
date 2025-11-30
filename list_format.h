@@ -18,6 +18,7 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
 void FormatFileInfoForPopupList(StrW& s, const FileInfo* pfi, unsigned max_width, int size_width=0);
 #endif
 unsigned FormatFileData(StrW& s, const WIN32_FIND_DATAW& fd);
+unsigned FormatFileData(StrW& s, const FileInfo& info);
 
 void InitLocale();
 
