@@ -206,7 +206,8 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned terminal_width, bool caseless
             {
             case Key::TAB:
                 // 'Ctrl-I' toggles ignore case.
-                caseless = !caseless;
+                if (input.modifier == Modifier::CTRL)
+                    caseless = !caseless;
                 done = false;
                 return -1;
             }
