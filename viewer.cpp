@@ -585,9 +585,13 @@ LAutoFitContentWidth:
                 right.Clear();
                 right.Printf(L"%u", m_left + width + 10);
                 left.SetLength(std::min<unsigned>(10 - right.Length(), m_content_width - width));
+                left.Append(right);
+                if (width + left.Length() > m_content_width)
+                    left.SetLength(m_content_width - width);
                 s.Append(left);
-                s.Append(right);
             }
+            if (m_terminal_width > m_content_width)
+                s.Append(c_clreol);
         }
         else
         {
