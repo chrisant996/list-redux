@@ -586,7 +586,7 @@ calc_width:
         assert(outcome == BreakWrapSkip);
         m_count = 0;
         m_available = 0;
-        return BreakWrapResync;
+        return BreakWrapResyncSkip;
     }
 
     m_bytes += length;
@@ -803,7 +803,7 @@ do_skip_whitespace:
                       ((outcome == FileLineIter::BreakMax) ? L"BreakMax" :
                        (outcome == FileLineIter::BreakWrap) ? L"BreakWrap" :
                        (outcome == FileLineIter::BreakWrapSkip) ? L"BreakWrapSkip" :
-                       (outcome == FileLineIter::BreakWrapResync) ? L"BreakWrapResync" : L"??"));
+                       (outcome == FileLineIter::BreakWrapResyncSkip) ? L"BreakWrapResyncSkip" : L"??"));
 #endif
         if (outcome == FileLineIter::Exhausted)
             break;
@@ -832,9 +832,14 @@ do_skip_whitespace:
             m_wrapped_current_line = false;
             break;
         case FileLineIter::BreakWrapSkip:
+        case FileLineIter::BreakWrapResyncSkip:
             m_skip_whitespace = 1;
-            goto do_skip_whitespace;
-        case FileLineIter::BreakWrapResync:
+            if (outcome == FileLineIter::BreakWrapSkip)
+            {
+                // The code for skipping whitespace is optimized to be outside and
+                // immediately preceding the loop, so must directly jump to it.
+                goto do_skip_whitespace;
+            }
             return;
         }
     }

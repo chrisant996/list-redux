@@ -83,8 +83,9 @@ public:
         BreakMax,               // Break because max line length was reached.
         BreakWrap,              // Break because wrapping width was reached.
         BreakWrapSkip,          // Wrapping break, and then skip whitespace.
-        BreakWrapResync,        // Wrapping break, and trigger resync (caller
-                                // clears data buffer and loads a new block).
+        BreakWrapResyncSkip,    // Wrapping break, trigger resync (caller
+                                // clears data buffer and loads a new block),
+                                // and then skip whitespace.
     };
 
                     FileLineIter(const ViewerOptions& options);
