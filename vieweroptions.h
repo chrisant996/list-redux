@@ -54,6 +54,7 @@ struct ViewerOptions
     WCHAR filter_byte_char = '.';
     unsigned hanging_extra = 8;         // How much to add to leading indent to create hanging indent.
 
+    bool internal_help_mode = false;    // Applies special hanging indent rules for the built in help text.
 #ifdef INCLUDE_MENU_ROW
     bool show_menu = false;
 #endif

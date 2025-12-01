@@ -2451,7 +2451,7 @@ ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e)
     return outcome;
 }
 
-ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title)
+ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title, bool help)
 {
     ViewerOptions old = g_options;
     g_options = ViewerOptions();
@@ -2463,6 +2463,12 @@ ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title)
     g_options.show_ruler = false;
     g_options.show_endoffile_line = true;
     g_options.show_debug_info = false;
+
+    if (help)
+    {
+        g_options.internal_help_mode = true;
+        g_options.hanging_extra = 0;
+    }
 
     Viewer viewer(text, title);
     ViewerOutcome ret = viewer.Go(e);

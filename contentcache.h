@@ -132,6 +132,7 @@ private:
     uint32          m_pending_wrap_length = 0;  // Candidate length for word wrap.
     uint32          m_pending_wrap_width = 0;   // Candidate width for word wrap.
     uint32          m_pending_wrap_indent = 0;  // Candidate hanging indent for word wrap.
+    int32           m_consecutive_spaces = 0;   // Only used by internal_help_mode.
     uint32          m_hanging_indent = 0;       // Hanging indent from previous line.
     bool            m_any_nonspace = false;     // For calculating hanging indent.
 

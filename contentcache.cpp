@@ -292,6 +292,7 @@ FileLineIter& FileLineIter::operator=(FileLineIter&& other)
     m_pending_wrap_length = other.m_pending_wrap_length;
     m_pending_wrap_width = other.m_pending_wrap_width;
     m_pending_wrap_indent = other.m_pending_wrap_indent;
+    m_consecutive_spaces = other.m_consecutive_spaces;
     m_hanging_indent = other.m_hanging_indent;
     m_any_nonspace = other.m_any_nonspace;
 
@@ -326,6 +327,7 @@ void FileLineIter::ClearProcessed()
     m_pending_wrap_length = 0;
     m_pending_wrap_width = 0;
     m_pending_wrap_indent = 0;
+    m_consecutive_spaces = m_options.internal_help_mode ? 0 : -1;
     m_hanging_indent = 0;
     m_any_nonspace = false;
 
@@ -371,6 +373,7 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
         m_pending_wrap_length = 0;
         m_pending_wrap_width = 0;
         m_pending_wrap_indent = 0;
+        m_consecutive_spaces = m_options.internal_help_mode ? 0 : -1;
         m_hanging_indent = 0;
         m_any_nonspace = false;
         return (out_length > 0) ? BreakNewline : Exhausted;
@@ -468,7 +471,9 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
                 if (newline)
                 {
                     outcome = BreakNewline;
-                    m_pending_wrap_indent = 0; // Newline cancels hanging indent.
+                    // Newline cancels hanging indent.
+                    m_pending_wrap_indent = 0;
+                    m_consecutive_spaces = m_options.internal_help_mode ? 0 : -1;
                 }
                 break;
             }
@@ -590,6 +595,20 @@ calc_width:
                     break;
                 }
             }
+            else if (m_consecutive_spaces >= 0)
+            {
+                if (m_pending_length > 24)
+                    m_consecutive_spaces = -1;
+                else if (c == ' ')
+                    ++m_consecutive_spaces;
+                else if (m_consecutive_spaces != 2)
+                    m_consecutive_spaces = 0;
+                else
+                {
+                    m_pending_wrap_indent = m_pending_length;
+                    m_consecutive_spaces = -1;
+                }
+            }
 
             m_pending_length += blen;
             m_pending_width += clen;
@@ -625,6 +644,7 @@ calc_width:
         m_pending_width = m_pending_wrap_indent;
         m_pending_wrap_length = 0;
         m_pending_wrap_width = m_pending_wrap_indent;
+        m_consecutive_spaces = m_options.internal_help_mode ? 0 : -1;
         m_any_nonspace = !!m_hanging_indent;
 #ifdef DEBUG
         ++m_line_index;
