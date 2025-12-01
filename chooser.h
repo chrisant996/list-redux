@@ -63,6 +63,7 @@ private:
     bool            AskForConfirmation(const WCHAR* msg);
     void            WaitToContinue(bool erase_after=false, bool new_line=false);
 
+    void            OnLeftClick(const InputRecord& input, Error& e);
     void            NewFileMask(Error& e);
     void            ChangeAttributes(Error& e);
     void            NewDirectory(Error& e);
@@ -98,6 +99,7 @@ private:
     MarkedList      m_tagged;
     InputRecord     m_prev_input;
     bool            m_prev_latched = false;
+    bool            m_can_drag = false;
 
     MarkedList      m_dirty;
     bool            m_dirty_header = false;

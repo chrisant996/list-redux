@@ -39,6 +39,7 @@ struct ViewerOptions
     unsigned max_line_length = c_default_max_line_length;
     unsigned tab_width = c_default_tab_width;
     CtrlMode ctrl_mode = CtrlMode::OEM437;
+    bool allow_mouse = true;
     bool wrapping = false;
     bool hex_mode = false;
     bool expand_tabs = true;

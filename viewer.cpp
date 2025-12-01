@@ -272,8 +272,6 @@ private:
     std::unique_ptr<Searcher> m_searcher;
     bool            m_multifile_search = false;
     FoundOffset     m_found_line;
-
-    bool            m_allow_mouse = false;
 };
 
 void ScopedWorkingIndicator::ShowFeedback(bool completed, unsigned __int64 processed, unsigned __int64 target, const Viewer* viewer, bool bytes)
@@ -316,7 +314,7 @@ ViewerOutcome Viewer::Go(Error& e)
 {
     SetFile(0);
 
-    AutoMouseConsoleMode mouse_mode;
+    AutoMouseConsoleMode mouse(0, g_options.allow_mouse);
 
     while (true)
     {
@@ -324,9 +322,7 @@ ViewerOutcome Viewer::Go(Error& e)
 
         UpdateDisplay();
 
-        mouse_mode.EnableMouseInput(m_allow_mouse);
-
-        const InputRecord input = SelectInput();
+        const InputRecord input = SelectInput(INFINITE, &mouse);
         switch (input.type)
         {
         case InputType::None:
@@ -1170,6 +1166,7 @@ unsigned Viewer::LinePercent(size_t line) const
 
 ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
 {
+    int amount = 1;
     if (input.type == InputType::Key || input.type == InputType::Mouse)
     {
         switch (input.key)
@@ -1274,44 +1271,50 @@ hex_bottom:
             break;
         case Key::UP:
 key_up:
-            if (!m_hex_mode)
+            while (amount-- > 0)
             {
-                if (m_top)
-                    --m_top;
-            }
-            else if (!m_hex_edit)
-            {
-                if (m_hex_top)
-                    m_hex_top -= m_hex_width;
-            }
-            else
-            {
-                if (m_hex_pos >= m_hex_width)
-                    m_hex_pos -= m_hex_width;
+                if (!m_hex_mode)
+                {
+                    if (m_top)
+                        --m_top;
+                }
+                else if (!m_hex_edit)
+                {
+                    if (m_hex_top)
+                        m_hex_top -= m_hex_width;
+                }
+                else
+                {
+                    if (m_hex_pos >= m_hex_width)
+                        m_hex_pos -= m_hex_width;
+                }
             }
             break;
         case Key::DOWN:
 key_down:
-            if (!m_hex_mode)
+            while (amount-- > 0)
             {
-                if (!m_context.Completed() || m_top + (g_options.show_ruler ? 0 : m_content_height) < CountForDisplay())
-                    ++m_top;
-            }
-            else if (!m_hex_edit)
-            {
-                if (m_hex_top + m_content_height * m_hex_width < m_context.GetFileSize())
-                    m_hex_top += m_hex_width;
-            }
-            else
-            {
-                if (m_hex_pos + m_hex_width < m_context.GetFileSize())
-                    m_hex_pos += m_hex_width;
-                else if (m_context.GetFileSize() > 0)
-                    m_hex_pos = m_context.GetFileSize() - 1;
+                if (!m_hex_mode)
+                {
+                    if (!m_context.Completed() || m_top + (g_options.show_ruler ? 0 : m_content_height) < CountForDisplay())
+                        ++m_top;
+                }
+                else if (!m_hex_edit)
+                {
+                    if (m_hex_top + m_content_height * m_hex_width < m_context.GetFileSize())
+                        m_hex_top += m_hex_width;
+                }
                 else
                 {
-                    m_hex_pos = 0;
-                    m_hex_high_nybble = true;
+                    if (m_hex_pos + m_hex_width < m_context.GetFileSize())
+                        m_hex_pos += m_hex_width;
+                    else if (m_context.GetFileSize() > 0)
+                        m_hex_pos = m_context.GetFileSize() - 1;
+                    else
+                    {
+                        m_hex_pos = 0;
+                        m_hex_high_nybble = true;
+                    }
                 }
             }
             break;
@@ -1505,12 +1508,17 @@ hex_edit_right:
             break;
 
         case Key::MouseWheel:
-            // FUTURE:  Respect the amount (in addition to the direction)?
             // FUTURE:  Acceleration?
             if (input.mouse_wheel_amount < 0)
+            {
+                amount = -input.mouse_wheel_amount;
                 goto key_up;
+            }
             else if (input.mouse_wheel_amount > 0)
+            {
+                amount = input.mouse_wheel_amount;
                 goto key_down;
+            }
             break;
         case Key::MouseLeftClick:
         case Key::MouseLeftDblClick:

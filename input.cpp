@@ -308,7 +308,7 @@ static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
     const bool drag = (btn & FROM_LEFT_1ST_BUTTON_PRESSED) && !left_click && !right_click && !wheel && !hwheel && (record.dwEventFlags & MOUSE_MOVED);
 
     enum class mouse_input_type { none, left_click, right_click, double_click, wheel, hwheel, drag };
-    const mouse_input_type mask = (left_click ? mouse_input_type::left_click :
+    const mouse_input_type type = (left_click ? mouse_input_type::left_click :
                                    right_click ? mouse_input_type::right_click :
                                    double_click ? mouse_input_type::double_click :
                                    wheel ? mouse_input_type::wheel :
@@ -316,7 +316,7 @@ static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
                                    drag ? mouse_input_type::drag :
                                    mouse_input_type::none);
 
-    if (mask == mouse_input_type::none)
+    if (type == mouse_input_type::none)
         return input;
 
     input.mouse_pos = mouse_pos;
@@ -360,7 +360,7 @@ static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
     return input;
 }
 
-InputRecord SelectInput(const DWORD timeout)
+InputRecord SelectInput(const DWORD timeout, AutoMouseConsoleMode* mouse)
 {
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
 
@@ -386,6 +386,9 @@ InputRecord SelectInput(const DWORD timeout)
         }
 
         // Wait for input.
+
+        if (mouse)
+            mouse->DisableMouseInputIfShift();
 
         if (!s_has_cached_record)
         {
@@ -838,11 +841,15 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
     }
 }
 
-AutoMouseConsoleMode::AutoMouseConsoleMode(HANDLE hin)
+AutoMouseConsoleMode::AutoMouseConsoleMode(HANDLE hin, bool enable)
 {
-    m_hin = hin ? hin : GetStdHandle(STD_INPUT_HANDLE);
-    if (m_hin && !GetConsoleMode(m_hin, &m_orig_mode))
-        m_hin = 0;
+    if (enable)
+    {
+        m_hin = hin ? hin : GetStdHandle(STD_INPUT_HANDLE);
+        if (m_hin && !GetConsoleMode(m_hin, &m_orig_mode))
+            m_hin = 0;
+        DisableMouseInputIfShift();
+    }
 }
 
 AutoMouseConsoleMode::~AutoMouseConsoleMode()
@@ -851,12 +858,15 @@ AutoMouseConsoleMode::~AutoMouseConsoleMode()
         SetConsoleMode(m_hin, m_orig_mode);
 }
 
-void AutoMouseConsoleMode::EnableMouseInput(bool enable)
+void AutoMouseConsoleMode::DisableMouseInputIfShift()
 {
     if (m_hin)
     {
-        const DWORD new_mode = ((m_orig_mode & ~ENABLE_MOUSE_INPUT) |
-                                (enable ? ENABLE_MOUSE_INPUT : 0));
+        DWORD new_mode = (m_orig_mode & ~(ENABLE_MOUSE_INPUT|ENABLE_QUICK_EDIT_MODE));
+        if (GetKeyState(VK_SHIFT) & 0x8000)
+            new_mode |= ENABLE_QUICK_EDIT_MODE;
+        else
+            new_mode |= ENABLE_MOUSE_INPUT;
         if (new_mode != m_prev_mode && SetConsoleMode(m_hin, new_mode))
             m_prev_mode = new_mode;
     }

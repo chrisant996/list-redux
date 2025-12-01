@@ -146,11 +146,13 @@ ChooserOutcome Chooser::Go(Error& e)
 {
     ForceUpdateAll();
 
+    AutoMouseConsoleMode mouse(0, g_options.allow_mouse);
+
     while (true)
     {
         UpdateDisplay();
 
-        const InputRecord input = SelectInput();
+        const InputRecord input = SelectInput(INFINITE, &mouse);
         switch (input.type)
         {
         case InputType::None:
@@ -163,6 +165,7 @@ ChooserOutcome Chooser::Go(Error& e)
 
         case InputType::Key:
         case InputType::Char:
+        case InputType::Mouse:
             {
                 e.Clear();
                 const ChooserOutcome outcome = HandleInput(input, e);
@@ -201,6 +204,7 @@ void Chooser::Reset()
     m_tagged.Clear();
     m_prev_input.type = InputType::None;
     m_prev_latched = false;
+    m_can_drag = false;
 
     ForceUpdateAll();
 }
@@ -590,6 +594,7 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
 
     if (input.type == InputType::Key)
     {
+        m_can_drag = false;
         switch (input.key)
         {
         case Key::F1:
@@ -620,6 +625,7 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
             return ChooserOutcome::EXITAPP;
 
         case Key::ENTER:
+viewone:
             if (m_index >= 0 && m_index < m_count)
             {
                 const auto& info = m_files[m_index];
@@ -953,6 +959,35 @@ LNext:
             break;
         }
     }
+    else if (input.type == InputType::Mouse)
+    {
+        switch (input.key)
+        {
+        case Key::MouseWheel:
+            // TODO: wheel
+            break;
+        case Key::MouseHWheel:
+            // TODO: wheel
+            break;
+        case Key::MouseLeftClick:
+            m_can_drag = true;
+            __fallthrough;
+        case Key::MouseDrag:
+            OnLeftClick(input, e);
+            break;
+        case Key::MouseLeftDblClick:
+            m_can_drag = false;
+            goto viewone;
+        case Key::MouseRightClick:
+            m_can_drag = false;
+            // TODO:  right click
+            break;
+        default:
+            assert(false);
+            m_can_drag = false;
+            break;
+        }
+    }
 
     return ChooserOutcome::CONTINUE;
 }
@@ -1188,6 +1223,57 @@ LDone:
     {
         OutputConsole(L"\r\n");
     }
+}
+
+void Chooser::OnLeftClick(const InputRecord& input, Error& e)
+{
+    // Check for clicks in file list area.
+    if (m_visible_rows > 0 && unsigned(input.mouse_pos.Y - 1) < unsigned(m_visible_rows))
+    {
+        if (input.mouse_pos.X == m_terminal_width - 1)
+        {
+            // TODO:  Click on scrollbar.
+        }
+        else if (m_can_drag)
+        {
+            intptr_t index = -1;
+            SHORT left = 0;
+            for (unsigned i = 0; i < m_col_widths.size(); ++i)
+            {
+                SHORT width = m_col_widths[i];
+                if (input.mouse_pos.X >= left && input.mouse_pos.X < left + width)
+                {
+                    const int y = input.mouse_pos.Y - 1;
+                    index = (i * m_num_rows) + m_top + y;
+                    if (size_t(index) < m_files.size())
+                    {
+                        SetIndex(index);
+                        return;
+                    }
+                    break;
+                }
+                left += m_col_widths[i] + m_padding;
+            }
+            m_can_drag = false;
+        }
+        return;
+    }
+
+    // Check for autoscroll
+    if (input.key == Key::MouseDrag)
+    {
+        if (m_can_drag)
+        {
+            // TODO:  autoscroll
+        }
+        return;
+    }
+
+    m_can_drag = false;
+
+    // TODO:  Click in header?
+    // TODO:  Click in footer?
+    // TODO:  Could hover effects be feasible/useful?  (To show clickable spots and tooltips?)
 }
 
 void Chooser::NewFileMask(Error& e)

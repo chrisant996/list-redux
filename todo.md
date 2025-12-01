@@ -10,11 +10,18 @@
 - [x] read color configuration from `.listredux` file
 - [x] history in ReadInput() prompts
 - [x] include terminal emulation for running on older than Windows 10 build 15063
-- [ ] mouse input
+- mouse input
   - Mouse wheel input is automatically converted to UP/DOWN keys even when ENABLE_MOUSE_INPUT is omitted, because of switching to the alternate screen.
-  - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
-  - [ ] mouse wheel should scroll by _N_ lines
-  - [ ] `Shift` to let mouse input through to terminal
+  - [x] mouse wheel should scroll by _N_ lines
+  - [x] `Shift` to let mouse input through to terminal
+  - [ ] wheel in chooser
+  - [ ] left click hotspots in chooser
+  - [ ] left click hotspots in viewer
+  - [ ] left click in scrollbars
+  - [ ] left click in edit edit mode in viewer
+  - [ ] mouse input in popup list
+  - [ ] mouse input in `ReadInput()`
+  - [ ] mouse input in message box routine
 - improve input routine
   - [x] scrollable bounds
   - [x] arrow keys
@@ -125,6 +132,7 @@
 ### Future
 
 - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
+- [ ] option to enable/disable mouse input
 - detect certain file types and render with formatting/color
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting

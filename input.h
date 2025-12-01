@@ -96,17 +96,17 @@ struct InputRecord
 
 extern const WCHAR c_prompt_char[];
 
-InputRecord SelectInput(DWORD timeout=INFINITE);
-bool ReadInput(StrW& out, History history=History::MAX, DWORD max_length=32, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&)>> input_callback=std::nullopt);
-
 class AutoMouseConsoleMode
 {
 public:
-                    AutoMouseConsoleMode(HANDLE hin=0);
+                    AutoMouseConsoleMode(HANDLE hin=0, bool enable=true);
                     ~AutoMouseConsoleMode();
-    void            EnableMouseInput(bool enable);
+    void            DisableMouseInputIfShift();
 private:
     HANDLE          m_hin = 0;
     DWORD           m_orig_mode = 0;
     DWORD           m_prev_mode = 0;
 };
+
+InputRecord SelectInput(DWORD timeout=INFINITE, AutoMouseConsoleMode* mouse=nullptr);
+bool ReadInput(StrW& out, History history=History::MAX, DWORD max_length=32, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&)>> input_callback=std::nullopt);
