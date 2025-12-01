@@ -291,6 +291,13 @@ FileLineIter& FileLineIter::operator=(FileLineIter&& other)
     m_pending_width = other.m_pending_width;
     m_pending_wrap_length = other.m_pending_wrap_length;
     m_pending_wrap_width = other.m_pending_wrap_width;
+    m_pending_wrap_indent = other.m_pending_wrap_indent;
+    m_hanging_indent = other.m_hanging_indent;
+    m_any_nonspace = other.m_any_nonspace;
+
+#ifdef DEBUG
+    m_line_index = other.m_line_index;
+#endif
 
     other.Reset();
     return *this;
@@ -318,6 +325,13 @@ void FileLineIter::ClearProcessed()
     m_pending_width = 0;
     m_pending_wrap_length = 0;
     m_pending_wrap_width = 0;
+    m_pending_wrap_indent = 0;
+    m_hanging_indent = 0;
+    m_any_nonspace = false;
+
+#ifdef DEBUG
+    m_line_index = 0;
+#endif
 }
 
 void FileLineIter::SetEncoding(FileDataType type, UINT codepage)
@@ -354,6 +368,11 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
         out_width = m_pending_width;
         m_pending_length = 0;
         m_pending_width = 0;
+        m_pending_wrap_length = 0;
+        m_pending_wrap_width = 0;
+        m_pending_wrap_indent = 0;
+        m_hanging_indent = 0;
+        m_any_nonspace = false;
         return (out_length > 0) ? BreakNewline : Exhausted;
     }
 
@@ -447,7 +466,10 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
             {
                 // Reached end of consumable range.
                 if (newline)
+                {
                     outcome = BreakNewline;
+                    m_pending_wrap_indent = 0; // Newline cancels hanging indent.
+                }
                 break;
             }
 
@@ -552,6 +574,23 @@ calc_width:
                 }
             }
 
+            // Accumulate hanging indent.
+            if (!m_any_nonspace)
+            {
+                switch (c)
+                {
+                case ' ':
+                    ++m_pending_wrap_indent;
+                    break;
+                case '\t':
+                    m_pending_wrap_indent += m_options.tab_width - (m_pending_wrap_indent % m_options.tab_width);
+                    break;
+                default:
+                    m_any_nonspace = true;
+                    break;
+                }
+            }
+
             m_pending_length += blen;
             m_pending_width += clen;
 
@@ -576,10 +615,17 @@ calc_width:
     out_width = m_pending_width;
     if (outcome != Exhausted)
     {
+        // Apply hanging indent to next line.
+        m_hanging_indent = m_pending_wrap_indent;
+        // Reset pending state.
         m_pending_length = 0;
-        m_pending_width = 0;
+        m_pending_width = m_pending_wrap_indent;
         m_pending_wrap_length = 0;
-        m_pending_wrap_width = 0;
+        m_pending_wrap_width = m_pending_wrap_indent;
+        m_any_nonspace = !!m_hanging_indent;
+#ifdef DEBUG
+        ++m_line_index;
+#endif
     }
 
     if (resync)
@@ -645,6 +691,7 @@ FileLineMap::FileLineMap(const ViewerOptions& options)
 FileLineMap& FileLineMap::operator=(FileLineMap&& other)
 {
     m_lines = std::move(other.m_lines);
+    m_formatting = std::move(other.m_formatting);
     m_line_numbers = std::move(other.m_line_numbers);
 
     m_current_line_number = other.m_current_line_number;
@@ -698,6 +745,7 @@ void FileLineMap::Reset()
 void FileLineMap::ClearProcessed()
 {
     m_lines.clear();
+    m_formatting.clear();
     m_line_numbers.clear();
 
     m_current_line_number = 1;
@@ -796,6 +844,9 @@ do_skip_whitespace:
 #endif
     while (true)
     {
+        FormattingInfo fmt;
+        fmt.m_leading_indent = m_line_iter.HangingIndent();
+
         const FileLineIter::Outcome outcome = m_line_iter.Next(line_ptr, line_length, line_width);
 #ifdef DEBUG_LINE_PARSING
         if (outcome != FileLineIter::Exhausted && outcome != FileLineIter::BreakNewline)
@@ -812,8 +863,11 @@ do_skip_whitespace:
         m_lines.emplace_back(m_pending_begin);
         if (m_wrap && !IsBinaryFile())
             m_line_numbers.emplace_back(m_current_line_number);
+        if (m_wrap)
+            m_formatting.emplace_back(std::move(fmt));
+        assert(m_lines.size() == m_line_iter.GetProcessedLineCount());
 #ifdef DEBUG_LINE_PARSING
-        dbgprintf(L"finished line %lu; offset %lu (%lx), length %lu, width %lu", m_lines.size(), m_pending_begin, m_pending_begin, line_length, line_width);
+        dbgprintf(L"finished line %lu; offset %lu (%lx), length %lu, width %lu, leading indent %u", m_lines.size(), m_pending_begin, m_pending_begin, line_length, line_width, fmt.m_leading_indent);
 #endif
 #ifdef DEBUG
         consumed += line_length;
@@ -858,6 +912,18 @@ FileOffset FileLineMap::GetOffset(size_t index) const
 {
     assert(!index || index < m_lines.size());
     return index ? m_lines[index] : 0;  // Uses 0 when m_lines is empty.
+}
+
+FormattingInfo FileLineMap::GetFormattingInfo(size_t index) const
+{
+    if (m_wrap)
+    {
+        assert(!index || index < m_formatting.size());
+        assert(m_formatting.size() == m_lines.size());
+        if (index < m_formatting.size())
+            return m_formatting[index];
+    }
+    return {};
 }
 
 size_t FileLineMap::GetLineNumber(size_t index) const
@@ -1198,6 +1264,14 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
 
     bool need_found_highlight = false;
     bool highlighting_found_text = false;
+
+    const auto fmt = m_map.GetFormattingInfo(line);
+    if (fmt.m_leading_indent)
+    {
+        visible_len = min<uint32>(left_offset, fmt.m_leading_indent);
+        total_cells = visible_len;
+        s.AppendSpaces(fmt.m_leading_indent - visible_len);
+    }
 
     // PREF:  Optimize color runs.  "{color}a{norm}{color}b{norm}" can be more
     // efficiently expressed as "{color}ab{norm}".

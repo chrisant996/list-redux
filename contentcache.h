@@ -73,6 +73,12 @@ private:
 
 typedef std::vector<PipeChunk> PipeChunks;
 
+struct FormattingInfo
+{
+// TODO:  Syntaxing highlighting info can go in here as well.
+    BYTE            m_leading_indent = 0;
+};
+
 class FileLineIter
 {
 public:
@@ -99,8 +105,13 @@ public:
     void            SetBytes(FileOffset offset, const BYTE* bytes, size_t available);
     bool            More() const { return m_count > 0; }
     Outcome         Next(const BYTE*& bytes, uint32& length, uint32& width);
+    uint32          HangingIndent() const { return m_hanging_indent; }
     bool            SkipWhitespace(uint32 curr_len, uint32& skipped);
     bool            IsBinaryFile() const { return m_binary_file; }
+
+#ifdef DEBUG
+    size_t          GetProcessedLineCount() const { return m_line_index; }
+#endif
 
 private:
     const ViewerOptions& m_options;
@@ -120,6 +131,13 @@ private:
     uint32          m_pending_width = 0;        // Width in character cells.
     uint32          m_pending_wrap_length = 0;  // Candidate length for word wrap.
     uint32          m_pending_wrap_width = 0;   // Candidate width for word wrap.
+    uint32          m_pending_wrap_indent = 0;  // Candidate hanging indent for word wrap.
+    uint32          m_hanging_indent = 0;       // Hanging indent from previous line.
+    bool            m_any_nonspace = false;     // For calculating hanging indent.
+
+#ifdef DEBUG
+    size_t          m_line_index = 0;
+#endif
 };
 
 class FileLineMap
@@ -141,6 +159,7 @@ public:
     size_t          Count() const { return m_lines.size(); }
     size_t          CountFriendlyLines() const;
     FileOffset      GetOffset(size_t index) const;
+    FormattingInfo  GetFormattingInfo(size_t index) const;
     size_t          GetLineNumber(size_t index) const;
     void            GetLineText(const BYTE* p, size_t num_bytes, StrW& out, bool hex_mode=false) const;
     size_t          FriendlyLineNumberToIndex(size_t line) const;
@@ -162,6 +181,7 @@ private:
     // Content.
     std::vector<FileOffset> m_lines;
     std::vector<size_t> m_line_numbers;
+    std::vector<FormattingInfo> m_formatting;
 
     // Processing.
     size_t          m_current_line_number = 1;
