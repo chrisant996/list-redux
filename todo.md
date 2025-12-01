@@ -1,8 +1,6 @@
-# BUGS
+# OPEN ISSUES
 
-- Some exotic characters are calculated as the wrong width in Windows Terminal (e.g. from dirx\icons.cpp when choosing inaccurate encodings).
 - What if codepage 437 isn't installed?  It's our fallback, but if it's not installed then choose another?
-- [x] Mitigate width miscalculations by making the scroll bar characters always use explicit positioning escape codes.
 - Sometimes detects `clink.log` file as Binary when `debug.log_terminal` is enabled, but it's really UTF8.
 
 # FEATURES
@@ -12,11 +10,25 @@
 - [x] read color configuration from `.listredux` file
 - [x] history in ReadInput() prompts
 - [x] include terminal emulation for running on older than Windows 10 build 15063
+- [ ] mouse input
+  - Mouse wheel input is automatically converted to UP/DOWN keys even when ENABLE_MOUSE_INPUT is omitted, because of switching to the alternate screen.
+  - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
+  - [ ] mouse wheel should scroll by _N_ lines
+  - [ ] `Shift` to let mouse input through to terminal
+- improve input routine
+  - [x] scrollable bounds
+  - [x] arrow keys
+  - [x] Ctrl-arrow keys
+  - [x] Ctrl-BACK and Ctrl-DEL keys
+  - [ ] copy/paste keys
+  - [ ] CUA keys
+  - [ ] show markers at left/right end when scrolled horizontally
+- [ ] improve message box routine
 - [ ] some way to configure colors inside the app
-- [ ] optionally save configured colors to `.listredux` file
 - [ ] some way to revert to default colors inside the app
+- [ ] save current settings into `.listredux` file as defaults
 - [ ] documentation for the `.listredux` file
-- [ ] documentation for regular expressions (link to MSVC ECMAScript syntax page)
+- [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
 
 ### File Chooser (list files in directory)
 
@@ -37,7 +49,6 @@
 - [x] `F2` incrementally search the list of file names
 - [x] `F` `S` `/` `\` search for text in files in file chooser (tag matching files)
 - [x] `Ctrl-N` invert tagged files
-- [ ] show used and free space in footer
 
 ### File Viewer (list file content)
 
@@ -50,7 +61,7 @@
   - [x] text files wrap with awareness of word breaks (can split after a run of spaces, or on a transition from punctuation to word characters, or if a single word exceeds the max line length)
   - [x] word wrapping mutates line numbers; consider having an index of "user friendly" line numbers to show in the left margin for Go To Line.
   - [x] toggle hanging indent (up to half the terminal width) (a third? a quarter? configurable maximum?)
-  - [ ] source code files should add +8 to hanging indent, other files should add +0 to hanging indent
+  - [x] source code files should add +8 to hanging indent, other files should add +0 to hanging indent
 - [x] `R` show ruler (both in text and hex modes)
 - [x] `N` show line numbers
 - [x] `O` show file offset
@@ -74,12 +85,11 @@
   - [x] `F4` toggle multi-file search (next/prev cross file boundaries)
   - [x] make search interruptible with `Ctrl-Break`
   - [x] search for regex (search line by line)
-  - [ ] search for hex bytes in hex mode (or just use regex searches with numeric escapes `\xAB`, except the MSVC ECMAScript engine doesn't support them -- another reason to use RE2)
+  - [ ] optionally build with RE2 regex library (and do it for official releases)
 - hex mode
   - [x] always show hex ruler on a second header row
   - [x] go to offset
   - [x] highlight newline characters in hex mode
-  - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [x] go to line
   - [x] `Alt-A` toggle ASCII filter in characters column
   - [x] remember hex mode across viewers
@@ -114,30 +124,22 @@
 
 ### Future
 
-- [ ] mouse input
-  - Mouse wheel input is automatically converted to UP/DOWN keys even when ENABLE_MOUSE_INPUT is omitted, because of switching to the alternate screen.
-  - [ ] toggle mouse input on/off (and configurable) since it interferes with the terminal host
-  - [ ] mouse wheel should scroll by _N_ lines
-- improve input routine
-  - [x] scrollable bounds
-  - [x] arrow keys
-  - [x] Ctrl-arrow keys
-  - [x] Ctrl-BACK and Ctrl-DEL keys
-  - [ ] copy/paste keys
-  - [ ] CUA keys
-- [ ] `S` configure sort order
+- [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
 - detect certain file types and render with formatting/color
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
   - [ ] detect C++, Lua, etc and render syntax coloring
   - [ ] allow showing CSI SGR codes inline?  (but wrapping and max line length are problematic)
-- [ ] option to sort horizontally instead of vertically
+- [ ] let user override hanging indent per file
 - [ ] option or toggle showing scrollbar in viewer?
+- [ ] `S` configure sort order
+- [ ] option to sort horizontally instead of vertically
 
 ### Maybe
 
-- optionally build with RE2 regex library (and do it for official releases)
 - use ICU for encodings when available _[ICU is independent from codepages, so it uses strings to identify encodings, and it has its own analogs to MLang and MultiByteToWideChar, and it's only available in Win10+ circa 2019 onward, so adjusting to use ICU when available will be an invasive change.]_
+- search for hex bytes in hex mode?  or just use regex searches with numeric escapes `\xAB`?  (but the MSVC ECMAScript engine doesn't support them, so it's another reason to use RE2)
+- show used and free space in chooser?
 - persist history lists for input prompts?
 - cut and paste to new or existing file [did it really "cut" or just "copy"?]
 - allow copying, moving tagged files?
@@ -159,6 +161,8 @@
 
 # KNOWN ISSUES
 
+- Some exotic characters are calculated as the wrong width in Windows Terminal (e.g. from dirx\icons.cpp when choosing inaccurate encodings).
+  - [x] Mitigate width miscalculations by making the scroll bar characters always use explicit positioning escape codes.
 - Very large files consisting mostly of very short lines may take an excessive amount of memory to open.  This could lead to crashing the program.  For example, a 2GB file containing only 0x0A bytes would be interpreted as 2 billion lines, and take many times that much space to maintain tracking data for all 2 billion lines.
 
 ### Not Planned
