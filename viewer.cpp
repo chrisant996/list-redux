@@ -435,7 +435,7 @@ LAutoFitContentWidth:
     m_content_width = m_terminal_width - m_margin_width - show_scrollbar;
     {
         Error e;
-        m_context.SetWrapWidth(m_wrap ? m_content_width : g_options.max_line_length);
+        m_context.SetWrapWidth(m_wrap ? m_content_width : 0);
         working.ShowFeedback(m_context.Completed(), m_context.Count(), m_top + m_content_height, this, false/*bytes*/);
         m_context.ProcessThrough(m_top + m_content_height, e);
         const unsigned new_margin_width = CalcMarginWidth();
@@ -1831,7 +1831,8 @@ hex_edit_right:
             {
                 if (!m_hex_mode)
                 {
-                    m_wrap = !m_wrap;
+                    g_options.wrapping = !g_options.wrapping;
+                    m_wrap = g_options.wrapping;
                     m_force_update = true;
                 }
             }
@@ -1994,6 +1995,8 @@ void Viewer::SetFile(intptr_t index, ContentCache* context, bool force)
             if (sh.Empty())
                 ZeroMemory(&m_fd, sizeof(m_fd));
         }
+
+        m_wrap = g_options.wrapping;
     }
 }
 
@@ -2081,7 +2084,7 @@ void Viewer::FindNext(bool next)
             }
 
             FoundOffset found_line;
-            ctx.SetWrapWidth(m_wrap ? m_content_width : g_options.max_line_length);
+            ctx.SetWrapWidth(m_wrap ? m_content_width : 0);
             found = (m_hex_mode ?
                     ctx.Find(next, m_searcher, m_hex_width, found_line, e) :
                     ctx.Find(next, m_searcher, m_content_width, found_line, left_offset, e));

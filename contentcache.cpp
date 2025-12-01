@@ -276,6 +276,7 @@ FileLineIter& FileLineIter::operator=(FileLineIter&& other)
 {
     // m_options can't be updated, and it doesn't need to be.
     m_wrap = other.m_wrap;
+    m_explicit_wrap = other.m_explicit_wrap;
 
     m_codepage = other.m_codepage;
     m_binary_file = other.m_binary_file;
@@ -297,7 +298,7 @@ FileLineIter& FileLineIter::operator=(FileLineIter&& other)
 
 void FileLineIter::Reset()
 {
-    // m_wrap carries over.
+    // m_wrap and m_explicit_wrap carry over.
 
     m_codepage = 0;
     m_binary_file = true;
@@ -328,7 +329,7 @@ void FileLineIter::SetEncoding(FileDataType type, UINT codepage)
 
 void FileLineIter::SetWrapWidth(uint32 wrap)
 {
-    assert(wrap);
+    m_explicit_wrap = !!wrap;
     m_wrap = wrap ? wrap : m_options.max_line_length;
 }
 
@@ -669,7 +670,6 @@ FileLineMap& FileLineMap::operator=(FileLineMap&& other)
 
 bool FileLineMap::SetWrapWidth(unsigned wrap)
 {
-    assert(wrap);
     if (m_wrap != wrap)
     {
         m_wrap = wrap;

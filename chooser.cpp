@@ -1727,7 +1727,6 @@ void Chooser::SearchAndTag(Error& e, bool caseless)
 #endif
 
         ctx.Open(s.Text(), e);
-        ctx.SetWrapWidth(g_options.max_line_length);
 
         if (e.Test())
         {

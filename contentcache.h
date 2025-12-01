@@ -105,6 +105,7 @@ public:
 private:
     const ViewerOptions& m_options;
     uint32          m_wrap = 80;
+    bool            m_explicit_wrap = false;
 
     UINT            m_codepage = 0;
     bool            m_binary_file = true;
