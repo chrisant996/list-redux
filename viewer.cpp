@@ -210,7 +210,7 @@ private:
     void            DoSearch(bool next, bool caseless);
     void            FindNext(bool next=true);
     void            Center(const FoundOffset& found_line);
-    void            GoTo();
+    void            GoTo(Error& e);
     size_t          GetFoundLineIndex(const FoundOffset& found_line);
     FileOffset      GetFoundOffset(const FoundOffset& found_line, unsigned* offset_highlight=nullptr);
     void            ShowFileList();
@@ -1703,7 +1703,7 @@ hex_edit_right:
         case 'g':
             if ((input.modifier & ~Modifier::ALT) == Modifier::None)
             {
-                GoTo();
+                GoTo(e);
             }
             break;
         case 'h':
@@ -2172,7 +2172,7 @@ static bool wcstonum(const WCHAR* text, unsigned radix, unsigned __int64& out)
     return true;
 }
 
-void Viewer::GoTo()
+void Viewer::GoTo(Error& e)
 {
     StrW s;
     bool lineno = !m_hex_mode;
@@ -2263,6 +2263,9 @@ void Viewer::GoTo()
             unsigned __int64 line;
             if (wcstonum(p, radix, line) && line > 0)
             {
+                m_context.ProcessThrough(line, e);
+                if (e.Test())
+                    return;
                 line = m_context.FriendlyLineNumberToIndex(line);
                 m_found_line.MarkOffset(m_context.GetOffset(line));
                 Center(m_found_line);
