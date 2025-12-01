@@ -49,7 +49,8 @@
 - [x] `W` wrapping
   - [x] text files wrap with awareness of word breaks (can split after a run of spaces, or on a transition from punctuation to word characters, or if a single word exceeds the max line length)
   - [x] word wrapping mutates line numbers; consider having an index of "user friendly" line numbers to show in the left margin for Go To Line.
-  - [ ] toggle hanging indent (up to half the terminal width) (a third? a quarter? configurable maximum?)
+  - [x] toggle hanging indent (up to half the terminal width) (a third? a quarter? configurable maximum?)
+  - [ ] source code files should add +8 to hanging indent, other files should add +0 to hanging indent
 - [x] `R` show ruler (both in text and hex modes)
 - [x] `N` show line numbers
 - [x] `O` show file offset
