@@ -635,10 +635,12 @@ calc_width:
     if (outcome != Exhausted)
     {
         // Apply hanging indent to next line.
+        m_hanging_indent = 0;
         if (m_pending_wrap_indent || outcome >= BreakWrap)
+        {
             m_hanging_indent = m_pending_wrap_indent + m_options.hanging_extra;
-        else
-            m_hanging_indent = 0;
+            m_hanging_indent = min(m_hanging_indent, m_options.max_line_length / 2);
+        }
         // Reset pending state.
         m_pending_length = 0;
         m_pending_width = m_pending_wrap_indent;

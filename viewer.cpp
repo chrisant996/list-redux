@@ -17,6 +17,7 @@
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
 #include "encodings.h"
+#include "filetypeconfig.h"
 #include "help.h"
 #include "os.h"
 
@@ -1995,6 +1996,8 @@ void Viewer::SetFile(intptr_t index, ContentCache* context, bool force)
             if (sh.Empty())
                 ZeroMemory(&m_fd, sizeof(m_fd));
         }
+
+        ApplyFileTypeConfig((*m_files)[m_index].Text(), g_options);
 
         m_wrap = g_options.wrapping;
     }
