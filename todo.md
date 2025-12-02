@@ -25,7 +25,7 @@
   - [x] Ctrl-arrow keys
   - [x] Ctrl-BACK and Ctrl-DEL keys
   - [x] CUA keys
-  - [ ] copy/paste keys
+  - [x] copy/paste keys
   - [ ] undo/redo
 - [ ] command line flags
 - [ ] documentation for the `.listredux` file

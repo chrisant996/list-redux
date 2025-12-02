@@ -641,7 +641,11 @@ struct ReadInputState
     void            Backspace(bool word=false);
     void            Delete(bool word=false);
 
+    void            CopyToClipboard();
+    void            PasteFromClipboard();
+
     void            InsertChar(WCHAR c, WCHAR c2=0);
+    void            InsertText(const WCHAR* s, size_t len);
     void            RemoveText(unsigned short begin, unsigned short end);
     bool            ElideSelectedText();
 };
@@ -804,22 +808,88 @@ void ReadInputState::Delete(bool word)
     RemoveText(m_pos, m_pos + moved);
 }
 
-void ReadInputState::InsertChar(WCHAR c, WCHAR c2)
+void ReadInputState::CopyToClipboard()
 {
-    ElideSelectedText();
-
-    const size_t len = (c2 ? 2 : 1);
-
-    // Limit the length.
-    if (m_s.Length() + len > m_max_length)
+    if (m_anchor > m_s.Length() || m_anchor == m_pos)
         return;
 
-    // Append or insert the character.
+    const unsigned short begin = min(m_pos, m_anchor);
+    const unsigned short end = max(m_pos, m_anchor);
+    const unsigned short len = (end - begin);
+
+    HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE|GMEM_ZEROINIT, (len + 1) * sizeof(WCHAR));
+    if (mem == nullptr)
+        return;
+
+    WCHAR* data = (WCHAR*)GlobalLock(mem);
+    memcpy(data, m_s.Text() + begin, len * sizeof(WCHAR));
+    data[len] = 0;
+    GlobalUnlock(mem);
+
+    if (!OpenClipboard(0))
+    {
+        GlobalFree(mem);
+        return;
+    }
+
+    EmptyClipboard();
+    SetClipboardData(CF_UNICODETEXT, mem);
+    CloseClipboard();
+}
+
+void ReadInputState::PasteFromClipboard()
+{
+    if (!OpenClipboard(0))
+        return;
+
+    HANDLE mem = GetClipboardData(CF_UNICODETEXT);
+    if (mem)
+    {
+        size_t len = size_t(GlobalSize(mem) / sizeof(WCHAR));
+        LPCWSTR data = LPCWSTR(GlobalLock(mem));
+
+        while (len && !data[len - 1])
+            --len;
+        InsertText(data, len);
+
+        GlobalUnlock(mem);
+    }
+
+    CloseClipboard();
+}
+
+void ReadInputState::InsertChar(WCHAR c, WCHAR c2)
+{
+    if (!c)
+        return;
+
+    const size_t len = (c2 ? 2 : 1);
+    WCHAR chars[2] = { c, c2 };
+    InsertText(chars, len);
+}
+
+void ReadInputState::InsertText(const WCHAR* s, size_t available)
+{
+    if (!available)
+        return;
+
+    ElideSelectedText();
+
+    if (available > size_t(m_max_length))
+        available = m_max_length;
+
+    unsigned short len = 0;
+    wcwidth_iter iter(s, static_cast<unsigned short>(available));
+    while (iter.next())
+    {
+        if (m_s.Length() + iter.character_length() > m_max_length)
+            break;
+        len += iter.character_length();
+    }
+
     if (m_pos == m_s.Length())
     {
-        m_s.Append(c);
-        if (c2)
-            m_s.Append(c2);
+        m_s.Append(s, len);
         m_pos = m_s.Length();
     }
     else
@@ -827,9 +897,7 @@ void ReadInputState::InsertChar(WCHAR c, WCHAR c2)
         StrW tmp;
         const int32 insert_pos = m_pos;
         tmp.Set(m_s.Text(), insert_pos);
-        tmp.Append(c);
-        if (c2)
-            tmp.Append(c2);
+        tmp.Append(s, len);
         m_pos = tmp.Length();
         tmp.Append(m_s.Text() + insert_pos, m_s.Length() - insert_pos);
         m_s = std::move(tmp);
@@ -940,12 +1008,23 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
                         state.Backspace((input.modifier & Modifier::CTRL) == Modifier::CTRL);
                 }
                 break;
+            case Key::INS:
+                if (input.modifier == Modifier::CTRL)
+                {
+                    state.CopyToClipboard();
+                }
+                else if (input.modifier == Modifier::SHIFT)
+                {
+                    state.PasteFromClipboard();
+                }
             case Key::DEL:
                 if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
                 {
                     if (!state.ElideSelectedText())
                         state.Delete((input.modifier & Modifier::CTRL) == Modifier::CTRL);
                 }
+                if (input.modifier == Modifier::SHIFT)
+                    goto cut_to_clip;
                 break;
             case Key::ENTER:
                 if (history && out.Length())
@@ -1004,6 +1083,17 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
                 case 'A'-'@':
                     state.Home(Modifier::None);
                     state.End(Modifier::SHIFT);
+                    break;
+                case 'C'-'@':
+                    state.CopyToClipboard();
+                    break;
+                case 'V'-'@':
+                    state.PasteFromClipboard();
+                    break;
+                case 'X'-'@':
+cut_to_clip:
+                    state.CopyToClipboard();
+                    state.ElideSelectedText();
                     break;
                 }
             }
