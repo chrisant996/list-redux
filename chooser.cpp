@@ -592,6 +592,7 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
         m_prev_input = input;
     }
 
+    int32 amount = 1;
     if (input.type == InputType::Key)
     {
         m_can_drag = false;
@@ -668,16 +669,24 @@ LEnd:
             break;
 
         case Key::UP:
-            if (m_index)
-                SetIndex(m_index - 1);
+DoKeyUp:
+            while (amount-- > 0)
+            {
+                if (m_index)
+                    SetIndex(m_index - 1);
+            }
             EnsureTop();
             break;
         case Key::DOWN:
-            if (m_index == m_count - 1)
-                m_prev_latched = true;
+DoKeyDown:
+            while (amount-- > 0)
+            {
+                if (m_index == m_count - 1)
+                    m_prev_latched = true;
 LNext:
-            if (m_count && m_index < m_count - 1)
-                SetIndex(m_index + 1);
+                if (m_count && m_index < m_count - 1)
+                    SetIndex(m_index + 1);
+            }
             EnsureTop();
             break;
 
@@ -964,26 +973,21 @@ LNext:
         switch (input.key)
         {
         case Key::MouseWheel:
-            // TODO: wheel
-            break;
-        case Key::MouseHWheel:
-            // TODO: wheel
+            amount = abs(input.mouse_wheel_amount);
+            if (input.mouse_wheel_amount < 0)
+                goto DoKeyUp;
+            else
+                goto DoKeyDown;
             break;
         case Key::MouseLeftClick:
             m_can_drag = true;
             __fallthrough;
         case Key::MouseDrag:
-            OnLeftClick(input, e);
-            break;
         case Key::MouseLeftDblClick:
-            m_can_drag = false;
-            goto viewone;
-        case Key::MouseRightClick:
-            m_can_drag = false;
-            // TODO:  right click
+            if (OnLeftClick(input, e))
+                goto viewone;
             break;
         default:
-            assert(false);
             m_can_drag = false;
             break;
         }
@@ -1225,7 +1229,7 @@ LDone:
     }
 }
 
-void Chooser::OnLeftClick(const InputRecord& input, Error& e)
+bool Chooser::OnLeftClick(const InputRecord& input, Error& e)
 {
     // Check for clicks in file list area.
     if (m_visible_rows > 0 && unsigned(input.mouse_pos.Y - 1) < unsigned(m_visible_rows))
@@ -1248,7 +1252,12 @@ void Chooser::OnLeftClick(const InputRecord& input, Error& e)
                     if (size_t(index) < m_files.size())
                     {
                         SetIndex(index);
-                        return;
+                        if (input.key == Key::MouseLeftDblClick)
+                        {
+                            m_can_drag = false;
+                            return true;
+                        }
+                        return false;
                     }
                     break;
                 }
@@ -1256,7 +1265,7 @@ void Chooser::OnLeftClick(const InputRecord& input, Error& e)
             }
             m_can_drag = false;
         }
-        return;
+        return false;
     }
 
     // Check for autoscroll
@@ -1266,7 +1275,7 @@ void Chooser::OnLeftClick(const InputRecord& input, Error& e)
         {
             // TODO:  autoscroll
         }
-        return;
+        return false;
     }
 
     m_can_drag = false;
@@ -1274,6 +1283,7 @@ void Chooser::OnLeftClick(const InputRecord& input, Error& e)
     // TODO:  Click in header?
     // TODO:  Click in footer?
     // TODO:  Could hover effects be feasible/useful?  (To show clickable spots and tooltips?)
+    return false;
 }
 
 void Chooser::NewFileMask(Error& e)

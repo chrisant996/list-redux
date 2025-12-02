@@ -252,6 +252,8 @@ private:
     bool            m_hex_high_nybble = true;
     bool            m_hex_characters = false;
 
+    bool            m_can_drag = false;
+
     intptr_t        m_last_index = -1;
     size_t          m_last_top = 0;
     size_t          m_last_left = 0;
@@ -259,6 +261,7 @@ private:
     FileOffset      m_last_hex_top = 0;
     bool            m_last_hex_edit = false;
     FileOffset      m_last_hex_pos = 0;
+    bool            m_last_hex_high_nybble = true;
     bool            m_last_hex_characters = false;
     FileOffset      m_last_processed = FileOffset(-1);
     bool            m_last_completed = false;
@@ -498,7 +501,7 @@ LAutoFitContentWidth:
     const bool pos_changed = (m_hex_edit && m_last_hex_pos != m_hex_pos);
     const bool processed_changed = (m_last_processed != m_context.Processed() || m_last_completed != m_context.Completed());
     const bool feedback_changed = (!m_last_feedback.Equal(m_feedback));
-    const bool hex_characters_changed = (m_last_hex_characters != m_hex_characters);
+    const bool hex_meta_pos_changed = (m_last_hex_characters != m_hex_characters || m_last_hex_high_nybble != m_hex_high_nybble);
 
     // Decide what needs to be updated.
     const bool update_header = (m_force_update || m_force_update_header || file_changed || top_changed || pos_changed || processed_changed);
@@ -506,7 +509,7 @@ LAutoFitContentWidth:
     const bool update_hex_edit = (m_force_update_hex_edit_offset != FileOffset(-1));
     const FileOffset update_hex_edit_offset = m_force_update_hex_edit_offset;
     update_command_line |= (m_force_update || m_force_update_footer || feedback_changed);
-    if (!update_header && !update_content && !update_command_line)
+    if (!update_header && !update_content && !update_command_line && !hex_meta_pos_changed)
         return;
     const bool update_debug_row = debug_row;
 #ifdef INCLUDE_MENU_ROW
@@ -521,6 +524,7 @@ LAutoFitContentWidth:
     m_last_hex_top = m_hex_top;
     m_last_hex_edit = m_hex_edit;
     m_last_hex_pos = m_hex_pos;
+    m_last_hex_high_nybble = m_hex_high_nybble;
     m_last_hex_characters = m_hex_characters;
     m_last_index = m_index;
     m_last_feedback.Set(m_feedback);
@@ -1010,7 +1014,7 @@ LAutoFitContentWidth:
         MakeCommandLine(s, left.Text());
     }
 
-    if (s.Length() || hex_characters_changed)
+    if (s.Length() || hex_meta_pos_changed)
     {
         unsigned cursor_y;
         unsigned cursor_x;
@@ -1167,8 +1171,9 @@ unsigned Viewer::LinePercent(size_t line) const
 ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
 {
     int amount = 1;
-    if (input.type == InputType::Key || input.type == InputType::Mouse)
+    if (input.type == InputType::Key)
     {
+        m_can_drag = false;
         switch (input.key)
         {
         case Key::F1:
@@ -1506,28 +1511,11 @@ hex_edit_right:
                 }
             }
             break;
-
-        case Key::MouseWheel:
-            // FUTURE:  Acceleration?
-            if (input.mouse_wheel_amount < 0)
-            {
-                amount = -input.mouse_wheel_amount;
-                goto key_up;
-            }
-            else if (input.mouse_wheel_amount > 0)
-            {
-                amount = input.mouse_wheel_amount;
-                goto key_down;
-            }
-            break;
-        case Key::MouseLeftClick:
-        case Key::MouseLeftDblClick:
-            OnLeftClick(input, e);
-            break;
         }
     }
     else if (input.type == InputType::Char)
     {
+        m_can_drag = false;
         if (m_hex_edit)
         {
             if (!m_hex_characters)
@@ -1865,19 +1853,104 @@ hex_edit_right:
             break;
         }
     }
+    else if (input.type == InputType::Mouse)
+    {
+        switch (input.key)
+        {
+        case Key::MouseWheel:
+            // FUTURE:  Acceleration?
+            if (input.mouse_wheel_amount < 0)
+            {
+                amount = -input.mouse_wheel_amount;
+                goto key_up;
+            }
+            else if (input.mouse_wheel_amount > 0)
+            {
+                amount = input.mouse_wheel_amount;
+                goto key_down;
+            }
+            break;
+        case Key::MouseLeftClick:
+        case Key::MouseLeftDblClick:
+            m_can_drag = true;
+            __fallthrough;
+        case Key::MouseDrag:
+            OnLeftClick(input, e);
+            break;
+        case Key::MouseRightClick:
+            m_can_drag = false;
+            break;
+        }
+    }
 
     return ViewerOutcome::CONTINUE;
 }
 
 void Viewer::OnLeftClick(const InputRecord& input, Error& e)
 {
-    // TODO:  Mouse clicks...
+    // Click in content area.
+    const uint32 content_top = 1 + !!m_hex_mode;
+    if (unsigned(input.mouse_pos.Y) >= content_top && unsigned(input.mouse_pos.Y) < content_top + m_content_height)
+    {
+        // TODO:  Click on scrollbar.
+        if (m_can_drag && m_hex_edit)
+        {
+            const FileOffset y_ofs = m_hex_top + ((input.mouse_pos.Y - content_top) * m_hex_width);
 
-    // TODO:  Click on scrollbar.
+            const uint32 hex_left = m_context.GetHexOffsetColumnWidth() + 2;
+            uint32 chars_left = hex_left;
+            chars_left += m_hex_width * 2;
+            chars_left += (1 << (3 - g_options.hex_grouping)) * (m_hex_width / 8);
+            chars_left += m_hex_width / 8;
+            chars_left += 1;
+
+            if (uint32(input.mouse_pos.X) >= chars_left && uint32(input.mouse_pos.X) < chars_left + m_hex_width)
+            {
+                const FileOffset pos = y_ofs + input.mouse_pos.X - chars_left;
+                if (pos >= 0 && pos < m_context.GetFileSize())
+                {
+                    m_hex_pos = pos;
+                    m_hex_characters = true;
+                }
+            }
+            else if (uint32(input.mouse_pos.X) >= hex_left && uint32(input.mouse_pos.X) < chars_left)
+            {
+                FileOffset pos = y_ofs;
+                int32 x = input.mouse_pos.X - hex_left;
+                for (uint32 ii = 0; ii < m_hex_width;)
+                {
+                    if (x == 0 || x == 1)
+                    {
+                        if (pos < m_context.GetFileSize())
+                        {
+                            m_hex_pos = pos;
+                            m_hex_high_nybble = (x == 0);
+                            m_hex_characters = false;
+                            break;
+                        }
+                    }
+
+                    ++ii;
+                    x -= 2;
+                    if (ii % (1 << g_options.hex_grouping) == 0)
+                        x -= (((ii % 8) == 0) ? 2 : 1);
+
+                    ++pos;
+                }
+            }
+        }
+        return;
+    }
+    else
+    {
+        if (m_can_drag && m_hex_edit)
+        {
+            // TODO:  autoscroll
+        }
+    }
 
     // TODO:  Click on file path in header?
     // TODO:  Click on line number (or offset) in header?
-    // TODO:  Click on content line?  (Maybe to mark/unmark?)
     // TODO:  Click on Command in footer?
     // TODO:  Click on encoding in footer?
     // TODO:  Click on options in footer?
@@ -1973,6 +2046,7 @@ void Viewer::SetFile(intptr_t index, ContentCache* context, bool force)
     m_index = index;
     m_hex_edit = false;
     m_hex_high_nybble = true;
+    m_can_drag = false;
     m_force_update = true;
 
     m_found_line.Clear();

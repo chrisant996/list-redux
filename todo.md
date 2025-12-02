@@ -10,16 +10,16 @@
 - [x] read color configuration from `.listredux` file
 - [x] history in ReadInput() prompts
 - [x] include terminal emulation for running on older than Windows 10 build 15063
+- [ ] improve message box routine
 - mouse input
   - Mouse wheel input is automatically converted to UP/DOWN keys even when ENABLE_MOUSE_INPUT is omitted, because of switching to the alternate screen.
   - [x] mouse wheel should scroll by _N_ lines
   - [x] `Shift` to let mouse input through to terminal
-  - [ ] wheel in chooser
-  - [ ] left click hotspots in chooser
-  - [ ] left click hotspots in viewer
+  - [x] wheel in chooser
+  - [x] left click in hex edit mode in viewer
   - [ ] left click in scrollbars
-  - [ ] left click in edit edit mode in viewer
-  - [ ] mouse input in popup list
+  - [ ] left click hotspots in viewer
+  - [x] mouse input in popup list
   - [ ] mouse input in `ReadInput()`
   - [ ] mouse input in message box routine
 - improve input routine
@@ -30,7 +30,6 @@
   - [ ] copy/paste keys
   - [ ] CUA keys
   - [ ] show markers at left/right end when scrolled horizontally
-- [ ] improve message box routine
 - [ ] some way to configure colors inside the app
 - [ ] some way to revert to default colors inside the app
 - [ ] save current settings into `.listredux` file as defaults

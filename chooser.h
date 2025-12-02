@@ -63,7 +63,7 @@ private:
     bool            AskForConfirmation(const WCHAR* msg);
     void            WaitToContinue(bool erase_after=false, bool new_line=false);
 
-    void            OnLeftClick(const InputRecord& input, Error& e);
+    bool            OnLeftClick(const InputRecord& input, Error& e);
     void            NewFileMask(Error& e);
     void            ChangeAttributes(Error& e);
     void            NewDirectory(Error& e);

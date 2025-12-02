@@ -13,6 +13,7 @@
 #include "fileinfo.h"
 #include "scroll_car.h"
 #include "wcwidth_iter.h"
+#include "vieweroptions.h"
 
 constexpr scroll_bar_style c_sbstyle = scroll_bar_style::whole_line_chars;
 
@@ -32,6 +33,7 @@ private:
     int32           get_scroll_offset() const;
     void            set_top(intptr_t top, bool ignore_scroll_offset=false);
     bool            is_selected(intptr_t index) const;
+    void            on_navigate();
 
     // Filtering.
     intptr_t        get_original_index(intptr_t index) const;
@@ -42,11 +44,14 @@ private:
     // Layout.
     int32           m_terminal_width = 0;
     int32           m_terminal_height = 0;
-#if 0
-    int32           m_mouse_offset = 0;
-    int32           m_mouse_left = 0;
-    int32           m_mouse_width = 0;
-#endif
+    int32           m_window_left = 0;
+    int32           m_window_top = 0;
+    int32           m_window_width = 0;
+    int32           m_window_height = 0;
+    int32           m_content_left = 0;
+    int32           m_content_top = 0;
+    int32           m_content_width = 0;
+    int32           m_content_height = 0;
     int32           m_visible_rows = 0;
     int32           m_longest_visible = 0;
     int32           m_vert_scroll_car = 0;
@@ -84,6 +89,7 @@ private:
     scroll_helper   m_scroll_helper;
     bool            m_scroll_bar_clicked = false;
 #endif
+    bool            m_can_drag = false;
 
     // Configuration.
     int32           m_pref_height = 0;      // Automatic.
@@ -108,6 +114,8 @@ PopupResult PopupList::Go(const WCHAR* title, const std::vector<StrW>& items, in
     m_terminal_width = LOWORD(colsrows);
     m_terminal_height = HIWORD(colsrows);
 
+    AutoMouseConsoleMode mouse(0, g_options.allow_mouse);
+
     if (items.empty())
     {
 cancel:
@@ -126,6 +134,7 @@ cancel:
     m_pref_height = 0;
     m_pref_width = 0;
     m_filter = true;
+    m_can_drag = false;
 
     // Measure longest item.
     m_longest = m_pref_width;
@@ -159,7 +168,7 @@ cancel:
     {
         update_display();
 
-        const InputRecord input = SelectInput();
+        const InputRecord input = SelectInput(INFINITE, &mouse);
         switch (input.type)
         {
         case InputType::None:
@@ -171,6 +180,7 @@ cancel:
 
         case InputType::Key:
         case InputType::Char:
+        case InputType::Mouse:
             if (handle_input(input))
                 return m_result;
             break;
@@ -213,23 +223,21 @@ bool PopupList::handle_input(const InputRecord& input)
         {
         case Key::UP:
             m_index--;
-navigated:
-            if (m_index >= m_count)
-                m_index = m_count - 1;
-            if (m_index < 0)
-                m_index = 0;
-            update_display();
+            on_navigate();
             break;
         case Key::DOWN:
             m_index++;
-            goto navigated;
+            on_navigate();
+            break;
 
         case Key::HOME:
             m_index = 0;
-            goto navigated;
+            on_navigate();
+            break;
         case Key::END:
             m_index = m_count - 1;
-            goto navigated;
+            on_navigate();
+            break;
 
         case Key::PGDN:
         case Key::PGUP:
@@ -246,7 +254,7 @@ navigated:
                     {
                         int32 new_y = int32(max<intptr_t>(0, (y <= m_top + scroll_ofs) ? y - scroll_rows : m_top + scroll_ofs));
                         m_index += (new_y - y);
-                        goto navigated;
+                        on_navigate();
                     }
                 }
                 else if (input.key == Key::PGDN)
@@ -261,7 +269,7 @@ navigated:
                             set_top(int32(max<intptr_t>(0, m_count - m_visible_rows)));
                             m_index = m_count - 1;
                         }
-                        goto navigated;
+                        on_navigate();
                     }
                 }
             }
@@ -272,22 +280,12 @@ navigated:
             return true;
 
         case Key::ENTER:
+on_enter:
             if (m_index < 0 || m_index >= m_count)
                 break;
             m_result.canceled = false;
             m_result.selected = get_original_index(m_index);
             return true;
-
-#if 0
-        case __mouse_wheel_up__:
-            m_index -= __wheel_amount__;
-            m_ignore_scroll_offset = false;
-            goto navigated;
-        case __mouse_wheel_down__:
-            m_index += __wheel_amount__;
-            m_ignore_scroll_offset = false;
-            goto navigated;
-#endif
 
         case Key::BACK:
             if (!m_needle.Empty())
@@ -342,6 +340,51 @@ update_needle:
         if (need_display)
             update_display();
     }
+    else if (input.type == InputType::Mouse)
+    {
+        // TODO:  click in scrollbar
+        switch (input.key)
+        {
+        case Key::MouseWheel:
+            m_index += input.mouse_wheel_amount;
+            on_navigate();
+            break;
+        case Key::MouseLeftClick:
+            m_can_drag = true;
+            __fallthrough;
+        case Key::MouseDrag:
+            if (m_can_drag)
+            {
+                if (input.mouse_pos.Y >= m_content_top && input.mouse_pos.Y < m_content_top + m_content_height &&
+                    input.mouse_pos.X >= m_content_left && input.mouse_pos.X < m_content_left + m_content_width)
+                {
+                    const intptr_t index = m_top + input.mouse_pos.Y - m_content_top;
+                    m_index = index;
+                    on_navigate();
+                }
+                else if (input.key == Key::MouseDrag)
+                {
+                    if (input.mouse_pos.Y <= m_content_top)
+                        --m_index;
+                    else
+                        ++m_index;
+                    on_navigate();
+                }
+                else
+                {
+                    m_can_drag = false;
+                }
+            }
+            break;
+        case Key::MouseLeftDblClick:
+            m_can_drag = false;
+            goto on_enter;
+        default:
+            m_can_drag = false;
+            break;
+        }
+
+    }
 
     // Keep dispatching input.
     return false;
@@ -357,10 +400,18 @@ void PopupList::update_layout()
     if (m_terminal_width <= min_screen_cols)
         m_visible_rows = 0;
 
+    const int32 extra = 2 * (1 + m_margin);
+    m_window_width = min<int32>(m_longest + extra, m_terminal_width);
+    m_window_height = m_visible_rows + 2; // +2 for borders.
+    m_window_left = (m_terminal_width - (m_window_width + 1)) / 2;
+    m_window_top = (m_terminal_height - (m_window_height + 1)) / 2;
+    m_content_width = m_window_width - 2;
+    m_content_height = m_window_height - 2;
+    m_content_left = m_window_left + 1;
+    m_content_top = m_window_top + 1;
+
     m_vert_scroll_car = calc_scroll_car_size(m_visible_rows, m_count, c_sbstyle);
-#if 0
-    m_vert_scroll_column = 0;
-#endif
+    m_vert_scroll_column = m_window_left + m_window_width - 1;
 
     m_ignore_scroll_offset = false;
 }
@@ -487,30 +538,19 @@ void PopupList::update_display()
         OutputConsole(c_hide_cursor);
 
         const bool draw_border = (m_prev_displayed < 0) || (m_title != m_orig_title);
-        const uint32 extra = 2 * (1 + m_margin);
-        const int32 popup_height = m_visible_rows + 2; // +2 for borders.
-        const int32 popup_width = min<int32>(m_longest + extra, m_terminal_width);
-        const int32 content_height = popup_height - 2;
-        const int32 content_width = popup_width - extra;
 
-        const int32 y = (m_terminal_height - (popup_height + 1)) / 2;
-        const int32 x = (m_terminal_width - (popup_width + 1)) / 2;
-        if (x > 0)
-            left.Printf(L"\x1b[%uG", x + 1);
-#if 0
-        m_mouse_left = x + 1;
-        m_mouse_width = content_width;
-#endif
+        if (m_window_left > 0)
+            left.Printf(L"\x1b[%uG", m_window_left + 1);
 
         line.Clear();
-        line.Printf(L"\x1b[%uH", y + 1);
+        line.Printf(L"\x1b[%uH", m_window_top + 1);
         OutputConsole(line.Text(), line.Length());
 
         // Display border.
         if (draw_border)
         {
             make_horz_border(m_title,
-                             content_width + (2 * m_margin),
+                             m_content_width + (2 * m_margin),
                              (m_title != m_orig_title),
                              horzline,
                              GetColor(ColorElement::PopupHeader),
@@ -525,14 +565,11 @@ void PopupList::update_display()
             OutputConsole(line.Text(), line.Length());
         }
 
-        const int32 car_top = calc_scroll_car_offset(m_top, content_height, count, m_vert_scroll_car, c_sbstyle);
-#if 0
-        m_vert_scroll_column = m_mouse_left + m_mouse_width;
-#endif
+        const int32 car_top = calc_scroll_car_offset(m_top, m_content_height, count, m_vert_scroll_car, c_sbstyle);
 
         // Display items.
         const bool dim_paths = ((m_flags & PopupListFlags::DimPaths) == PopupListFlags::DimPaths);
-        for (int32 row = 0; row < content_height; row++)
+        for (int32 row = 0; row < m_content_height; row++)
         {
             const intptr_t i = m_top + row;
 
@@ -562,12 +599,12 @@ void PopupList::update_display()
                     item = tmp2.Text();
                 }
 
-                const int32 cell_len = ellipsify_ex(item, content_width, ellipsify_mode::PATH, tmp);
+                const int32 cell_len = ellipsify_ex(item, m_content_width, ellipsify_mode::PATH, tmp);
                 line.AppendSpaces(m_margin);
                 if (dim_paths)
                     line.AppendColor(dimcolor);
                 line.Append(tmp);                                   // main text
-                line.AppendSpaces(content_width + m_margin - cell_len);
+                line.AppendSpaces(m_content_width + m_margin - cell_len);
 
                 const WCHAR* car = get_scroll_car_char(row, car_top, m_vert_scroll_car, false/*floating*/, scroll_bar_style::whole_line_chars);
                 line.AppendNormalIf(true);
@@ -590,7 +627,7 @@ void PopupList::update_display()
         if (draw_border)
         {
             OutputConsole(L"\r\n", 2);
-            make_horz_border(L"ENTER=View, ESC=Cancel", content_width + (2 * m_margin), true/*bars*/, horzline,
+            make_horz_border(L"ENTER=View, ESC=Cancel", m_content_width + (2 * m_margin), true/*bars*/, horzline,
                              GetColor(ColorElement::PopupFooter), GetColor(ColorElement::PopupBorder));
             line.Clear();
             line.Append(left);
@@ -606,11 +643,8 @@ void PopupList::update_display()
 
         // Move cursor.
         line.Clear();
-        line.Printf(L"\x1b[%u;%uH", 1+y+1+(m_index-m_top), 1+x+1);
+        line.Printf(L"\x1b[%u;%uH", 1+m_content_top+(m_index-m_top), 1+m_content_left);
         OutputConsole(line.Text(), line.Length());
-#if 0
-        m_mouse_offset = 1 + y + 1;
-#endif
 
         OutputConsole(c_show_cursor);
     }
@@ -641,6 +675,15 @@ bool PopupList::is_selected(intptr_t index) const
     if (index < 0 || index >= m_count)
         return false;
     return m_index == index;
+}
+
+void PopupList::on_navigate()
+{
+    if (m_index >= m_count)
+        m_index = m_count - 1;
+    if (m_index < 0)
+        m_index = 0;
+    update_display();
 }
 
 intptr_t PopupList::get_original_index(intptr_t index) const
