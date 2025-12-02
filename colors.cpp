@@ -36,6 +36,8 @@ static const WCHAR* c_default_colors[] =
     L"30;48;5;23",      // SelectedTagged
     L"93",              // Header
     L"93",              // Command
+    L"93",              // Input
+    L"43;30",           // InputSelection
     L"90",              // Divider
     L"90",              // LineNumber
     L"",                // Content
@@ -804,6 +806,8 @@ static const WCHAR* const c_reg_color_name[] =
     L"SelectedTagged",
     L"Header",
     L"Command",
+    L"Input",
+    L"InputSelection",
     L"Divider",
     L"LineNumber",
     L"Content",

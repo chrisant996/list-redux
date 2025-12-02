@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "input.h"
 #include "output.h"
+#include "colors.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
 
@@ -621,6 +622,252 @@ static unsigned short PosMover(const WCHAR* s, const unsigned len, unsigned shor
     return moved;
 }
 
+struct ReadInputState
+{
+    StrW            m_s;
+    DWORD           m_max_width = 32;
+    DWORD           m_max_length = 32;
+    unsigned short  m_left = 0;
+    unsigned short  m_pos = 0;
+    unsigned short  m_anchor = -1;
+
+    void            EnsureLeft();
+    void            PrintVisible(unsigned short x);
+
+    void            Home(Modifier modifier);
+    void            End(Modifier modifier);
+    void            Left(Modifier modifier);
+    void            Right(Modifier modifier);
+    void            Backspace(bool word=false);
+    void            Delete(bool word=false);
+
+    void            InsertChar(WCHAR c, WCHAR c2=0);
+    void            RemoveText(unsigned short begin, unsigned short end);
+    bool            ElideSelectedText();
+};
+
+void ReadInputState::EnsureLeft()
+{
+    m_left = min(m_left, m_pos);
+
+    // Auto-scroll horizontally forward.
+    while (__wcswidth(m_s.Text() + m_left, m_pos - m_left) >= m_max_width)
+    {
+        wcwidth_iter iter(m_s.Text() + m_left, m_s.Length() - m_left);
+        if (!iter.next())
+            break;
+        m_left += iter.character_length();
+    }
+
+    // Auto-scroll horizontally backward.
+    assert(m_pos >= m_left);
+    {
+        unsigned short backup_left = m_pos;
+        BackUpByAmount(backup_left, m_s.Text(), m_pos, 4);
+        if (m_left > backup_left)
+            m_left = backup_left;
+    }
+}
+
+void ReadInputState::PrintVisible(unsigned short x)
+{
+    StrW tmp;
+    tmp.Printf(L"%s\x1b[%uG", c_hide_cursor, x + 1);
+    OutputConsole(tmp.Text(), tmp.Length());
+
+    unsigned width = 0;
+    const unsigned len = FitsInWcwidth(m_s.Text() + m_left, m_s.Length() - m_left, m_max_width, &width);
+
+    tmp.Clear();
+    tmp.AppendColor(GetColor(ColorElement::Input));
+
+    if (m_anchor <= m_s.Length())
+    {
+        const unsigned short begin = clamp<unsigned short>(min(m_pos, m_anchor), m_left, m_left + len);
+        const unsigned short end = clamp<unsigned short>(max(m_pos, m_anchor), m_left, m_left + len);
+        tmp.Append(m_s.Text() + m_left, begin - m_left);
+        if (begin < end)
+            tmp.AppendColor(GetColor(ColorElement::InputSelection));
+        tmp.Append(m_s.Text() + begin, end - begin);
+        if (begin < end)
+            // REVIEW:  Should this append a space here if the selection isn't fully drawn due to character width clipping?
+            tmp.AppendColor(GetColor(ColorElement::Input));
+        tmp.Append(m_s.Text() + end, len - end);
+    }
+    else
+    {
+        tmp.Append(m_s.Text() + m_left, len);
+    }
+
+    tmp.AppendSpaces(m_max_width - width);
+    tmp.Printf(L"\x1b[%uG%s", x + 1 + __wcswidth(m_s.Text() + m_left, m_pos - m_left), c_show_cursor);
+    OutputConsole(tmp.Text(), tmp.Length());
+}
+
+void ReadInputState::Home(Modifier modifier)
+{
+    const bool shift = ((modifier & Modifier::SHIFT) == Modifier::SHIFT);
+    if (!shift)
+        m_anchor = -1;
+    else if (m_anchor > m_s.Length())
+        m_anchor = m_pos;
+
+    m_pos = 0;
+    m_left = 0;
+}
+
+void ReadInputState::End(Modifier modifier)
+{
+    const bool shift = ((modifier & Modifier::SHIFT) == Modifier::SHIFT);
+    if (!shift)
+        m_anchor = -1;
+    else if (m_anchor > m_s.Length())
+        m_anchor = m_pos;
+
+    m_pos = m_s.Length();
+    m_left = m_pos;
+
+    BackUpByAmount(m_left, m_s.Text(), m_pos, m_max_width - 1);
+}
+
+void ReadInputState::Left(Modifier modifier)
+{
+    const bool shift = ((modifier & Modifier::SHIFT) == Modifier::SHIFT);
+    if (!shift)
+    {
+        const auto old_anchor = m_anchor;
+        m_anchor = -1;
+        if (old_anchor <= m_s.Length())
+        {
+            m_pos = min(m_pos, old_anchor);
+            return;
+        }
+    }
+
+    if (m_pos <= 0)
+        return;
+
+    if (shift && m_anchor > m_s.Length())
+        m_anchor = m_pos;
+
+    const bool word = ((modifier & Modifier::CTRL) == Modifier::CTRL);
+    PosMover(m_s.Text(), m_s.Length(), m_pos, false/*forward*/, word);
+}
+
+void ReadInputState::Right(Modifier modifier)
+{
+    const bool shift = ((modifier & Modifier::SHIFT) == Modifier::SHIFT);
+    if (!shift)
+    {
+        const auto old_anchor = m_anchor;
+        m_anchor = -1;
+        if (old_anchor <= m_s.Length())
+        {
+            m_pos = max(m_pos, old_anchor);
+            return;
+        }
+    }
+
+    if (unsigned(m_pos) >= m_s.Length())
+        return;
+
+    if (shift && m_anchor > m_s.Length())
+        m_anchor = m_pos;
+
+    const bool word = ((modifier & Modifier::CTRL) == Modifier::CTRL);
+    PosMover(m_s.Text(), m_s.Length(), m_pos, true/*forward*/, word);
+}
+
+void ReadInputState::Backspace(bool word)
+{
+    if (m_pos <= 0)
+        return;
+
+#ifdef DEBUG
+    const unsigned short old_pos = m_pos;
+#endif
+    const unsigned short moved = PosMover(m_s.Text(), m_s.Length(), m_pos, false/*forward*/, word);
+#ifdef DEBUG
+    assert(old_pos == m_pos + moved);
+#endif
+    RemoveText(m_pos, m_pos + moved);
+}
+
+void ReadInputState::Delete(bool word)
+{
+    if (m_pos >= m_s.Length())
+        return;
+
+    unsigned short del_pos = m_pos;
+    const unsigned short moved = PosMover(m_s.Text(), m_s.Length(), del_pos, true/*forward*/, word);
+    m_pos = del_pos - moved;
+    RemoveText(m_pos, m_pos + moved);
+}
+
+void ReadInputState::InsertChar(WCHAR c, WCHAR c2)
+{
+    ElideSelectedText();
+
+    const size_t len = (c2 ? 2 : 1);
+
+    // Limit the length.
+    if (m_s.Length() + len > m_max_length)
+        return;
+
+    // Append or insert the character.
+    if (m_pos == m_s.Length())
+    {
+        m_s.Append(c);
+        if (c2)
+            m_s.Append(c2);
+        m_pos = m_s.Length();
+    }
+    else
+    {
+        StrW tmp;
+        const int32 insert_pos = m_pos;
+        tmp.Set(m_s.Text(), insert_pos);
+        tmp.Append(c);
+        if (c2)
+            tmp.Append(c2);
+        m_pos = tmp.Length();
+        tmp.Append(m_s.Text() + insert_pos, m_s.Length() - insert_pos);
+        m_s = std::move(tmp);
+    }
+}
+
+void ReadInputState::RemoveText(unsigned short begin, unsigned short end)
+{
+    if (end == m_s.Length())
+    {
+        m_s.SetLength(begin);
+    }
+    else
+    {
+        StrW tmp;
+        tmp.Append(m_s.Text(), begin);
+        tmp.Append(m_s.Text() + end, m_s.Length() - end);
+        m_s = std::move(tmp);
+    }
+}
+
+bool ReadInputState::ElideSelectedText()
+{
+    if (m_anchor > m_s.Length() || m_anchor == m_pos)
+    {
+        m_anchor = -1;
+        return false;
+    }
+
+    const unsigned short begin = min(m_pos, m_anchor);
+    const unsigned short end = max(m_pos, m_anchor);
+
+    m_pos = begin;
+    m_anchor = -1;
+    RemoveText(begin, end);
+    return true;
+}
+
 bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
 {
     static std::vector<StrW> s_histories[size_t(History::MAX)];
@@ -644,41 +891,18 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
     StrW curr_input_history;
     size_t history_index = history ? history->size() : 0;
 
+    ReadInputState state;
+    state.m_max_width = max_width;
+    state.m_max_length = max_length;
+
     StrW tmp;
     unsigned short left = 0;
     unsigned short pos = 0;
+    unsigned short anchor = -1;
     while (true)
     {
-        tmp.Clear();
-        tmp.Printf(L"%s\x1b[%uG", c_hide_cursor, csbi.dwCursorPosition.X + 1);
-        OutputConsole(tmp.Text(), tmp.Length());
-
-        left = min(left, pos);
-
-        // Auto-scroll horizontally forward.
-        while (__wcswidth(out.Text() + left, pos - left) >= max_width)
-        {
-            wcwidth_iter iter(out.Text() + left, out.Length() - left);
-            if (!iter.next())
-                break;
-            left += iter.character_length();
-        }
-
-        // Auto-scroll horizontally backward.
-        assert(pos >= left);
-        {
-            unsigned short backup_left = pos;
-            BackUpByAmount(backup_left, out.Text(), pos, 4);
-            if (left > backup_left)
-                left = backup_left;
-        }
-
-        // Print the visible part of the input string.
-        tmp.Set(out.Text() + left, out.Length() - left);
-        const unsigned width = TruncateWcwidth(tmp, max_width, 0);
-        tmp.AppendSpaces(max_width - width);
-        tmp.Printf(L"\x1b[%uG%s", csbi.dwCursorPosition.X + 1 + __wcswidth(out.Text() + left, pos - left), c_show_cursor);
-        OutputConsole(tmp.Text(), tmp.Length());
+        state.EnsureLeft();
+        state.PrintVisible(csbi.dwCursorPosition.X);
 
         const InputRecord input = SelectInput();
         switch (input.type)
@@ -712,60 +936,27 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
             case Key::BACK:
                 if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
                 {
-                    if (pos > 0)
-                    {
-                        const bool word = ((input.modifier & Modifier::CTRL) == Modifier::CTRL);
-                        const unsigned short old_pos = pos;
-                        const unsigned short moved = PosMover(out.Text(), out.Length(), pos, false/*forward*/, word);
-                        if (old_pos == out.Length())
-                        {
-                            out.SetLength(pos);
-                        }
-                        else
-                        {
-                            const unsigned short pos_keep = (pos + moved);
-                            tmp.Set(out.Text(), pos);
-                            tmp.Append(out.Text() + pos_keep, out.Length() - pos_keep);
-                            out = std::move(tmp);
-                        }
-                    }
+                    if (!state.ElideSelectedText())
+                        state.Backspace((input.modifier & Modifier::CTRL) == Modifier::CTRL);
                 }
                 break;
             case Key::DEL:
                 if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
                 {
-                    if (unsigned(pos) < out.Length())
-                    {
-                        const bool word = ((input.modifier & Modifier::CTRL) == Modifier::CTRL);
-                        unsigned short del_pos = pos;
-                        const unsigned short moved = PosMover(out.Text(), out.Length(), del_pos, true/*forward*/, word);
-                        pos = del_pos - moved;
-                        if (pos + moved == out.Length())
-                        {
-                            out.SetLength(pos);
-                        }
-                        else
-                        {
-                            const unsigned short pos_keep = (pos + moved);
-                            tmp.Set(out.Text(), pos);
-                            tmp.Append(out.Text() + pos_keep, out.Length() - pos_keep);
-                            out = std::move(tmp);
-                        }
-                    }
+                    if (!state.ElideSelectedText())
+                        state.Delete((input.modifier & Modifier::CTRL) == Modifier::CTRL);
                 }
                 break;
             case Key::ENTER:
                 if (history && out.Length())
-                    history->emplace_back(out);
+                    history->emplace_back(state.m_s);
+                out = std::move(state.m_s);
                 return true;
             case Key::HOME:
-                pos = 0;
-                left = 0;
+                state.Home(input.modifier);
                 continue;
             case Key::END:
-                pos = out.Length();
-                left = pos;
-                BackUpByAmount(left, out.Text(), pos, max_width - 1);
+                state.End(input.modifier);
                 continue;
             case Key::UP:
                 if (history && history_index)
@@ -793,20 +984,10 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
                 }
                 continue; // Avoid resetting history_index.
             case Key::LEFT:
-// TODO:  CUA (Shift-LEFT, Ctrl-Shift-LEFT)
-                if (pos > 0)
-                {
-                    const bool word = ((input.modifier & Modifier::CTRL) == Modifier::CTRL);
-                    PosMover(out.Text(), out.Length(), pos, false/*forward*/, word);
-                }
+                state.Left(input.modifier);
                 break;
             case Key::RIGHT:
-// TODO:  CUA (Shift-RIGHT, Ctrl-Shift-RIGHT)
-                if (unsigned(pos) < out.Length())
-                {
-                    const bool word = ((input.modifier & Modifier::CTRL) == Modifier::CTRL);
-                    PosMover(out.Text(), out.Length(), pos, true/*forward*/, word);
-                }
+                state.Right(input.modifier);
                 break;
             }
         }
@@ -814,24 +995,16 @@ bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std
         {
             if (input.key_char >= ' ')
             {
-                // Limit the length.
-                if (out.Length() >= max_length)
-                    continue;
-
-                // Append or insert the character.
-                if (pos == out.Length())
+                state.InsertChar(input.key_char, input.key_char2);
+            }
+            else
+            {
+                switch (input.key_char)
                 {
-                    out.Append(&input.key_char, input.key_char2 ? 2 : 1);
-                    pos = out.Length();
-                }
-                else
-                {
-                    const int32 i = pos;
-                    tmp.Set(out.Text(), i);
-                    tmp.Append(&input.key_char, input.key_char2 ? 2 : 1);
-                    pos = tmp.Length();
-                    tmp.Append(out.Text() + i, out.Length() - i);
-                    out = std::move(tmp);
+                case 'A'-'@':
+                    state.Home(Modifier::None);
+                    state.End(Modifier::SHIFT);
+                    break;
                 }
             }
         }

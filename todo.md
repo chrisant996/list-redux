@@ -10,7 +10,6 @@
 - [x] read color configuration from `.listredux` file
 - [x] history in ReadInput() prompts
 - [x] include terminal emulation for running on older than Windows 10 build 15063
-- [ ] improve message box routine
 - mouse input
   - Mouse wheel input is automatically converted to UP/DOWN keys even when ENABLE_MOUSE_INPUT is omitted, because of switching to the alternate screen.
   - [x] mouse wheel should scroll by _N_ lines
@@ -20,19 +19,15 @@
   - [ ] left click in scrollbars
   - [ ] left click hotspots in viewer
   - [x] mouse input in popup list
-  - [ ] mouse input in `ReadInput()`
-  - [ ] mouse input in message box routine
 - improve input routine
   - [x] scrollable bounds
   - [x] arrow keys
   - [x] Ctrl-arrow keys
   - [x] Ctrl-BACK and Ctrl-DEL keys
+  - [x] CUA keys
   - [ ] copy/paste keys
-  - [ ] CUA keys
-  - [ ] show markers at left/right end when scrolled horizontally
-- [ ] some way to configure colors inside the app
-- [ ] some way to revert to default colors inside the app
-- [ ] save current settings into `.listredux` file as defaults
+  - [ ] undo/redo
+- [ ] command line flags
 - [ ] documentation for the `.listredux` file
 - [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
 
@@ -132,6 +127,13 @@
 
 - [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
 - [ ] option to enable/disable mouse input
+- improve input routine
+  - [ ] mouse input
+  - [ ] show markers at left/right end when scrolled horizontally
+  - [ ] encapsulate in a class, and have ability to stop processing one instance and start processing a different instance (effectively making it possible to navigate between different input boxes)
+- [ ] some way to configure colors inside the app (could benefit from ability to navigate between different input boxes)
+- [ ] some way to revert to default colors inside the app
+- [ ] save current settings into `.listredux` file as defaults
 - detect certain file types and render with formatting/color
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
@@ -144,6 +146,8 @@
 
 ### Maybe
 
+- improve message box routine (make it not full terminal width, have clickable buttons, etc)
+  - mouse input in message box routine
 - use ICU for encodings when available _[ICU is independent from codepages, so it uses strings to identify encodings, and it has its own analogs to MLang and MultiByteToWideChar, and it's only available in Win10+ circa 2019 onward, so adjusting to use ICU when available will be an invasive change.]_
 - search for hex bytes in hex mode?  or just use regex searches with numeric escapes `\xAB`?  (but the MSVC ECMAScript engine doesn't support them, so it's another reason to use RE2)
 - show used and free space in chooser?

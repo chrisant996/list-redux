@@ -196,29 +196,26 @@ unsigned FitsInWcwidth(const WCHAR* s, const unsigned len, const unsigned trunca
     wcwidth_iter iter(s, len);
     while (true)
     {
-        const WCHAR* const p = iter.get_pointer();
         const char32_t c = iter.next();
         if (!c)
             break;
 
-        if (width <= truncate_width)
-        {
-            length_fits = unsigned(p - s);
-            width_fits = width;
-        }
-
         const int32 w = iter.character_wcwidth_onectrl();
+        width += w;
 
-        if (width + w > truncate_width)
+        if (width > truncate_width)
         {
             if (truncated_width)
                 *truncated_width = width_fits;
             return length_fits;
         }
 
-        width += w;
+        length_fits = unsigned(iter.get_pointer() - s);
+        width_fits = width;
     }
 
+    if (truncated_width)
+        *truncated_width = width_fits;
     return length_fits;
 }
 
