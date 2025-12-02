@@ -16,7 +16,7 @@
   - [x] `Shift` to let mouse input through to terminal
   - [x] wheel in chooser
   - [x] left click in hex edit mode in viewer
-  - [ ] left click in scrollbars
+  - [x] left click in scrollbars
   - [ ] left click hotspots in viewer
   - [x] mouse input in popup list
 - improve input routine

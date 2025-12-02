@@ -1104,6 +1104,35 @@ cut_to_clip:
     }
 }
 
+int32 MouseHelper::LinesFromRecord(const InputRecord& input)
+{
+    assert(input.type == InputType::Mouse);
+    assert(input.key == Key::MouseWheel || input.key == Key::MouseHWheel);
+    if (!m_allow_acceleration)
+        return input.mouse_wheel_amount;
+    else if (input.key == Key::MouseHWheel)
+        return m_horz_accel.MaybeAccelerate(input.mouse_wheel_amount);
+    else
+        return m_vert_accel.MaybeAccelerate(input.mouse_wheel_amount);
+}
+
+int32 MouseHelper::AccelerationHelper::MaybeAccelerate(int32 lines)
+{
+    if (sgn(m_acceleration) != sgn(lines) || GetTickCount() - m_last_tick > 50)
+    {
+        // Reset if direction changes or time expires.
+        m_acceleration = 0;
+    }
+
+    m_acceleration = clamp(m_acceleration + sgn(lines), -4, 4);
+    m_last_tick = GetTickCount();
+
+    if (abs(m_acceleration) >= 4)
+        return lines * (1 + (abs(m_acceleration) / 4)) * 2;
+
+    return lines;
+}
+
 AutoMouseConsoleMode::AutoMouseConsoleMode(HANDLE hin, bool enable)
 {
     if (enable)

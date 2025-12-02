@@ -11,6 +11,7 @@
 #include "columns.h"
 #include "input.h"
 #include "output.h"
+#include "scroll_car.h"
 
 #include <vector>
 #include <unordered_set>
@@ -92,6 +93,8 @@ private:
     int32           m_num_per_row = 0;
     int32           m_visible_rows = 0;
     int32           m_vert_scroll_column = 0;
+    scroll_car      m_vert_scroll_car;
+    MouseHelper     m_mouse;
     StrW            m_feedback;
 
     intptr_t        m_top = 0;
@@ -100,6 +103,7 @@ private:
     InputRecord     m_prev_input;
     bool            m_prev_latched = false;
     bool            m_can_drag = false;
+    bool            m_can_scrollbar = false;
 
     MarkedList      m_dirty;
     bool            m_dirty_header = false;

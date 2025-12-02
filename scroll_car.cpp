@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "scroll_car.h"
+#include "input.h"
 
 //------------------------------------------------------------------------------
 static int32 get_scale_positions(scroll_bar_style style)
@@ -154,12 +155,15 @@ const WCHAR* get_scroll_car_char(intptr_t row, intptr_t car_offset, int32 car_si
 }
 
 //------------------------------------------------------------------------------
-int32 hittest_scroll_car(intptr_t row, intptr_t rows, intptr_t total)
+intptr_t hittest_scrollbar(int32 row, int32 rows, intptr_t total)
 {
+    if (row < 0 || row >= rows || rows > total)
+        return -1;
+
     if (rows <= 1 || total <= 1)
         return 0;
 
-    return int32(row * (total - 1) / (rows - 1));
+    return (row * (total - 1) / (rows - 1));
 }
 
 //------------------------------------------------------------------------------
@@ -178,7 +182,7 @@ void scroll_car::set_extents(int32 rows, intptr_t total)
     }
     m_rows = rows;
     m_total = total;
-    m_vert_scroll_car = (m_rows > 0) ? calc_scroll_car_size(m_rows, m_total, m_style) : 0;
+    m_car_size = (m_rows > 0) ? calc_scroll_car_size(m_rows, m_total, m_style) : 0;
     m_car_top = -1;
 }
 
@@ -186,7 +190,7 @@ void scroll_car::set_extents(int32 rows, intptr_t total)
 void scroll_car::set_position(intptr_t top)
 {
     if (m_rows > 0)
-        m_car_top = calc_scroll_car_offset(top, m_rows, m_total, m_vert_scroll_car, m_style);
+        m_car_top = calc_scroll_car_offset(top, m_rows, m_total, m_car_size, m_style);
     else
         assert(m_car_top <= 0);
 }
@@ -200,7 +204,7 @@ int32 scroll_car::get_car_top() const
 //------------------------------------------------------------------------------
 int32 scroll_car::get_car_size() const
 {
-    return m_vert_scroll_car;
+    return m_car_size;
 }
 
 //------------------------------------------------------------------------------
@@ -209,5 +213,19 @@ const WCHAR* scroll_car::get_char(int32 row, bool floating) const
     if (m_car_top < 0)
         return nullptr;
     assert(m_rows > 0 && m_total > 0);
-    return get_scroll_car_char(row, m_car_top, m_vert_scroll_car, floating, m_style);
+    return get_scroll_car_char(row, m_car_top, m_car_size, floating, m_style);
+}
+
+//------------------------------------------------------------------------------
+intptr_t scroll_car::hittest_scrollbar(const InputRecord& input, int32 top)
+{
+    if (input.type != InputType::Mouse)
+        return -1;
+    if (input.key != Key::MouseLeftClick && input.key != Key::MouseDrag)
+        return -1;
+    if (input.mouse_pos.Y < top || input.mouse_pos.Y >= top + m_rows)
+        return -1;
+
+    const intptr_t index = ::hittest_scrollbar(input.mouse_pos.Y - top, m_rows, m_total);
+    return index;
 }

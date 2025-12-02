@@ -108,5 +108,24 @@ private:
     DWORD           m_prev_mode = 0;
 };
 
+class MouseHelper
+{
+    struct AccelerationHelper
+    {
+                    AccelerationHelper() = default;
+        int32       MaybeAccelerate(int32 lines);
+        int32       m_acceleration = 0;
+        DWORD       m_last_tick = 0;
+    };
+public:
+                    MouseHelper(bool allow=false) : m_allow_acceleration(allow) {}
+    void            AllowAcceleration(bool allow) { m_allow_acceleration = allow; }
+    int32           LinesFromRecord(const InputRecord& input);
+private:
+    AccelerationHelper m_vert_accel;
+    AccelerationHelper m_horz_accel;
+    bool            m_allow_acceleration = false;
+};
+
 InputRecord SelectInput(DWORD timeout=INFINITE, AutoMouseConsoleMode* mouse=nullptr);
 bool ReadInput(StrW& out, History history=History::MAX, DWORD max_length=32, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&)>> input_callback=std::nullopt);

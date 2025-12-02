@@ -226,6 +226,9 @@ private:
     unsigned        m_content_height = 0;
     unsigned        m_content_width = 0;
     unsigned        m_margin_width = 0;
+    scroll_car      m_vert_scroll_car;
+    MouseHelper     m_mouse;
+    int32           m_vert_scroll_column = 0;
 
     StrW            m_errmsg;
 
@@ -253,6 +256,7 @@ private:
     bool            m_hex_characters = false;
 
     bool            m_can_drag = false;
+    bool            m_can_scrollbar = false;
 
     intptr_t        m_last_index = -1;
     size_t          m_last_top = 0;
@@ -420,6 +424,7 @@ void Viewer::UpdateDisplay()
                                  m_content_height >= 4 &&
                                  !(m_errmsg.Length() || !m_context.HasContent()) &&
                                  m_context.GetFileSize() > 0);
+    m_vert_scroll_column = (show_scrollbar ? m_terminal_width - 1 : 0);
 
     // Decide how many hex bytes fit per line.
     InitHexWidth();
@@ -536,21 +541,20 @@ LAutoFitContentWidth:
     m_force_update_footer = false;
 
     // Compute scrollbar metrics.
-    scroll_car scroll_car;
     if (show_scrollbar)
     {
-        scroll_car.set_style(c_sbstyle);
+        m_vert_scroll_car.set_style(c_sbstyle);
         if (m_hex_mode)
         {
             // Use hex line based metrics.
-            scroll_car.set_extents(m_content_height, ((m_context.GetFileSize() - 1) / m_hex_width) + 1);
-            scroll_car.set_position(m_hex_top / m_hex_width);
+            m_vert_scroll_car.set_extents(m_content_height, ((m_context.GetFileSize() - 1) / m_hex_width) + 1);
+            m_vert_scroll_car.set_position(m_hex_top / m_hex_width);
         }
         else if (m_context.Completed())
         {
             // Use line based metrics.
-            scroll_car.set_extents(m_content_height, CountForDisplay());
-            scroll_car.set_position(m_top);
+            m_vert_scroll_car.set_extents(m_content_height, CountForDisplay());
+            m_vert_scroll_car.set_position(m_top);
         }
         else
         {
@@ -559,8 +563,8 @@ LAutoFitContentWidth:
             const intptr_t i_bottom = m_top + m_content_height - 1;
             const FileOffset offset_bottom = m_context.GetOffset(i_bottom) + m_context.GetLength(i_bottom);
             const FileOffset bytes_per_line = max<FileOffset>(1, offset_bottom / (i_bottom + 1));
-            scroll_car.set_extents(m_content_height, intptr_t(total / bytes_per_line));
-            scroll_car.set_position(m_top);
+            m_vert_scroll_car.set_extents(m_content_height, intptr_t(total / bytes_per_line));
+            m_vert_scroll_car.set_position(m_top);
         }
     }
 
@@ -697,7 +701,7 @@ LAutoFitContentWidth:
         if (m_errmsg.Length() || !m_context.HasContent())
         {
             // There's no scrollbar when showing an error message.
-            scroll_car.set_extents(0, 0);
+            m_vert_scroll_car.set_extents(0, 0);
 
             msg_text = m_errmsg.Length() ? m_errmsg.Text() : c_no_file_open;
             WrapText(msg_text, s2, m_terminal_width);
@@ -771,10 +775,10 @@ LAutoFitContentWidth:
                     const uint32 orig_length = s.Length();
                     m_context.FormatHexData(m_hex_top, row, m_hex_width, s, e, found_line);
 
-                    if (scroll_car.has_car())
+                    if (m_vert_scroll_car.has_car())
                     {
                         s.AppendSpaces(m_content_width - cell_count(s.Text() + orig_length));
-                        const WCHAR* car = scroll_car.get_char(int32(row), c_floating);
+                        const WCHAR* car = m_vert_scroll_car.get_char(int32(row), c_floating);
                         if (c_floating)
                         {
                             s.AppendColor(GetColor(ColorElement::FloatingScrollBar));
@@ -869,9 +873,9 @@ LAutoFitContentWidth:
                 {
                     const WCHAR* car;
                     s.Printf(L"\x1b[%u;%uH", 2 + row, m_terminal_width);
-                    if (scroll_car.has_car())
+                    if (m_vert_scroll_car.has_car())
                     {
-                        car = scroll_car.get_char(int32(row), c_floating);
+                        car = m_vert_scroll_car.get_char(int32(row), c_floating);
                         if (c_floating)
                         {
                             s.AppendColor(GetColor(ColorElement::FloatingScrollBar));
@@ -1171,9 +1175,15 @@ unsigned Viewer::LinePercent(size_t line) const
 ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
 {
     int amount = 1;
+    AutoCleanup cleanup;
+
     if (input.type == InputType::Key)
     {
-        m_can_drag = false;
+        cleanup.Set([&]() {
+            m_can_drag = false;
+            m_can_scrollbar = false;
+        });
+
         switch (input.key)
         {
         case Key::F1:
@@ -1195,6 +1205,8 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
 #endif
 
         case Key::ESC:
+            if (m_can_drag || m_can_scrollbar)
+                break;
             if (m_hex_edit)
             {
                 ToggleHexEditMode(e);
@@ -1515,7 +1527,11 @@ hex_edit_right:
     }
     else if (input.type == InputType::Char)
     {
-        m_can_drag = false;
+        cleanup.Set([&]() {
+            m_can_drag = false;
+            m_can_scrollbar = false;
+        });
+
         if (m_hex_edit)
         {
             if (!m_hex_characters)
@@ -1858,27 +1874,28 @@ hex_edit_right:
         switch (input.key)
         {
         case Key::MouseWheel:
-            // FUTURE:  Acceleration?
             if (input.mouse_wheel_amount < 0)
             {
-                amount = -input.mouse_wheel_amount;
+                amount = -m_mouse.LinesFromRecord(input);
                 goto key_up;
             }
             else if (input.mouse_wheel_amount > 0)
             {
-                amount = input.mouse_wheel_amount;
+                amount = m_mouse.LinesFromRecord(input);
                 goto key_down;
             }
             break;
         case Key::MouseLeftClick:
         case Key::MouseLeftDblClick:
             m_can_drag = true;
+            m_can_scrollbar = (m_vert_scroll_column && input.mouse_pos.X == m_vert_scroll_column && input.mouse_pos.Y >= 1 + !!m_hex_mode && unsigned(input.mouse_pos.Y) < 1 + !!m_hex_mode + m_content_height);
             __fallthrough;
         case Key::MouseDrag:
             OnLeftClick(input, e);
             break;
         case Key::MouseRightClick:
             m_can_drag = false;
+            m_can_scrollbar = false;
             break;
         }
     }
@@ -1888,11 +1905,37 @@ hex_edit_right:
 
 void Viewer::OnLeftClick(const InputRecord& input, Error& e)
 {
-    // Click in content area.
     const uint32 content_top = 1 + !!m_hex_mode;
+
+    // Clink in scrollbar.
+    if (m_can_scrollbar)
+    {
+        if (m_can_scrollbar)
+        {
+            const intptr_t scroll_pos = m_vert_scroll_car.hittest_scrollbar(input, content_top);
+            if (scroll_pos >= 0)
+            {
+                FoundOffset found;
+                if (m_hex_mode)
+                {
+                    found.MarkOffset(scroll_pos * m_hex_width);
+                }
+                else
+                {
+                    if (!m_context.ProcessThrough(scroll_pos, e))
+                        return;
+                    if (m_context.Count() > 0)
+                        found.MarkOffset(m_context.GetOffset(min<size_t>(scroll_pos, m_context.Count() - 1)));
+                }
+                Center(found);
+            }
+        }
+        return;
+    }
+
+    // Click in content area.
     if (unsigned(input.mouse_pos.Y) >= content_top && unsigned(input.mouse_pos.Y) < content_top + m_content_height)
     {
-        // TODO:  Click on scrollbar.
         if (m_can_drag && m_hex_edit)
         {
             const FileOffset y_ofs = m_hex_top + ((input.mouse_pos.Y - content_top) * m_hex_width);
@@ -1941,7 +1984,7 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
         }
         return;
     }
-    else
+    else if (input.key == Key::MouseDrag)
     {
         if (m_can_drag && m_hex_edit)
         {
@@ -2047,6 +2090,7 @@ void Viewer::SetFile(intptr_t index, ContentCache* context, bool force)
     m_hex_edit = false;
     m_hex_high_nybble = true;
     m_can_drag = false;
+    m_can_scrollbar = false;
     m_force_update = true;
 
     m_found_line.Clear();
@@ -2080,6 +2124,7 @@ void Viewer::SetFile(intptr_t index, ContentCache* context, bool force)
         }
 
         ApplyFileTypeConfig((*m_files)[m_index].Text(), g_options);
+        m_mouse.AllowAcceleration(true);
 
         m_wrap = g_options.wrapping;
     }

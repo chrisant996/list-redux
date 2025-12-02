@@ -16,7 +16,6 @@
 #include "ellipsify.h"
 #include "ecma48.h"
 #include "sorting.h"
-#include "scroll_car.h"
 #include "help.h"
 #include "os.h"
 
@@ -205,6 +204,7 @@ void Chooser::Reset()
     m_prev_input.type = InputType::None;
     m_prev_latched = false;
     m_can_drag = false;
+    m_can_scrollbar = false;
 
     ForceUpdateAll();
 }
@@ -251,12 +251,11 @@ void Chooser::UpdateDisplay()
     if (m_top < 0)
         m_top = 0;
 
-    scroll_car scroll_car;
     const int32 rows = int32(min<intptr_t>(m_visible_rows, m_num_rows));
-    scroll_car.set_style(c_sbstyle);
-    scroll_car.set_extents(rows, m_num_rows);
-    scroll_car.set_position(m_top);
-    m_vert_scroll_column = scroll_car.has_car() ? m_terminal_width : 0;
+    m_vert_scroll_car.set_style(c_sbstyle);
+    m_vert_scroll_car.set_extents(rows, m_num_rows);
+    m_vert_scroll_car.set_position(m_top);
+    m_vert_scroll_column = m_vert_scroll_car.has_car() ? m_terminal_width - 1 : 0;
 
     // Header.
     if (m_dirty_header)
@@ -328,9 +327,9 @@ void Chooser::UpdateDisplay()
                     row_width += FormatFileInfo(s2, pfi, m_col_widths[jj], m_details, selected, tagged, m_max_size_width);
                 }
 
-                if (scroll_car.has_car())
+                if (m_vert_scroll_car.has_car())
                 {
-                    const WCHAR* car = scroll_car.get_char(int32(ii), c_floating);
+                    const WCHAR* car = m_vert_scroll_car.get_char(int32(ii), c_floating);
                     if (!c_floating || car)
                     {
                         // Space was reserved by update_layout() or col_max.
@@ -593,9 +592,15 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
     }
 
     int32 amount = 1;
+    AutoCleanup cleanup;
+
     if (input.type == InputType::Key)
     {
-        m_can_drag = false;
+        cleanup.Set([&]() {
+            m_can_drag = false;
+            m_can_scrollbar = false;
+        });
+
         switch (input.key)
         {
         case Key::F1:
@@ -623,6 +628,8 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
 #endif
 
         case Key::ESC:
+            if (m_can_drag || m_can_scrollbar)
+                break;
             return ChooserOutcome::EXITAPP;
 
         case Key::ENTER:
@@ -793,6 +800,11 @@ LNext:
     }
     else if (input.type == InputType::Char)
     {
+        cleanup.Set([&]() {
+            m_can_drag = false;
+            m_can_scrollbar = false;
+        });
+
         switch (input.key_char)
         {
         case '?':
@@ -973,7 +985,7 @@ LNext:
         switch (input.key)
         {
         case Key::MouseWheel:
-            amount = abs(input.mouse_wheel_amount);
+            amount = abs(m_mouse.LinesFromRecord(input));
             if (input.mouse_wheel_amount < 0)
                 goto DoKeyUp;
             else
@@ -981,6 +993,7 @@ LNext:
             break;
         case Key::MouseLeftClick:
             m_can_drag = true;
+            m_can_scrollbar = (m_vert_scroll_column && input.mouse_pos.X == m_vert_scroll_column && input.mouse_pos.Y >= 1 && unsigned(input.mouse_pos.Y) < 1 + m_content_height);
             __fallthrough;
         case Key::MouseDrag:
         case Key::MouseLeftDblClick:
@@ -989,6 +1002,7 @@ LNext:
             break;
         default:
             m_can_drag = false;
+            m_can_scrollbar = false;
             break;
         }
     }
@@ -1231,14 +1245,26 @@ LDone:
 
 bool Chooser::OnLeftClick(const InputRecord& input, Error& e)
 {
+    // Check for clicks in scrollbar.
+    if (m_can_scrollbar)
+    {
+        if (unsigned(input.mouse_pos.Y) >= 1 && unsigned(input.mouse_pos.Y) < 1 + m_content_height)
+        {
+            const intptr_t scroll_pos = m_vert_scroll_car.hittest_scrollbar(input, 1);
+            if (scroll_pos >= 0)
+            {
+                SetIndex(scroll_pos);
+                SetTop(clamp<intptr_t>(scroll_pos - (m_content_height / 2), 0, m_num_rows));
+                return false;
+            }
+        }
+        return false;
+    }
+
     // Check for clicks in file list area.
     if (m_visible_rows > 0 && unsigned(input.mouse_pos.Y - 1) < unsigned(m_visible_rows))
     {
-        if (input.mouse_pos.X == m_terminal_width - 1)
-        {
-            // TODO:  Click on scrollbar.
-        }
-        else if (m_can_drag)
+        if (m_can_drag)
         {
             intptr_t index = -1;
             SHORT left = 0;
