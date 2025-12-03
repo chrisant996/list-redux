@@ -51,11 +51,11 @@ static const FlagUsageInfo c_usage_info[] =
     { FLAGS,    "--input-file file",        "Load files named in 'file' into a file viewer.\n" },
     { FLAGS,    "--line num",               "Go to line 'num' in file viewer (base 10 by default).\n" },
     { FLAGS,    "--max-line-length num",    "Override the maximum line length (between 16 and $(MAXMAXLINELEN)).\n" },
-    { FLAGS,    "--multibyte",              "Auto-detecting multibyte encodings.\n" },
+    { FLAGS,    "--multibyte",              "Auto-detect multibyte encodings.\n" },
     { FLAGS,    "--no-multibyte",           "Do not auto-detect multibyte encodings.\n" },
     { FLAGS,    "--offset num",             "Go to offset 'num' in file viewer (base 16 by default).\n" },
-    { FLAGS,    "--wrapping",               "Wrap lines wider than the terminal.\n" },
-    { FLAGS,    "--no-wrapping",            "Only wrap lines at maximum line length ($(MAXMAXLINELEN)).\n" },
+    { FLAGS,    "--wrap",                   "Wrap lines wider than the terminal.\n" },
+    { FLAGS,    "--no-wrap",                "Only wrap lines at maximum line length ($(MAXMAXLINELEN)).\n" },
 };
 
 static const char c_usage_prolog[] =
