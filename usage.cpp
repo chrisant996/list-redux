@@ -43,7 +43,9 @@ static const FlagUsageInfo c_usage_info[] =
     { USAGE,    "-V, --version",            "Display version information.\n" },
 
     // FLAGS -----------------------------------------------------------------
-    { FLAGS,    "-@ file",                  "Read file names from 'file' and load them into a file viewer.\n" },
+    { FLAGS,    "-@ file",                  "Load files named in 'file' into a file viewer.\n" },
+    { FLAGS,    "--line num",               "Go to line 'num' in file viewer (base 10 by default).\n" },
+    { FLAGS,    "--offset num",             "Go to offset 'num' in file viewer (base 16 by default).\n" },
 };
 
 static const char c_usage_prolog[] =
