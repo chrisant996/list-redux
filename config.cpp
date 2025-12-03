@@ -6,6 +6,8 @@
 #include "pch.h"
 #include "config.h"
 #include "colors.h"
+#include "input.h"
+#include "output.h"
 #include "viewer.h"
 #include "os.h"
 
@@ -18,8 +20,24 @@ static void ReadOptions(const WCHAR* ini_filename)
 {
     WCHAR value[256];
 
-    ReadConfigString(ini_filename, L"Options", L"Scrollbar", value, _countof(value), L"1");
-    SetViewerScrollbar(!wcsicmp(value, L"true") || !wcsicmp(value, L"1") || !wcsicmp(value, L"on") || !wcsicmp(value, L"yes"));
+    if (ReadConfigString(ini_filename, L"Options", L"Scrollbar", value, _countof(value)))
+        SetViewerScrollbar(!wcsicmp(value, L"true") || !wcsicmp(value, L"1") || !wcsicmp(value, L"on") || !wcsicmp(value, L"yes"));
+
+    if (ReadConfigString(ini_filename, L"Options", L"Wrap", value, _countof(value)))
+        SetWrapping(!wcsicmp(value, L"true") || !wcsicmp(value, L"1") || !wcsicmp(value, L"on") || !wcsicmp(value, L"yes"));
+
+    if (ReadConfigString(ini_filename, L"Options", L"MaxLineLength", value, _countof(value)))
+        SetMaxLineLength(value);
+
+    if (ReadConfigString(ini_filename, L"Options", L"Emulate", value, _countof(value)))
+    {
+        if (!wcsicmp(value, L"on") || !wcsicmp(value, L"1") || !wcsicmp(value, L"yes"))
+            SetEmulation(true);
+        else if (!wcsicmp(value, L"off") || !wcsicmp(value, L"0") || !wcsicmp(value, L"no"))
+            SetEmulation(false);
+        else
+            SetEmulation(-1);
+    }
 }
 #endif
 
@@ -50,22 +68,34 @@ void LoadConfig()
 }
 
 #ifdef USE_REGISTRY_FOR_CONFIG
-void ReadConfigString(HKEY hkeyApp, const WCHAR* name, WCHAR* out, uint32 max_len, const WCHAR* default_value)
+bool ReadConfigString(HKEY hkeyApp, const WCHAR* name, WCHAR* out, uint32 max_len, const WCHAR* default_value)
 {
     DWORD type;
     DWORD len = max_len;
     if (RegGetValueW(hkeyApp, nullptr, name, RRF_RT_REG_SZ, &type, out, &len) != ERROR_SUCCESS ||
         type != REG_SZ || !len || len >= max_len)
     {
-        StringCchCopy(out, max_len, default_value);
+        StringCchCopy(out, max_len, default_value ? default_value : L"");
+        return false;
     }
+    return true;
 }
 #else
-void ReadConfigString(const WCHAR* ini_filename, const WCHAR* section, const WCHAR* name, WCHAR* out, uint32 max_len, const WCHAR* default_value)
+bool ReadConfigString(const WCHAR* ini_filename, const WCHAR* section, const WCHAR* name, WCHAR* out, uint32 max_len, const WCHAR* default_value)
 {
+    if (!max_len)
+        return false;
+
+    out[0] = 0;
+
     if (ini_filename && *ini_filename)
-        GetPrivateProfileStringW(section, name, default_value, out, max_len, ini_filename);
-    else
-        StringCchCopy(out, max_len, default_value);
+    {
+        GetPrivateProfileStringW(section, name, L"", out, max_len, ini_filename);
+        if (out[0])
+            return true;
+    }
+
+    StringCchCopy(out, max_len, default_value ? default_value : L"");
+    return false;
 }
 #endif

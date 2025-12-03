@@ -49,13 +49,13 @@ uint32 GetMaxMaxLineLength()
 
 void SetMaxLineLength(const WCHAR* arg)
 {
+    uint64 n;
     const uint32 c_max_line_length = std::min<uint32>(c_data_buffer_slop, c_default_max_line_length);
-    uint32 max_line_length = _wtoi(arg);
-    if (max_line_length <= 16)
-        max_line_length = 16;
-    else if (max_line_length > c_max_line_length)
-        max_line_length = c_max_line_length;
-    g_options.max_line_length = max_line_length;
+    if (ParseULongLong(arg, n) && n <= 0xffff)
+        n = clamp<uint32>(uint32(n), 16, c_max_line_length);
+    else
+        n = c_max_line_length;
+    g_options.max_line_length = uint32(n);
 }
 
 void SetWrapping(bool wrapping)

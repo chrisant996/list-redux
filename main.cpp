@@ -186,6 +186,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     std::optional<size_t> goto_line;
     std::optional<uint64> goto_offset;
     UINT force_codepage = 0;
+    int32 emulate = -2;
     int32 wrapping = -1;
 
     for (unsigned ii = 0; !e.Test() && opts.GetValue(ii, ch, opt_value, &long_opt); ii++)
@@ -252,7 +253,6 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
             case LOI_EMULATE:
             case LOI_NO_EMULATE:
                 {
-                    int emulate;
                     if (!opt_value)
                         emulate = (long_opt->value == LOI_EMULATE);
                     else if (wcsicmp(opt_value, L"auto") == 0)
@@ -263,7 +263,6 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                         emulate = false;
                     else
                         e.Set(L"Unrecognized value '%1' for option 'emulate'.") << opt_value;
-                    SetEmulation(emulate);
                 }
                 break;
             case LOI_GOTO_LINE:
@@ -306,6 +305,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         return e.Report();
 
     LoadConfig();
+    if (emulate >= -1)
+        SetEmulation(emulate);
     if (wrapping >= 0)
         SetWrapping(!!wrapping);
 
