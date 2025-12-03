@@ -23,6 +23,7 @@
 #include "options.h"
 #include "chooser.h"
 #include "viewer.h"
+#include "contentcache.h"
 #include "list_format.h"
 #include "output.h"
 #include "signaled.h"
@@ -106,6 +107,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         LOI_UNIQUE_IDS              = 0x7FFF,
         LOI_EMULATE,
         LOI_NO_EMULATE,
+        LOI_GOTO_LINE,
+        LOI_GOTO_OFFSET,
         LOI_MAX_LINE_LENGTH,
         LOI_MULTIBYTE,
         LOI_NO_MULTIBYTE,
@@ -118,9 +121,11 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         { L"version",               nullptr,            'V' },
         { L"emulate",               nullptr,            LOI_EMULATE, LOHA_OPTIONAL },
         { L"no-emulate",            nullptr,            LOI_NO_EMULATE },
+        { L"line",                  nullptr,            LOI_GOTO_LINE, LOHA_REQUIRED },
         { L"max-line-length",       nullptr,            LOI_MAX_LINE_LENGTH, LOHA_REQUIRED },
         { L"multibyte",             nullptr,            LOI_MULTIBYTE },
         { L"no-multibyte",          nullptr,            LOI_NO_MULTIBYTE },
+        { L"offset",                nullptr,            LOI_GOTO_OFFSET, LOHA_REQUIRED },
         { nullptr }
     };
 
@@ -172,6 +177,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
 
     const LongOption<WCHAR>* long_opt;
     std::vector<StrW> files;
+    std::optional<size_t> goto_line;
+    std::optional<uint64> goto_offset;
 
     for (unsigned ii = 0; !e.Test() && opts.GetValue(ii, ch, opt_value, &long_opt); ii++)
     {
@@ -242,6 +249,26 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                     SetEmulation(emulate);
                 }
                 break;
+            case LOI_GOTO_LINE:
+                {
+                    ULONGLONG n;
+                    if (ParseULongLong(opt_value, n, 10))
+                    {
+                        goto_line = n;
+                        goto_offset.reset();
+                    }
+                }
+                break;
+            case LOI_GOTO_OFFSET:
+                {
+                    ULONGLONG n;
+                    if (ParseULongLong(opt_value, n, 16))
+                    {
+                        goto_line.reset();
+                        goto_offset = n;
+                    }
+                }
+                break;
             case LOI_MAX_LINE_LENGTH:
                 SetMaxLineLength(opt_value);
                 break;
@@ -294,6 +321,16 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
             navigate = files.empty();
         }
     }
+
+    if (!navigate && files.size() == 1)
+    {
+        if (goto_line.has_value())
+            SetViewerGotoLine(goto_line.value());
+        else if (goto_offset.has_value())
+            SetViewerGotoOffset(goto_offset.value());
+    }
+    goto_line.reset();
+    goto_offset.reset();
 
     Interactive interactive;
     Chooser chooser(&interactive);

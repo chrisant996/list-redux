@@ -1104,6 +1104,53 @@ cut_to_clip:
     }
 }
 
+static bool wcstonum(const WCHAR* text, unsigned radix, unsigned __int64& out)
+{
+    assert(radix == 10 || radix == 16);
+
+    if (!*text)
+        return false;
+
+    unsigned __int64 num = 0;
+    while (*text)
+    {
+        if (*text >= '0' && *text <= '9')
+            num = (num * radix) + (*text - '0');
+        else if (radix != 16)
+            return false;
+        else if (*text >= 'A' && *text <= 'F')
+            num = (num * radix) + (10 + *text - 'A');
+        else if (*text >= 'a' && *text <= 'f')
+            num = (num * radix) + (10 + *text - 'a');
+        ++text;
+    }
+
+    out = num;
+    return true;
+}
+
+bool ParseULongLong(const WCHAR* s, ULONGLONG& out, int radix)
+{
+    // Parse radix selector.
+    if (s[0] == '$')
+    {
+        radix = 16;
+        ++s;
+    }
+    else if (s[0] == '#')
+    {
+        radix = 10;
+        ++s;
+    }
+    else if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
+    {
+        radix = 16;
+        s += 2;
+    }
+
+    return wcstonum(s, radix, out);
+}
+
 int32 MouseHelper::LinesFromRecord(const InputRecord& input)
 {
     assert(input.type == InputType::Mouse);

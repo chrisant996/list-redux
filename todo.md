@@ -27,7 +27,15 @@
   - [x] CUA keys
   - [x] copy/paste keys
   - [ ] undo/redo
-- [ ] command line flags
+- command line flags
+  - [x] goto line (only if exactly one file matches the command line args)
+  - [x] goto offset (same limitation as goto line)
+  - [ ] encoding (same limitation as goto line)
+  - [ ] search (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)
+  - [ ] wrapping
+  - [ ] hex view
+  - [ ] hex edit (same limitation as goto line)
+- [ ] optionally build with RE2 regex library (and do it for official releases)
 - [ ] documentation for the `.listredux` file
 - [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
 
@@ -86,7 +94,6 @@
   - [x] `F4` toggle multi-file search (next/prev cross file boundaries)
   - [x] make search interruptible with `Ctrl-Break`
   - [x] search for regex (search line by line)
-  - [ ] optionally build with RE2 regex library (and do it for official releases)
 - hex mode
   - [x] always show hex ruler on a second header row
   - [x] go to offset

@@ -35,6 +35,8 @@ const DWORD c_max_needle = 32;
 static_assert(c_max_needle <= c_data_buffer_slop); // Important for searching across word wrapped line breaks.
 
 static unsigned s_max_line_length = c_default_max_line_length;
+static size_t s_goto_line = size_t(-1);
+static uint64 s_goto_offset = uint64(-1);
 ViewerOptions g_options;
 
 constexpr unsigned c_horiz_scroll_amount = 10;
@@ -53,6 +55,18 @@ void SetMaxLineLength(const WCHAR* arg)
 void SetViewerScrollbar(bool scrollbar)
 {
     g_options.show_scrollbar = scrollbar;
+}
+
+void SetViewerGotoLine(size_t line)
+{
+    s_goto_line = line;
+    s_goto_offset = size_t(-1);
+}
+
+void SetViewerGotoOffset(uint64 offset)
+{
+    s_goto_line = uint64(-1);
+    s_goto_offset = offset;
 }
 
 // 1 = yes, 0 = no, -1 = cancel.
@@ -428,6 +442,25 @@ void Viewer::UpdateDisplay()
 
     // Decide how many hex bytes fit per line.
     InitHexWidth();
+
+    // Honor command line flag to goto line or offset.
+    if (s_goto_line != size_t(-1))
+    {
+        Error dummy;
+        if (m_context.ProcessThrough(s_goto_line, dummy))
+        {
+            const size_t index = m_context.FriendlyLineNumberToIndex(s_goto_line);
+            m_found_line.MarkOffset(m_context.GetOffset(index));
+            Center(m_found_line);
+        }
+    }
+    else if (s_goto_offset != FileOffset(-1))
+    {
+        m_found_line.MarkOffset(s_goto_offset);
+        Center(m_found_line);
+    }
+    s_goto_line = size_t(-1);
+    s_goto_offset = FileOffset(-1);
 
     // Process enough lines to display the current screenful of lines.  If
     // processing lines causes the margin width to change, then wrapping and
@@ -2284,31 +2317,6 @@ void Viewer::Center(const FoundOffset& found_line)
     }
 }
 
-static bool wcstonum(const WCHAR* text, unsigned radix, unsigned __int64& out)
-{
-    assert(radix == 10 || radix == 16);
-
-    if (!*text)
-        return false;
-
-    unsigned __int64 num = 0;
-    while (*text)
-    {
-        if (*text >= '0' && *text <= '9')
-            num = (num * radix) + (*text - '0');
-        else if (radix != 16)
-            return false;
-        else if (*text >= 'A' && *text <= 'F')
-            num = (num * radix) + (10 + *text - 'A');
-        else if (*text >= 'a' && *text <= 'f')
-            num = (num * radix) + (10 + *text - 'a');
-        ++text;
-    }
-
-    out = num;
-    return true;
-}
-
 void Viewer::GoTo(Error& e)
 {
     StrW s;
@@ -2365,49 +2373,24 @@ void Viewer::GoTo(Error& e)
 
     if (s.Length())
     {
-        unsigned radix = lineno ? 10 : 16;
-        const WCHAR* p = s.Text();
-        if (p[0] == '$')
+        ULONGLONG n;
+        const unsigned radix = lineno ? 10 : 16;
+        if (ParseULongLong(s.Text(), n, radix))
         {
-            radix = 16;
-            ++p;
-        }
-        else if (p[0] == '#')
-        {
-            radix = 10;
-            ++p;
-        }
-        else if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
-        {
-            radix = 16;
-            p += 2;
-        }
-
-        if (!lineno)
-        {
-            FileOffset offset;
-            if (wcstonum(p, radix, offset))
+            if (!lineno)
             {
-                if (m_hex_mode)
-                    offset &= ~FileOffset(m_hex_width - 1);
-                m_found_line.MarkOffset(offset);
-                Center(m_found_line);
-                m_force_update = true;
+                m_found_line.MarkOffset(n);
             }
-        }
-        else
-        {
-            unsigned __int64 line;
-            if (wcstonum(p, radix, line) && line > 0)
+            else
             {
-                m_context.ProcessThrough(line, e);
+                m_context.ProcessThrough(n, e);
                 if (e.Test())
                     return;
-                line = m_context.FriendlyLineNumberToIndex(line);
+                size_t line = m_context.FriendlyLineNumberToIndex(n);
                 m_found_line.MarkOffset(m_context.GetOffset(line));
-                Center(m_found_line);
-                m_force_update = true;
             }
+            Center(m_found_line);
+            m_force_update = true;
         }
     }
 }
