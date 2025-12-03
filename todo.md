@@ -88,6 +88,7 @@
 - [x] `'` or `@` to display a list of names of files being viewed; use arrows to choose one, press Enter to make it the current file for viewing
 - [x] `F5` to reprocess/reload the file (but not documented, since the file is opened with deny shared writing)
 - [x] remember scroll position in each file
+- [ ] override tab stop width
 - searching
   - [x] search in text mode (/ for case sensitive, \ for caseless)
   - [x] search in hex mode

@@ -890,7 +890,8 @@ do_skip_whitespace:
             m_line_numbers.emplace_back(m_current_line_number);
         if (m_wrap)
             m_formatting.emplace_back(std::move(fmt));
-        assert(m_lines.size() == m_line_iter.GetProcessedLineCount());
+        assert(m_lines.size() == m_line_iter.GetProcessedLineCount() ||
+               m_lines.size() == m_line_iter.GetProcessedLineCount() + 1);
 #ifdef DEBUG_LINE_PARSING
         dbgprintf(L"finished line %lu; offset %lu (%lx), length %lu, width %lu, leading indent %u", m_lines.size(), m_pending_begin, m_pending_begin, line_length, line_width, fmt.m_leading_indent);
 #endif

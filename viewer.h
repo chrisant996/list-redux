@@ -16,6 +16,7 @@ enum class ViewerOutcome { CONTINUE, RETURN, EXITAPP };
 ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e);
 ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title=nullptr, bool help=false);
 
+uint32 GetMaxMaxLineLength();
 void SetMaxLineLength(const WCHAR* arg);
 void SetPipedInput();
 void SetViewerScrollbar(bool scrollbar);

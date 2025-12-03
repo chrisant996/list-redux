@@ -41,10 +41,15 @@ ViewerOptions g_options;
 
 constexpr unsigned c_horiz_scroll_amount = 10;
 
+uint32 GetMaxMaxLineLength()
+{
+    return std::min<uint32>(c_data_buffer_slop, c_default_max_line_length);
+}
+
 void SetMaxLineLength(const WCHAR* arg)
 {
-    const unsigned c_max_line_length = std::min<DWORD>(c_data_buffer_slop, c_default_max_line_length);
-    unsigned max_line_length = _wtoi(arg);
+    const uint32 c_max_line_length = std::min<uint32>(c_data_buffer_slop, c_default_max_line_length);
+    uint32 max_line_length = _wtoi(arg);
     if (max_line_length <= 16)
         max_line_length = 16;
     else if (max_line_length > c_max_line_length)

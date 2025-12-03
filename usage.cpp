@@ -5,6 +5,7 @@
 
 #include "pch.h"
 #include "usage.h"
+#include "viewer.h"
 
 #include <vector>
 #include <map>
@@ -44,7 +45,14 @@ static const FlagUsageInfo c_usage_info[] =
 
     // FLAGS -----------------------------------------------------------------
     { FLAGS,    "-@ file",                  "Load files named in 'file' into a file viewer.\n" },
+    { FLAGS,    "--emulate",                "Use built-in terminal emulator.\n" },
+    { FLAGS,    "--emulate=mode",           "Override using terminal emulator.  'mode' can be 'off', 'on', or 'auto' (the default).\n" },
+    { FLAGS,    "--no-emulate",             "Use native terminal (no emulation).\n" },
+    { FLAGS,    "--input-file file",        "Load files named in 'file' into a file viewer.\n" },
     { FLAGS,    "--line num",               "Go to line 'num' in file viewer (base 10 by default).\n" },
+    { FLAGS,    "--max-line-length num",    "Override the maximum line length (between 16 and $(MAXMAXLINELEN)).\n" },
+    { FLAGS,    "--multibyte",              "Auto-detecting multibyte encodings.\n" },
+    { FLAGS,    "--no-multibyte",           "Do not auto-detect multibyte encodings.\n" },
     { FLAGS,    "--offset num",             "Go to offset 'num' in file viewer (base 16 by default).\n" },
 };
 
@@ -72,6 +80,34 @@ static const char c_usage_epilog[] =
 #endif
 ;
 
+static void DoReplacements(const char* in, StrA& out)
+{
+    out.Clear();
+    while (*in)
+    {
+        const char* repl = strstr(in, "$(");
+        if (repl)
+        {
+            out.Append(in, repl - in);
+            if (strnicmp(repl, "$(MAXMAXLINELEN)", 16) == 0)
+            {
+                out.Printf("%u", GetMaxMaxLineLength());
+                in = repl + 16;
+            }
+            else
+            {
+                out.Append(repl, 2);
+                in = repl + 2;
+            }
+        }
+        else
+        {
+            out.Append(in);
+            in += strlen(in);
+        }
+    }
+}
+
 static unsigned s_flag_col_width = 24;
 static void AppendFlagUsage(StrA& u, const FlagUsageInfo& info, bool skip_leading_spaces=false)
 {
@@ -93,8 +129,9 @@ static void AppendFlagUsage(StrA& u, const FlagUsageInfo& info, bool skip_leadin
     u.AppendSpaces(s_flag_col_width - flag_len);
     u.Append("\032");
 
-    const char* p = info.desc;
-    while (*p)
+    StrA desc;
+    DoReplacements(info.desc, desc);
+    for (const char* p = desc.Text(); *p;)
     {
         const char* const end = strchr(p, '\n');
         size_t len = end ? (end - p) : strlen(p);
