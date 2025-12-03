@@ -19,6 +19,7 @@ ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title=nullptr, b
 uint32 GetMaxMaxLineLength();
 void SetMaxLineLength(const WCHAR* arg);
 void SetPipedInput();
+void SetWrapping(bool wrapping);
 void SetViewerScrollbar(bool scrollbar);
 void SetViewerGotoLine(size_t line);
 void SetViewerGotoOffset(uint64 offset);

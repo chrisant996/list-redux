@@ -113,6 +113,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         LOI_MAX_LINE_LENGTH,
         LOI_MULTIBYTE,
         LOI_NO_MULTIBYTE,
+        LOI_WRAP,
+        LOI_NO_WRAP,
     };
 
     static LongOption<WCHAR> long_opts[] =
@@ -128,6 +130,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         { L"multibyte",             nullptr,            LOI_MULTIBYTE },
         { L"no-multibyte",          nullptr,            LOI_NO_MULTIBYTE },
         { L"offset",                nullptr,            LOI_GOTO_OFFSET, LOHA_REQUIRED },
+        { L"wrap",                  nullptr,            LOI_WRAP },
+        { L"no-wrap",               nullptr,            LOI_NO_WRAP },
         { nullptr }
     };
 
@@ -182,6 +186,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     std::optional<size_t> goto_line;
     std::optional<uint64> goto_offset;
     UINT force_codepage = 0;
+    int32 wrapping = -1;
 
     for (unsigned ii = 0; !e.Test() && opts.GetValue(ii, ch, opt_value, &long_opt); ii++)
     {
@@ -288,6 +293,10 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
             case LOI_NO_MULTIBYTE:
                 SetMultiByteEnabled(long_opt->value == LOI_MULTIBYTE);
                 break;
+            case LOI_WRAP:
+            case LOI_NO_WRAP:
+                wrapping = (long_opt->value == LOI_WRAP);
+                break;
             }
             break;
         }
@@ -297,6 +306,9 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         return e.Report();
 
     LoadConfig();
+    if (wrapping >= 0)
+        SetWrapping(!!wrapping);
+
     TryCoInitialize();
 
     StrW dir;

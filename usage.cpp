@@ -54,6 +54,8 @@ static const FlagUsageInfo c_usage_info[] =
     { FLAGS,    "--multibyte",              "Auto-detecting multibyte encodings.\n" },
     { FLAGS,    "--no-multibyte",           "Do not auto-detect multibyte encodings.\n" },
     { FLAGS,    "--offset num",             "Go to offset 'num' in file viewer (base 16 by default).\n" },
+    { FLAGS,    "--wrapping",               "Wrap lines wider than the terminal.\n" },
+    { FLAGS,    "--no-wrapping",            "Only wrap lines at maximum line length ($(MAXMAXLINELEN)).\n" },
 };
 
 static const char c_usage_prolog[] =

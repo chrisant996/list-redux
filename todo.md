@@ -32,7 +32,7 @@
   - [x] goto offset (same limitation as goto line)
   - [x] codepage (same limitation as goto line)
   - [ ] search (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)
-  - [ ] wrapping
+  - [x] wrapping
   - [ ] hex view
   - [ ] hex edit (same limitation as goto line)
 - [ ] optionally build with RE2 regex library (and do it for official releases)
