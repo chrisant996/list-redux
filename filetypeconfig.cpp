@@ -35,11 +35,14 @@ static const ConfigDetails c_config_map[] =
     { ".ts.tsx.js.jsx.",                    8 },
     { ".lua.",                              8 },
     { ".rs.",                               8 },
+    { ".go.",                               8 },
+    { ".rb.rake.rakefile.",                 8 },
     { ".xml.htm.html.shtm.shtml.xaml.",     8 },
     { ".rc.",                               8 },
     { ".idl.odl.",                          8 },
     { ".asm.inc.",                          8 },
     { ".i.pp.",                             8 },
+    { ".sql.",                              8 },
 };
 #if 0
 static_assert(_countof(c_config_map) == size_t(ConfigType::MAX));
