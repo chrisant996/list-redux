@@ -31,10 +31,9 @@
   - [x] goto line (only if exactly one file matches the command line args)
   - [x] goto offset (same limitation as goto line)
   - [x] codepage (same limitation as goto line)
-  - [ ] search (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)
   - [x] wrapping
-  - [ ] hex view
-  - [ ] hex edit (same limitation as goto line)
+  - [x] hex view
+  - [x] hex edit (same limitation as goto line)
 - [ ] optionally build with RE2 regex library (and do it for official releases)
 - [ ] documentation for the `.listredux` file
 - [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
@@ -139,6 +138,9 @@
   - [ ] mouse input
   - [ ] show markers at left/right end when scrolled horizontally
   - [ ] encapsulate in a class, and have ability to stop processing one instance and start processing a different instance (effectively making it possible to navigate between different input boxes)
+- [ ] improve message box routine (make it not full terminal width, have clickable buttons, etc)
+  - [ ] mouse input in message box routine
+- [ ] search (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)
 - [ ] some way to configure colors inside the app (could benefit from ability to navigate between different input boxes)
 - [ ] some way to revert to default colors inside the app
 - [ ] save current settings into `.listredux` file as defaults
@@ -154,8 +156,6 @@
 
 ### Maybe
 
-- improve message box routine (make it not full terminal width, have clickable buttons, etc)
-  - mouse input in message box routine
 - use ICU for encodings when available _[ICU is independent from codepages, so it uses strings to identify encodings, and it has its own analogs to MLang and MultiByteToWideChar, and it's only available in Win10+ circa 2019 onward, so adjusting to use ICU when available will be an invasive change.]_
 - search for hex bytes in hex mode?  or just use regex searches with numeric escapes `\xAB`?  (but the MSVC ECMAScript engine doesn't support them, so it's another reason to use RE2)
 - show used and free space in chooser?

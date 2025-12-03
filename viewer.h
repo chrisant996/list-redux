@@ -24,4 +24,6 @@ void SetViewerScrollbar(bool scrollbar);
 void SetViewerGotoLine(size_t line);
 void SetViewerGotoOffset(uint64 offset);
 void SetViewerCodePage(UINT cp);
+void SetViewerHexViewMode(bool hex_view);
+void SetViewerHexEditMode(bool hex_edit);
 

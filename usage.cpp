@@ -45,15 +45,18 @@ static const FlagUsageInfo c_usage_info[] =
 
     // FLAGS -----------------------------------------------------------------
     { FLAGS,    "-@ file",                  "Load files named in 'file' into a file viewer.\n" },
+    { FLAGS,    "--codepage num",           "Decode single file using 'num' as the codepage.\n" },
     { FLAGS,    "--emulate",                "Use built-in terminal emulator.\n" },
     { FLAGS,    "--emulate=mode",           "Override using terminal emulator.  'mode' can be 'off', 'on', or 'auto' (the default).\n" },
     { FLAGS,    "--no-emulate",             "Use native terminal (no emulation).\n" },
+    { FLAGS,    "--hex",                    "Display files in hex view.\n" },
+    { FLAGS,    "--hex-edit",               "Activate hex editing mode for single file.\n" },
     { FLAGS,    "--input-file file",        "Load files named in 'file' into a file viewer.\n" },
-    { FLAGS,    "--line num",               "Go to line 'num' in file viewer (base 10 by default).\n" },
+    { FLAGS,    "--line num",               "Go to line 'num' for single file (base 10 by default).\n" },
     { FLAGS,    "--max-line-length num",    "Override the maximum line length (between 16 and $(MAXMAXLINELEN)).\n" },
     { FLAGS,    "--multibyte",              "Auto-detect multibyte encodings.\n" },
     { FLAGS,    "--no-multibyte",           "Do not auto-detect multibyte encodings.\n" },
-    { FLAGS,    "--offset num",             "Go to offset 'num' in file viewer (base 16 by default).\n" },
+    { FLAGS,    "--offset num",             "Go to offset 'num' for single file (base 16 by default).\n" },
     { FLAGS,    "--wrap",                   "Wrap lines wider than the terminal.\n" },
     { FLAGS,    "--no-wrap",                "Only wrap lines at maximum line length ($(MAXMAXLINELEN)).\n" },
 };

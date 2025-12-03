@@ -110,6 +110,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         LOI_NO_EMULATE,
         LOI_GOTO_LINE,
         LOI_GOTO_OFFSET,
+        LOI_HEX_EDIT,
+        LOI_HEX_VIEW,
         LOI_MAX_LINE_LENGTH,
         LOI_MULTIBYTE,
         LOI_NO_MULTIBYTE,
@@ -125,6 +127,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         { L"codepage",              nullptr,            LOI_CODEPAGE, LOHA_REQUIRED },
         { L"emulate",               nullptr,            LOI_EMULATE, LOHA_OPTIONAL },
         { L"no-emulate",            nullptr,            LOI_NO_EMULATE },
+        { L"hex",                   nullptr,            LOI_HEX_VIEW },
+        { L"hex-edit",              nullptr,            LOI_HEX_EDIT },
         { L"line",                  nullptr,            LOI_GOTO_LINE, LOHA_REQUIRED },
         { L"max-line-length",       nullptr,            LOI_MAX_LINE_LENGTH, LOHA_REQUIRED },
         { L"multibyte",             nullptr,            LOI_MULTIBYTE },
@@ -186,8 +190,10 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     std::optional<size_t> goto_line;
     std::optional<uint64> goto_offset;
     UINT force_codepage = 0;
-    int32 emulate = -2;
-    int32 wrapping = -1;
+    int8 emulate = -2;
+    int8 wrapping = -1;
+    int8 hex_view = -1;
+    int8 hex_edit = -1;
 
     for (unsigned ii = 0; !e.Test() && opts.GetValue(ii, ch, opt_value, &long_opt); ii++)
     {
@@ -285,6 +291,12 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                     }
                 }
                 break;
+            case LOI_HEX_EDIT:
+                hex_edit = true;
+                break;
+            case LOI_HEX_VIEW:
+                hex_view = true;
+                break;
             case LOI_MAX_LINE_LENGTH:
                 SetMaxLineLength(opt_value);
                 break;
@@ -308,7 +320,9 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     if (emulate >= -1)
         SetEmulation(emulate);
     if (wrapping >= 0)
-        SetWrapping(!!wrapping);
+        SetWrapping(wrapping > 0);
+    if (hex_view >= 0)
+        SetViewerHexViewMode(hex_view > 0);
 
     TryCoInitialize();
 
@@ -351,14 +365,13 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     {
         if (goto_line.has_value())
             SetViewerGotoLine(goto_line.value());
-        else if (goto_offset.has_value())
+        if (goto_offset.has_value())
             SetViewerGotoOffset(goto_offset.value());
-
         if (force_codepage)
             SetViewerCodePage(force_codepage);
+        if (hex_edit >= 0)
+            SetViewerHexEditMode(hex_edit > 0);
     }
-    goto_line.reset();
-    goto_offset.reset();
 
     Interactive interactive;
     Chooser chooser(&interactive);
