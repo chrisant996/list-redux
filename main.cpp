@@ -105,6 +105,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     enum
     {
         LOI_UNIQUE_IDS              = 0x7FFF,
+        LOI_CODEPAGE,
         LOI_EMULATE,
         LOI_NO_EMULATE,
         LOI_GOTO_LINE,
@@ -119,6 +120,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         { L"help",                  nullptr,            '?' },
         { L"input-file",            nullptr,            '@', LOHA_REQUIRED },
         { L"version",               nullptr,            'V' },
+        { L"codepage",              nullptr,            LOI_CODEPAGE, LOHA_REQUIRED },
         { L"emulate",               nullptr,            LOI_EMULATE, LOHA_OPTIONAL },
         { L"no-emulate",            nullptr,            LOI_NO_EMULATE },
         { L"line",                  nullptr,            LOI_GOTO_LINE, LOHA_REQUIRED },
@@ -179,6 +181,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     std::vector<StrW> files;
     std::optional<size_t> goto_line;
     std::optional<uint64> goto_offset;
+    UINT force_codepage = 0;
 
     for (unsigned ii = 0; !e.Test() && opts.GetValue(ii, ch, opt_value, &long_opt); ii++)
     {
@@ -232,6 +235,15 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                 continue; // Other flags are handled separately further below.
             switch (long_opt->value)
             {
+            case LOI_CODEPAGE:
+                {
+                    uint64 n;
+                    if (ParseULongLong(opt_value, n, 10) && !(n & ~uint64(0xffffffff)))
+                    {
+                        force_codepage = UINT(n);
+                    }
+                }
+                break;
             case LOI_EMULATE:
             case LOI_NO_EMULATE:
                 {
@@ -251,7 +263,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                 break;
             case LOI_GOTO_LINE:
                 {
-                    ULONGLONG n;
+                    uint64 n;
                     if (ParseULongLong(opt_value, n, 10))
                     {
                         goto_line = n;
@@ -261,7 +273,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                 break;
             case LOI_GOTO_OFFSET:
                 {
-                    ULONGLONG n;
+                    uint64 n;
                     if (ParseULongLong(opt_value, n, 16))
                     {
                         goto_line.reset();
@@ -328,6 +340,9 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
             SetViewerGotoLine(goto_line.value());
         else if (goto_offset.has_value())
             SetViewerGotoOffset(goto_offset.value());
+
+        if (force_codepage)
+            SetViewerCodePage(force_codepage);
     }
     goto_line.reset();
     goto_offset.reset();

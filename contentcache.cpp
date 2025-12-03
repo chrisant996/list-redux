@@ -799,9 +799,17 @@ void FileLineMap::SetFileType(FileDataType type, UINT codepage, const WCHAR* enc
 {
     m_detected_type = type;
     m_detected_codepage = codepage;
+    if (encoding_name)
+        m_detected_encoding_name = encoding_name;
+    else
+        GetCodePageName(codepage, m_detected_encoding_name);
+
     m_codepage = IsCodePageAllowed(codepage) ? codepage : GetSingleByteOEMCP();
-    m_detected_encoding_name = encoding_name;
-    m_encoding_name = encoding_name;
+    if (encoding_name)
+        m_encoding_name = encoding_name;
+    else
+        GetCodePageName(m_codepage, m_encoding_name);
+
     m_line_iter.SetEncoding(type, m_codepage);
     m_need_type = false;
 }

@@ -30,7 +30,7 @@
 - command line flags
   - [x] goto line (only if exactly one file matches the command line args)
   - [x] goto offset (same limitation as goto line)
-  - [ ] encoding (same limitation as goto line)
+  - [x] codepage (same limitation as goto line)
   - [ ] search (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)
   - [ ] wrapping
   - [ ] hex view

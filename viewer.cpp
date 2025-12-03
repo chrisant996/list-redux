@@ -37,6 +37,7 @@ static_assert(c_max_needle <= c_data_buffer_slop); // Important for searching ac
 static unsigned s_max_line_length = c_default_max_line_length;
 static size_t s_goto_line = size_t(-1);
 static uint64 s_goto_offset = uint64(-1);
+static UINT s_force_codepage = 0;
 ViewerOptions g_options;
 
 constexpr unsigned c_horiz_scroll_amount = 10;
@@ -72,6 +73,11 @@ void SetViewerGotoOffset(uint64 offset)
 {
     s_goto_line = uint64(-1);
     s_goto_offset = offset;
+}
+
+void SetViewerCodePage(UINT cp)
+{
+    s_force_codepage = cp;
 }
 
 // 1 = yes, 0 = no, -1 = cancel.
@@ -2152,6 +2158,12 @@ void Viewer::SetFile(intptr_t index, ContentCache* context, bool force)
                 e.Format(m_errmsg);
                 m_errmsg.TrimRight();
             }
+        }
+
+        if (s_force_codepage)
+        {
+            m_context.SetEncoding(s_force_codepage);
+            s_force_codepage = 0;
         }
 
         if (!m_context.IsPipe())
