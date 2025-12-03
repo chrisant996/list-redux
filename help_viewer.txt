@@ -41,6 +41,7 @@ TEXT VIEWER KEYS:
              W  Toggle wrapping to the terminal width.
 
         Ctrl-E  Choose file encoding.
+        Ctrl-T  Choose tab width.
 
 HEX VIEWER KEYS:
 

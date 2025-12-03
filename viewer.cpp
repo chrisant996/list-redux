@@ -259,6 +259,7 @@ private:
     FileOffset      GetFoundOffset(const FoundOffset& found_line, unsigned* offset_highlight=nullptr);
     void            ShowFileList();
     void            ChooseEncoding();
+    void            ChooseTabWidth();
     void            OpenNewFile(Error& e);
     ViewerOutcome   CloseCurrentFile();
     bool            ToggleHexEditMode(Error& e);
@@ -1686,6 +1687,13 @@ hex_edit_right:
                 }
             }
             break;
+        case 'T'-'@':   // CTRL-T
+            if (input.modifier == Modifier::CTRL)
+            {
+                if (!m_hex_mode && !m_text)
+                    ChooseTabWidth();
+            }
+            break;
         case 'U'-'@':   // CTRL-U
             if (input.modifier == Modifier::CTRL)
             {
@@ -2523,6 +2531,28 @@ void Viewer::ChooseEncoding()
         m_context.SetEncoding(encodings[result.selected].codepage);
 }
 
+void Viewer::ChooseTabWidth()
+{
+    StrW s;
+    StrW right;
+    right = L"(from 2 to 16)";
+    s.AppendColor(GetColor(ColorElement::Command));
+    s.Printf(L"\r%s\x1b[%uG%s\rEnter tab width%s ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), c_prompt_char);
+    OutputConsole(s.Text(), s.Length());
+
+    ReadInput(s, History::MAX, 8, 8);
+
+    OutputConsole(c_norm);
+    m_force_update = true;
+
+    if (s.Empty())
+        return;
+
+    uint64 n;
+    if (ParseULongLong(s.Text(), n) && n >= 2 && n <= 16)
+        g_options.tab_width = uint8(n);
+}
+
 void Viewer::OpenNewFile(Error& e)
 {
     StrW s;
@@ -2535,6 +2565,10 @@ void Viewer::OpenNewFile(Error& e)
     ReadInput(s, History::OpenFile, m_terminal_width - 1 - tmp.Length());
 
     OutputConsole(c_norm);
+    m_force_update = true;
+
+    if (s.Empty())
+        return;
 
     StrW full;
     if (!OS::GetFullPathName(s.Text(), full, e))
