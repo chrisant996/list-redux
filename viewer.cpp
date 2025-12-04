@@ -29,7 +29,6 @@ static const WCHAR c_no_file_open[] = L"*** No File Open ***";
 static const WCHAR c_endoffile_marker[] = L"*** End Of File ***";
 static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
 static const WCHAR c_canceled[] = L"*** Canceled ***";
-static const WCHAR c_div_char[] = L":"; //L"\u2590"; //L"\u2595"; //L":";
 
 const DWORD c_max_needle = 32;
 static_assert(c_max_needle <= c_data_buffer_slop); // Important for searching across word wrapped line breaks.
@@ -269,9 +268,6 @@ private:
     unsigned        m_terminal_height = 0;
     unsigned        m_content_height = 0;
     unsigned        m_content_width = 0;
-    unsigned        m_margin_width = 0;         // Combined margin (line number and offset).
-    unsigned        m_margin_width_line = 0;    // Line number margin.
-    unsigned        m_margin_width_offset = 0;  // Offset margin.
     scroll_car      m_vert_scroll_car;
     MouseHelper     m_mouse;
     int32           m_vert_scroll_column = 0;
@@ -411,70 +407,6 @@ static void PadToWidth(StrW& s, unsigned min_width)
         s.AppendSpaces(min_width - cells);
 }
 
-unsigned Viewer::CalcMarginWidth()
-{
-    StrW s;
-    unsigned margin = 0;
-    bool overflow = false;
-
-#ifdef DEBUG
-    const unsigned c_min_margin_width = 5;
-#else
-    const unsigned c_min_margin_width = 8;
-#endif
-
-    m_margin_width_offset = 0;
-    m_margin_width_line = 0;
-
-    if (!overflow && g_options.show_line_numbers)
-    {
-        unsigned line_number_width;
-        if (m_hex_mode)
-        {
-            line_number_width = 6;
-        }
-        else
-        {
-            s.Clear();
-            s.Printf(L"%lu", m_context.CountFriendlyLines());
-            line_number_width = s.Length();
-        }
-        const unsigned hex_margin = m_hex_mode ? m_context.GetHexMarginWidth() : 0;
-        m_margin_width_line = std::max<unsigned>(c_min_margin_width, line_number_width + 2);
-        if (margin + hex_margin + m_margin_width_line > m_terminal_width / 2)
-        {
-            overflow = true;
-            m_margin_width_line = 0;
-        }
-        else
-        {
-            margin += m_margin_width_line;
-        }
-    }
-
-    if (!overflow && !m_hex_mode && g_options.show_file_offsets)
-    {
-        s.Clear();
-#ifdef DEBUG
-        s.Printf(L"%lx", m_context.Processed());
-#else
-        s.Printf(L"%lx", m_context.GetFileSize());
-#endif
-        m_margin_width_offset = std::max<unsigned>(c_min_margin_width, s.Length() + 2);
-        if (margin + m_margin_width_offset > m_terminal_width / 2)
-        {
-            overflow = true;
-            m_margin_width_offset = 0;
-        }
-        else
-        {
-            margin += m_margin_width_offset;
-        }
-    }
-
-    return margin;
-}
-
 void Viewer::UpdateDisplay()
 {
 #ifdef DEBUG
@@ -532,8 +464,8 @@ void Viewer::UpdateDisplay()
     unsigned autofit_retries = 0;
 LAutoFitContentWidth:
     assert(autofit_retries != 2); // Should be impossible to occur...
-    m_margin_width = CalcMarginWidth();
-    m_content_width = m_terminal_width - (m_hex_mode ? 0 : m_margin_width) - show_scrollbar;
+    const unsigned margin_width = m_context.CalcMarginWidth(m_hex_mode);
+    m_content_width = m_terminal_width - show_scrollbar;
     {
         Error e;
         m_context.SetWrapWidth(m_wrap ? m_content_width : 0);
@@ -555,8 +487,8 @@ LAutoFitContentWidth:
                 m_context.ProcessThrough(index, e);
             }
         }
-        const unsigned new_margin_width = CalcMarginWidth();
-        if (new_margin_width != m_margin_width)
+        const unsigned new_margin_width = m_context.CalcMarginWidth(m_hex_mode);
+        if (new_margin_width != margin_width)
         {
             // Margin width changed; redo wrapping and processing (processing
             // may be a no-op if wrapping isn't active).
@@ -695,7 +627,7 @@ LAutoFitContentWidth:
 
         if (g_options.show_ruler && !m_hex_mode)
         {
-            s.AppendSpaces(m_margin_width);
+            s.AppendSpaces(margin_width);
             left.Set(L"\u252c\u252c\u252c\u252c\u253c\u252c\u252c\u252c");
             for (unsigned width = 0; width < m_content_width; width += 10)
             {
@@ -858,10 +790,10 @@ LAutoFitContentWidth:
             {
                 StrW ruler;
                 ruler.AppendColor(GetColor(ColorElement::Header));
-                ruler.AppendSpaces(m_context.GetHexMarginWidth());
+                ruler.AppendSpaces(margin_width);
                 for (unsigned ii = 0; ii < m_hex_width; ++ii)
                 {
-                    if (ii % (1 << g_options.hex_grouping) == 0)
+                    if (ii && (ii % (1 << g_options.hex_grouping) == 0))
                         ruler.Append(L"  ", ((ii % 8) == 0) ? 2 : 1);
                     ruler.Printf(L"%02x", ii);
                 }
@@ -949,36 +881,6 @@ LAutoFitContentWidth:
                         if (row_offset <= found_line->offset && found_line->offset < row_offset + max<size_t>(1, row_length))
                             color = GetColor(ColorElement::MarkedLine);
                     }
-                    if (m_margin_width)
-                    {
-#ifdef DEBUG
-                        const unsigned begin_index = s.Length();
-#endif
-                        s.AppendColor(GetColor(ColorElement::LineNumber));
-                        if (g_options.show_line_numbers)
-                        {
-                            const size_t prev_num = (m_top + row > 0) ? m_context.GetLineNunber(m_top + row - 1) : 0;
-                            const size_t num = m_context.GetLineNunber(m_top + row);
-                            if (num > prev_num)
-                                s.Printf(L"%*lu%s", m_margin_width_line - 2, m_context.GetLineNunber(m_top + row), c_div_char);
-                            else
-                                s.Printf(L"%*s%s", m_margin_width_line - 2, L"", c_div_char);
-                        }
-                        if (g_options.show_file_offsets)
-                        {
-                            if (g_options.show_line_numbers)
-                                s.Append(L" ");
-                            s.Printf(L"%0*lx%s", m_margin_width_offset - 2, m_context.GetOffset(m_top + row), c_div_char);
-                        }
-                        assert(implies(!g_options.show_line_numbers && !g_options.show_file_offsets, !m_margin_width));
-                        s.AppendNormalIf(true);
-                        s.Append(L" ");
-#ifdef DEBUG
-                        assert(cell_count(s.Text() + begin_index) == m_margin_width);
-#endif
-                    }
-                    if (color)
-                        s.AppendColor(color);
                     const unsigned width = m_context.FormatLineData(m_top + row, m_left, s, m_content_width, e, color, found_line);
                     if (width < m_content_width || show_scrollbar)
                         s.Append(c_clreol);
@@ -1151,8 +1053,7 @@ LAutoFitContentWidth:
             cursor_y += 1;                              // Hex ruler.
             cursor_y += unsigned(m_hex_pos - m_hex_top) / m_hex_width;
             cursor_x = 1;                               // One-based.
-            cursor_x += m_context.GetHexMarginWidth();
-            cursor_x += 2;                              // Padding.
+            cursor_x += margin_width;
             if (m_hex_characters)
             {
                 cursor_x += m_hex_width * 2;
@@ -2066,7 +1967,7 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
         {
             const FileOffset y_ofs = m_hex_top + ((input.mouse_pos.Y - content_top) * m_hex_width);
 
-            const uint32 hex_left = m_context.GetHexMarginWidth() + 2;
+            const uint32 hex_left = m_context.CalcMarginWidth(m_hex_mode);
             uint32 chars_left = hex_left;
             chars_left += m_hex_width * 2;
             chars_left += (1 << (3 - g_options.hex_grouping)) * (m_hex_width / 8);

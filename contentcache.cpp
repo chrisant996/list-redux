@@ -24,6 +24,15 @@
 // static const WCHAR c_eol_marker[] = L"\x1b[0;33;48;2;80;0;80m\u22a6\x1b[m";
 // static const WCHAR c_eol_marker[] = L"\x1b[36m\u22a6\x1b[m";
 static const WCHAR c_eol_marker[] = L"\x1b[36m\u2022\x1b[m";
+static const WCHAR c_div_char[] = L":"; //L"\u2590"; //L"\u2595"; //L":";
+
+#ifdef DEBUG
+const unsigned c_min_num_width = 3;
+#else
+const unsigned c_min_num_width = 6;
+#endif
+const unsigned c_min_hexofs_width = 6;
+const unsigned c_margin_padding = 2;
 
 constexpr unsigned c_find_horiz_scroll_threshold = 10;
 
@@ -1033,6 +1042,22 @@ size_t FileLineMap::OffsetToIndex(FileOffset offset) const
     return index;
 }
 
+size_t FileLineMap::FirstLineNumberInHexRow(FileOffset offset, unsigned hex_width) const
+{
+    const size_t begin_line = OffsetToIndex(offset) + 1;
+    const size_t end_line = OffsetToIndex(offset + hex_width - 1) + 1;
+    if (begin_line < end_line)
+    {
+        for (FileOffset o = offset + 1; o < offset + hex_width; ++o)
+        {
+            const size_t l = OffsetToIndex(o) + 1;
+            if (begin_line < l)
+                return l;
+        }
+    }
+    return begin_line;
+}
+
 bool FileLineMap::IsUTF8Compatible() const
 {
     switch (GetCodePage())
@@ -1091,6 +1116,8 @@ ContentCache& ContentCache::operator=(ContentCache&& other)
     m_file = std::move(other.m_file);
     m_size = other.m_size;
     m_hex_size_width = other.m_hex_size_width;
+    m_file_size_width = other.m_file_size_width;
+    m_line_count_width = other.m_line_count_width;
     m_redirected = other.m_redirected;
     m_chunks = std::move(other.m_chunks);
     m_text = other.m_text;
@@ -1112,12 +1139,16 @@ ContentCache& ContentCache::operator=(ContentCache&& other)
 void ContentCache::SetSize(FileOffset size)
 {
     m_size = size;
-    m_hex_size_width = 6;
+    m_hex_size_width = c_min_hexofs_width;
+    m_file_size_width = c_min_num_width;
+    m_line_count_width = 0;
+
     if (size)
     {
         StrW tmp;
         tmp.Printf(L"%lx", size);
         m_hex_size_width = max(m_hex_size_width, tmp.Length());
+        m_file_size_width = max(m_file_size_width, tmp.Length());
     }
 }
 
@@ -1273,11 +1304,49 @@ void ContentCache::SetWrapWidth(unsigned wrap)
     }
 }
 
-unsigned ContentCache::GetHexMarginWidth() const
+unsigned ContentCache::CalcMarginWidth(bool hex_mode)
 {
-    unsigned margin = m_hex_size_width;
+    StrW s;
+    unsigned margin = 0;
+
+    enum WhichNumberType { None, LineNo, LineOffset, HexOffset };
+    WhichNumberType order[3];
+    unsigned count = 0;
+
+    if (hex_mode)
+        order[count++] = HexOffset;
     if (m_options.show_line_numbers)
-        margin += 6 + 2;
+        order[count++] = LineNo;
+    if (!hex_mode && m_options.show_file_offsets)
+        order[count++] = LineOffset;
+
+    for (unsigned i = 0; i < count; ++i)
+    {
+        switch (order[i])
+        {
+        case HexOffset:
+            margin += m_hex_size_width + c_margin_padding;
+            break;
+        case LineNo:
+            if (!m_line_count_width)
+            {
+                s.Clear();
+                s.Printf(L"%lu", CountFriendlyLines());
+                m_line_count_width = max(c_min_num_width, s.Length());
+            }
+            margin += m_line_count_width + hex_mode/*c_div_char*/ + c_margin_padding;
+            break;
+        case LineOffset:
+#ifdef DEBUG
+            s.Clear();
+            s.Printf(L"%lx", Processed());
+            m_file_size_width = max(c_min_num_width, s.Length());
+#endif
+            margin += m_file_size_width + c_margin_padding;
+            break;
+        }
+    }
+
     return margin;
 }
 
@@ -1290,6 +1359,39 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
 
     assert(!found_line || !found_line->Empty());
     const FileOffset offset = GetOffset(line);
+
+    // Margin (line number and offset).
+
+    if (m_options.show_line_numbers || m_options.show_file_offsets)
+    {
+#ifdef DEBUG
+        const unsigned begin_index = s.Length();
+        const unsigned margin_width = CalcMarginWidth(false/*hex_mode*/);
+#endif
+        s.AppendColor(GetColor(ColorElement::LineNumber));
+        if (m_options.show_line_numbers)
+        {
+            const size_t prev_num = (line > 0) ? GetLineNunber(line - 1) : 0;
+            const size_t num = GetLineNunber(line);
+            if (num > prev_num)
+                s.Printf(L"%*lu%s", m_line_count_width, num, c_div_char);
+            else
+                s.Printf(L"%*s%s", m_line_count_width, L"", c_div_char);
+        }
+        if (m_options.show_file_offsets)
+        {
+            if (m_options.show_line_numbers)
+                s.Append(L" ");
+            s.Printf(L"%0*lx%s", m_file_size_width, offset, c_div_char);
+        }
+        s.Append(c_norm);
+        s.Append(L" ");
+#ifdef DEBUG
+        assert(cell_count(s.Text() + begin_index) == margin_width);
+#endif
+    }
+
+    // Line content.
 
     assert(offset >= m_data_offset);
     const BYTE* ptr = m_data + (offset - m_data_offset);
@@ -1306,6 +1408,9 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
 
     bool need_found_highlight = false;
     bool highlighting_found_text = false;
+
+    if (color)
+        s.AppendColor(color);
 
     const auto fmt = m_map.GetFormattingInfo(line);
     if (fmt.m_leading_indent)
@@ -1601,23 +1706,19 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     // Format line number.
     if (m_options.show_line_numbers)
     {
-        size_t prev_line = (!offset) ? 0 : (m_map.OffsetToIndex(offset - 1) + 1);
-        size_t this_line = m_map.OffsetToIndex(offset);
-        if (this_line + 1 < m_map.Count() && m_map.GetOffset(this_line + 1) < offset + hex_bytes)
-            ++this_line;
-        ++this_line;
+        const size_t prev_line = (offset < hex_bytes) ? 0 : m_map.FirstLineNumberInHexRow(offset - hex_bytes, hex_bytes);
+        const size_t this_line = m_map.FirstLineNumberInHexRow(offset, hex_bytes);
         tmp2.Clear();
         if (prev_line < this_line)
-            tmp2.Printf(L"%zu", this_line);
-        const WCHAR* num = tmp2.Text() + (tmp2.Length() > 6 ? tmp2.Length() - 6 : 0);
+            tmp2.Printf(L"%zu%s", this_line, c_div_char);
         s.AppendColor(GetColor(ColorElement::LineNumber));
-        s.Printf(L"%6s", num);
+        s.Printf(L"%*s", m_line_count_width + 1, tmp2.Text());
         s.Append(c_norm);
         s.Append(L"  ", 2);
     }
 
 #ifdef DEBUG
-    assert(cell_count(s.Text() + begin_index) == GetHexMarginWidth() + 2);
+    assert(cell_count(s.Text() + begin_index) == CalcMarginWidth(true/*hex_mode*/));
 #endif
 
     // Format the hex bytes.
@@ -1762,6 +1863,8 @@ bool ContentCache::ProcessThrough(size_t line, Error& e, bool cancelable)
     {
         while (line >= m_map.Count() && !m_completed)
         {
+            m_line_count_width = 0;
+
             const FileOffset offset = m_map.Processed();
             if (!LoadData(offset, m_data_slop, e))
             {

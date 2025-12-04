@@ -165,6 +165,7 @@ public:
     void            GetLineText(const BYTE* p, size_t num_bytes, StrW& out, bool hex_mode=false) const;
     size_t          FriendlyLineNumberToIndex(size_t line) const;
     size_t          OffsetToIndex(FileOffset offset) const;
+    size_t          FirstLineNumberInHexRow(FileOffset offset, unsigned hex_width) const;
     bool            IsDetectedBinaryFile() const { return m_detected_type == FileDataType::Binary; }
     bool            IsBinaryFile() const { return m_line_iter.IsBinaryFile(); }
     bool            IsUTF8Compatible() const;
@@ -228,7 +229,7 @@ public:
 
     void            ClearProcessed();
     void            SetWrapWidth(unsigned wrap);
-    unsigned        GetHexMarginWidth() const;
+    unsigned        CalcMarginWidth(bool hex_mode);
     unsigned        FormatLineData(size_t line, unsigned left_offset, StrW& s, unsigned max_width, Error& e, const WCHAR* color=nullptr, const FoundOffset* found_line=nullptr, unsigned max_len=-1);
     bool            FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundOffset* found_line=nullptr);
 
@@ -276,6 +277,8 @@ private:
     SHFile          m_file;
     FileOffset      m_size = 0;
     unsigned        m_hex_size_width = 0;
+    unsigned        m_file_size_width = 0;
+    unsigned        m_line_count_width = 0;
 
     bool            m_redirected = false;
     PipeChunks      m_chunks;
