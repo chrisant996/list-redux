@@ -26,7 +26,7 @@
   - [x] Ctrl-BACK and Ctrl-DEL keys
   - [x] CUA keys
   - [x] copy/paste keys
-  - [ ] undo/redo
+  - [x] undo/redo
 - command line flags
   - [x] goto line (only if exactly one file matches the command line args)
   - [x] goto offset (same limitation as goto line)
