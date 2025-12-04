@@ -101,6 +101,7 @@
   - [x] go to line
   - [x] `Alt-A` toggle ASCII filter in characters column
   - [x] remember hex mode across viewers
+  - [x] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
   - [x] `Alt-E` toggle hex edit mode
     - [x] navigate through bytes
     - [x] navigate through characters (`TAB` to toggle between bytes and characters)
@@ -132,7 +133,6 @@
 
 ### Future
 
-- [ ] option to show line numbers next to offsets in hex mode (show first _new_ line number on a row)
 - [ ] option to enable/disable mouse input
 - improve input routine
   - [ ] mouse input

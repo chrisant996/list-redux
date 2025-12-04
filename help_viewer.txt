@@ -48,6 +48,8 @@ HEX VIEWER KEYS:
              H  Toggle viewing content as hexadecimal values.
          Alt-A  Toggle ASCII filter for characters column.
          Alt-H  Cycle through hex grouping widths in hex mode.
+         Alt-N  Toggle showing file line numbers.
+
          Alt-E  Toggle edit mode.
 
 HEX EDIT MODE KEYS:

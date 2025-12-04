@@ -1273,6 +1273,14 @@ void ContentCache::SetWrapWidth(unsigned wrap)
     }
 }
 
+unsigned ContentCache::GetHexMarginWidth() const
+{
+    unsigned margin = m_hex_size_width;
+    if (m_options.show_line_numbers)
+        margin += 6 + 2;
+    return margin;
+}
+
 unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, StrW& s, const unsigned max_width, Error& e, const WCHAR* const color, const FoundOffset* const found_line, unsigned max_len)
 {
     if (!EnsureFileData(line, e))
@@ -1578,6 +1586,10 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     if (found_line && offset <= found_line->offset && found_line->offset < offset + hex_bytes)
         marked_color = GetColor(ColorElement::MarkedLine);
 
+#ifdef DEBUG
+    const unsigned begin_index = s.Length();
+#endif
+
     // Format the offset.
     if (offset % 0x400 == 0)
         s.AppendColor(L"1");
@@ -1585,6 +1597,28 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     if (offset % 0x400 == 0)
         s.Append(c_norm);
     s.Append(L"  ", 2);
+
+    // Format line number.
+    if (m_options.show_line_numbers)
+    {
+        size_t prev_line = (!offset) ? 0 : (m_map.OffsetToIndex(offset - 1) + 1);
+        size_t this_line = m_map.OffsetToIndex(offset);
+        if (this_line + 1 < m_map.Count() && m_map.GetOffset(this_line + 1) < offset + hex_bytes)
+            ++this_line;
+        ++this_line;
+        tmp2.Clear();
+        if (prev_line < this_line)
+            tmp2.Printf(L"%zu", this_line);
+        const WCHAR* num = tmp2.Text() + (tmp2.Length() > 6 ? tmp2.Length() - 6 : 0);
+        s.AppendColor(GetColor(ColorElement::LineNumber));
+        s.Printf(L"%6s", num);
+        s.Append(c_norm);
+        s.Append(L"  ", 2);
+    }
+
+#ifdef DEBUG
+    assert(cell_count(s.Text() + begin_index) == GetHexMarginWidth() + 2);
+#endif
 
     // Format the hex bytes.
     if (marked_color)

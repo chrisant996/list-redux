@@ -241,7 +241,7 @@ public:
     StrW            GetCurrentFile() const;
 
 private:
-    unsigned        CalcMarginWidth() const;
+    unsigned        CalcMarginWidth();
     void            UpdateDisplay();
     void            MakeCommandLine(StrW& s, const WCHAR* msg=nullptr) const;
     void            InitHexWidth();
@@ -269,7 +269,9 @@ private:
     unsigned        m_terminal_height = 0;
     unsigned        m_content_height = 0;
     unsigned        m_content_width = 0;
-    unsigned        m_margin_width = 0;
+    unsigned        m_margin_width = 0;         // Combined margin (line number and offset).
+    unsigned        m_margin_width_line = 0;    // Line number margin.
+    unsigned        m_margin_width_offset = 0;  // Offset margin.
     scroll_car      m_vert_scroll_car;
     MouseHelper     m_mouse;
     int32           m_vert_scroll_column = 0;
@@ -409,36 +411,67 @@ static void PadToWidth(StrW& s, unsigned min_width)
         s.AppendSpaces(min_width - cells);
 }
 
-unsigned Viewer::CalcMarginWidth() const
+unsigned Viewer::CalcMarginWidth()
 {
+    StrW s;
     unsigned margin = 0;
-    if (!m_hex_mode)
+    bool overflow = false;
+
+#ifdef DEBUG
+    const unsigned c_min_margin_width = 5;
+#else
+    const unsigned c_min_margin_width = 8;
+#endif
+
+    m_margin_width_offset = 0;
+    m_margin_width_line = 0;
+
+    if (!overflow && g_options.show_line_numbers)
     {
-#ifdef DEBUG
-        const unsigned c_min_margin_width = 5;
-#else
-        const unsigned c_min_margin_width = 8;
-#endif
-
-        StrW s;
-        if (g_options.show_line_numbers)
+        unsigned line_number_width;
+        if (m_hex_mode)
         {
+            line_number_width = 6;
+        }
+        else
+        {
+            s.Clear();
             s.Printf(L"%lu", m_context.CountFriendlyLines());
-            margin = std::max<unsigned>(c_min_margin_width, s.Length() + 2);
+            line_number_width = s.Length();
         }
-        else if (g_options.show_file_offsets)
+        const unsigned hex_margin = m_hex_mode ? m_context.GetHexMarginWidth() : 0;
+        m_margin_width_line = std::max<unsigned>(c_min_margin_width, line_number_width + 2);
+        if (margin + hex_margin + m_margin_width_line > m_terminal_width / 2)
         {
-#ifdef DEBUG
-            s.Printf(L"%lx", m_context.Processed());
-#else
-            s.Printf(L"%lx", m_context.GetFileSize());
-#endif
-            margin = std::max<unsigned>(c_min_margin_width, s.Length() + 2);
+            overflow = true;
+            m_margin_width_line = 0;
         }
-
-        if (margin > m_terminal_width / 2)
-            margin = 0;
+        else
+        {
+            margin += m_margin_width_line;
+        }
     }
+
+    if (!overflow && !m_hex_mode && g_options.show_file_offsets)
+    {
+        s.Clear();
+#ifdef DEBUG
+        s.Printf(L"%lx", m_context.Processed());
+#else
+        s.Printf(L"%lx", m_context.GetFileSize());
+#endif
+        m_margin_width_offset = std::max<unsigned>(c_min_margin_width, s.Length() + 2);
+        if (margin + m_margin_width_offset > m_terminal_width / 2)
+        {
+            overflow = true;
+            m_margin_width_offset = 0;
+        }
+        else
+        {
+            margin += m_margin_width_offset;
+        }
+    }
+
     return margin;
 }
 
@@ -500,12 +533,28 @@ void Viewer::UpdateDisplay()
 LAutoFitContentWidth:
     assert(autofit_retries != 2); // Should be impossible to occur...
     m_margin_width = CalcMarginWidth();
-    m_content_width = m_terminal_width - m_margin_width - show_scrollbar;
+    m_content_width = m_terminal_width - (m_hex_mode ? 0 : m_margin_width) - show_scrollbar;
     {
         Error e;
         m_context.SetWrapWidth(m_wrap ? m_content_width : 0);
         working.ShowFeedback(m_context.Completed(), m_context.Count(), m_top + m_content_height, this, false/*bytes*/);
-        m_context.ProcessThrough(m_top + m_content_height, e);
+        if (!m_hex_mode)
+        {
+            m_context.ProcessThrough(m_top + m_content_height, e);
+        }
+        else if (g_options.show_line_numbers)
+        {
+            const FileOffset offset_end = min(m_hex_top + (m_hex_width * m_content_height), m_context.GetFileSize());
+            size_t index = m_top;
+            while (!m_context.Completed())
+            {
+                const FileOffset offset_line = m_context.GetOffset(index);
+                if (offset_line >= offset_end)
+                    break;
+                ++index;
+                m_context.ProcessThrough(index, e);
+            }
+        }
         const unsigned new_margin_width = CalcMarginWidth();
         if (new_margin_width != m_margin_width)
         {
@@ -809,7 +858,7 @@ LAutoFitContentWidth:
             {
                 StrW ruler;
                 ruler.AppendColor(GetColor(ColorElement::Header));
-                ruler.AppendSpaces(m_context.GetHexOffsetColumnWidth());
+                ruler.AppendSpaces(m_context.GetHexMarginWidth());
                 for (unsigned ii = 0; ii < m_hex_width; ++ii)
                 {
                     if (ii % (1 << g_options.hex_grouping) == 0)
@@ -902,22 +951,31 @@ LAutoFitContentWidth:
                     }
                     if (m_margin_width)
                     {
+#ifdef DEBUG
+                        const unsigned begin_index = s.Length();
+#endif
                         s.AppendColor(GetColor(ColorElement::LineNumber));
                         if (g_options.show_line_numbers)
                         {
                             const size_t prev_num = (m_top + row > 0) ? m_context.GetLineNunber(m_top + row - 1) : 0;
                             const size_t num = m_context.GetLineNunber(m_top + row);
                             if (num > prev_num)
-                                s.Printf(L"%*lu%s", m_margin_width - 2, m_context.GetLineNunber(m_top + row), c_div_char);
+                                s.Printf(L"%*lu%s", m_margin_width_line - 2, m_context.GetLineNunber(m_top + row), c_div_char);
                             else
-                                s.Printf(L"%*s%s", m_margin_width - 2, L"", c_div_char);
+                                s.Printf(L"%*s%s", m_margin_width_line - 2, L"", c_div_char);
                         }
-                        else if (g_options.show_file_offsets)
-                            s.Printf(L"%0*lx%s", m_margin_width - 2, m_context.GetOffset(m_top + row), c_div_char);
-                        else
-                            assert(!m_margin_width);
+                        if (g_options.show_file_offsets)
+                        {
+                            if (g_options.show_line_numbers)
+                                s.Append(L" ");
+                            s.Printf(L"%0*lx%s", m_margin_width_offset - 2, m_context.GetOffset(m_top + row), c_div_char);
+                        }
+                        assert(implies(!g_options.show_line_numbers && !g_options.show_file_offsets, !m_margin_width));
                         s.AppendNormalIf(true);
                         s.Append(L" ");
+#ifdef DEBUG
+                        assert(cell_count(s.Text() + begin_index) == m_margin_width);
+#endif
                     }
                     if (color)
                         s.AppendColor(color);
@@ -1093,7 +1151,7 @@ LAutoFitContentWidth:
             cursor_y += 1;                              // Hex ruler.
             cursor_y += unsigned(m_hex_pos - m_hex_top) / m_hex_width;
             cursor_x = 1;                               // One-based.
-            cursor_x += m_context.GetHexOffsetColumnWidth();
+            cursor_x += m_context.GetHexMarginWidth();
             cursor_x += 2;                              // Padding.
             if (m_hex_characters)
             {
@@ -1801,12 +1859,15 @@ hex_edit_right:
                     m_hex_mode = !m_hex_mode;
                     g_options.hex_mode = m_hex_mode;
                     InitHexWidth();
-                    if (m_hex_width)
+                    if (!m_found_line.Empty())
+                        Center(m_found_line);
+                    else if (m_hex_width)
+                        m_hex_top = m_context.GetOffset(m_top) & ~FileOffset(m_hex_width - 1);
+                    else
                     {
-                        if (m_found_line.Empty())
-                            m_hex_top = m_context.GetOffset(m_top) & ~FileOffset(m_hex_width - 1);
-                        else
-                            Center(m_found_line);
+                        FoundOffset rough;
+                        rough.MarkOffset(m_hex_top + (m_hex_width * m_content_height / 2));
+                        Center(rough);
                     }
                     m_force_update = true;
                 }
@@ -1835,21 +1896,17 @@ hex_edit_right:
                 if (!m_hex_mode)
                     m_found_line.MarkOffset(m_context.GetOffset(m_top + (std::min<size_t>(m_content_height, m_context.Count()) / 2)));
                 else if (!m_hex_edit)
-                    m_found_line.MarkOffset(std::min<FileOffset>(m_hex_top + (m_content_height / 2) * m_hex_width, m_context.GetFileSize() / 2));
+                    m_found_line.MarkOffset(std::min<FileOffset>(m_hex_top + (m_content_height / 2) * m_hex_width, m_context.GetFileSize()));
                 else
                     m_found_line.MarkOffset(m_hex_pos);
                 m_force_update = true;
             }
             break;
         case 'n':
-            if (input.modifier == Modifier::None)
+            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
             {
-                if (!m_hex_mode)
-                {
-                    g_options.show_line_numbers = !g_options.show_line_numbers;
-                    g_options.show_file_offsets = false;
-                    m_force_update = true;
-                }
+                g_options.show_line_numbers = !g_options.show_line_numbers;
+                m_force_update = true;
             }
             break;
         case 'o':
@@ -1858,7 +1915,6 @@ hex_edit_right:
                 if (!m_hex_mode && !m_text)
                 {
                     g_options.show_file_offsets = !g_options.show_file_offsets;
-                    g_options.show_line_numbers = false;
                     m_force_update = true;
                 }
             }
@@ -2010,7 +2066,7 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
         {
             const FileOffset y_ofs = m_hex_top + ((input.mouse_pos.Y - content_top) * m_hex_width);
 
-            const uint32 hex_left = m_context.GetHexOffsetColumnWidth() + 2;
+            const uint32 hex_left = m_context.GetHexMarginWidth() + 2;
             uint32 chars_left = hex_left;
             chars_left += m_hex_width * 2;
             chars_left += (1 << (3 - g_options.hex_grouping)) * (m_hex_width / 8);
