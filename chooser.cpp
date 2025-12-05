@@ -1817,7 +1817,7 @@ void Chooser::SearchAndTag(Error& e, bool caseless)
     s.Printf(L"\r\x1b[KSearch%s ", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 
-    auto searcher = ReadSearchInput(m_terminal_width, caseless, false, e);
+    auto searcher = ReadSearchInput(m_terminal_height - 1, m_terminal_width, caseless, false, e);
 
     OutputConsole(c_norm);
     m_dirty_footer = true;

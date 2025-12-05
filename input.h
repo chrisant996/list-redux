@@ -127,6 +127,33 @@ private:
     bool            m_allow_acceleration = false;
 };
 
+struct ClickableHotspot
+{
+    StrW            m_s;
+    DWORD           m_id;
+    COORD           m_coord;
+    unsigned short  m_width;
+
+                    ClickableHotspot(const WCHAR* s, DWORD id, SHORT x=0, SHORT y=0);
+                    ~ClickableHotspot() = default;
+    ClickableHotspot& operator=(const ClickableHotspot& other);
+    void            AppendOutput(StrW& out) const;
+};
+
+class ClickableHotspotManager
+{
+public:
+                    ClickableHotspotManager() = default;
+                    ~ClickableHotspotManager() = default;
+    void            Clear();
+    void            Add(ClickableHotspot&& hotspot);
+    DWORD           InterpretInput(const InputRecord& input) const;
+    void            AppendOutput(StrW& out) const;
+private:
+    std::vector<ClickableHotspot> m_hotspots;
+    std::vector<unsigned short> m_hotspot_widths;
+};
+
 InputRecord SelectInput(DWORD timeout=INFINITE, AutoMouseConsoleMode* mouse=nullptr);
 bool ReadInput(StrW& out, History history=History::MAX, DWORD max_length=32, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&)>> input_callback=std::nullopt);
 

@@ -386,8 +386,11 @@ update_needle:
                          input.mouse_pos.X >= m_content_left && input.mouse_pos.X < m_content_left + m_content_width)
                 {
                     const intptr_t index = m_top + input.mouse_pos.Y - m_content_top;
-                    m_index = index;
-                    on_navigate();
+                    if (index < m_count)
+                    {
+                        m_index = index;
+                        on_navigate();
+                    }
                 }
                 else if (input.key == Key::MouseDrag)
                 {
@@ -397,9 +400,15 @@ update_needle:
                         ++m_index;
                     on_navigate();
                 }
-                else
+                else if (input.mouse_pos.Y >= m_window_top && input.mouse_pos.Y < m_window_top + m_window_height &&
+                         input.mouse_pos.X >= m_window_left && input.mouse_pos.X < m_window_left + m_window_width)
                 {
                     m_can_drag = false;
+                }
+                else
+                {
+                    m_result.canceled = true;
+                    return true;
                 }
             }
             break;
@@ -409,7 +418,19 @@ update_needle:
             if (input.mouse_pos.Y >= m_content_top && input.mouse_pos.Y < m_content_top + m_content_height &&
                 input.mouse_pos.X >= m_content_left && input.mouse_pos.X < m_content_left + m_content_width)
             {
-                goto on_enter;
+                const intptr_t index = m_top + input.mouse_pos.Y - m_content_top;
+                if (index < m_count)
+                {
+                    m_index = index;
+                    on_navigate();
+                    goto on_enter;
+                }
+            }
+            else if (input.mouse_pos.Y < m_window_top || input.mouse_pos.Y >= m_window_top + m_window_height ||
+                     input.mouse_pos.X < m_window_left || input.mouse_pos.X >= m_window_left + m_window_width)
+            {
+                m_result.canceled = true;
+                return true;
             }
             break;
         default:

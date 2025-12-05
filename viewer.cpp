@@ -42,6 +42,14 @@ ViewerOptions g_options;
 
 constexpr unsigned c_horiz_scroll_amount = 10;
 
+enum
+{
+    ID_NONE,
+
+    ID_ENCODING,
+    ID_HEXEDIT,
+};
+
 uint32 GetMaxMaxLineLength()
 {
     return std::min<uint32>(c_data_buffer_slop, c_default_max_line_length);
@@ -213,7 +221,7 @@ class ScopedWorkingIndicator
 {
 public:
                     ScopedWorkingIndicator() = default;
-    void            ShowFeedback(bool completed, unsigned __int64 processed, unsigned __int64 target, const Viewer* viewer, bool bytes);
+    void            ShowFeedback(bool completed, unsigned __int64 processed, unsigned __int64 target, Viewer* viewer, bool bytes);
     bool            NeedsCleanup() const { return m_needs_cleanup; }
 private:
     bool            m_needs_cleanup = false;
@@ -242,7 +250,7 @@ public:
 private:
     unsigned        CalcMarginWidth();
     void            UpdateDisplay();
-    void            MakeCommandLine(StrW& s, const WCHAR* msg=nullptr) const;
+    void            MakeCommandLine(StrW& s, const WCHAR* msg=nullptr);
     void            InitHexWidth();
     unsigned        LinePercent(size_t line) const;
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
@@ -299,6 +307,8 @@ private:
 
     bool            m_can_drag = false;
     bool            m_can_scrollbar = false;
+    ClickableHotspotManager m_hotspots_header;
+    ClickableHotspotManager m_hotspots_footer;
 
     intptr_t        m_last_index = -1;
     size_t          m_last_top = 0;
@@ -323,7 +333,7 @@ private:
     FoundOffset     m_found_line;
 };
 
-void ScopedWorkingIndicator::ShowFeedback(bool completed, unsigned __int64 processed, unsigned __int64 target, const Viewer* viewer, bool bytes)
+void ScopedWorkingIndicator::ShowFeedback(bool completed, unsigned __int64 processed, unsigned __int64 target, Viewer* viewer, bool bytes)
 {
     const size_t c_threshold = bytes ? 160000 : 5000; // Based on an average of 32 bytes per line.
     if (!m_needs_cleanup && viewer && !completed && processed + c_threshold < target)
@@ -1086,7 +1096,7 @@ LAutoFitContentWidth:
     m_feedback.Clear();
 }
 
-void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
+void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg)
 {
     static const WCHAR* const c_ctrl_indicator[] =
     {
@@ -1106,15 +1116,70 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
 
-    const unsigned offset = s.Length();
+    uint32 msg_width = cell_count(msg);
+
+    StrW tmp;
     StrW right;
-    if (m_multifile_search)
-        right.Append(L"    MultiFile");
-    right.Printf(L"    %-6s", m_context.GetEncodingName(m_hex_mode));
+    unsigned short right_width = 0;
+    std::vector<ClickableHotspot> hotspots;
+
+    auto shift_by = [&](short x_delta)
+    {
+        for (size_t i = 0; i < hotspots.size(); ++i)
+            hotspots[i].m_coord.X += x_delta;
+    };
+
+    auto prepend = [&](const WCHAR* s, unsigned short width, unsigned short left_padding)
+    {
+        tmp = std::move(right);
+        assert(right.Empty());
+        right.AppendSpaces(left_padding);
+        right.Append(s);
+        right.Append(tmp);
+        shift_by(left_padding + width);
+        right_width += left_padding + width;
+    };
+
+    auto add_end = [&](const WCHAR* s, DWORD id, unsigned short left_padding) -> bool
+    {
+        ClickableHotspot hotspot(s, id);
+        if (msg_width + 3 + left_padding + hotspot.m_width + right_width > m_terminal_width)
+            return false;
+        right.AppendSpaces(left_padding);
+        right.Append(s);
+        if (id != ID_NONE)
+        {
+            hotspot.m_coord.X = right_width + left_padding;
+            hotspot.m_coord.Y = m_terminal_height - 1;
+            hotspots.emplace_back(std::move(hotspot));
+        }
+        right_width += left_padding + hotspot.m_width;
+        return true;
+    };
+
+    auto add_begin = [&](const WCHAR* s, DWORD id, unsigned short left_padding) -> bool
+    {
+        ClickableHotspot hotspot(s, id);
+        if (msg_width + 3 + left_padding + hotspot.m_width + right_width > m_terminal_width)
+            return false;
+        prepend(s, hotspot.m_width, left_padding);
+        if (id != ID_NONE)
+        {
+            hotspot.m_coord.X = left_padding;
+            hotspot.m_coord.Y = m_terminal_height - 1;
+            hotspots.insert(hotspots.begin(), std::move(hotspot));
+            assert(hotspots.front().m_s.Equal(s));
+        }
+        return true;
+    };
+
+    assert(right.Empty());
+    assert(!right_width);
     if (m_hex_mode)
     {
-        right.AppendSpaces(4);
-        AppendKeyName(right, L"Alt-E", ColorElement::Command, m_hex_edit ? L"EDITING " : L"EditMode");
+        tmp.Clear();
+        AppendKeyName(tmp, L"Alt-E", ColorElement::Command, m_hex_edit ? L"EDITING " : L"EditMode");
+        add_end(tmp.Text(), ID_HEXEDIT, 4);
     }
     else
     {
@@ -1136,11 +1201,15 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
 #ifdef DEBUG
         right.Append(g_options.show_debug_info ? L"D" : L"d");
 #endif
+        right_width = cell_count(right.Text());
     }
-    uint32 right_width = cell_count(right.Text());
 
-    StrW tmp;
-    uint32 msg_width = cell_count(msg);
+    if (add_begin(m_context.GetEncodingName(m_hex_mode), ID_ENCODING, 4))
+    {
+        if (m_multifile_search)
+            add_begin(L"MultiFile", ID_NONE, 4);
+    }
+
     if (msg_width >= m_terminal_width)
     {
         bool truncated = false;
@@ -1149,10 +1218,17 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg) const
             msg = tmp.Text();
     }
 
+    m_hotspots_footer.Clear();
     if (msg_width + 3 + right_width > m_terminal_width)
     {
         right.Clear();
         right_width = 0;
+    }
+    else
+    {
+        shift_by(m_terminal_width - right_width);
+        for (auto& hotspot : hotspots)
+            m_hotspots_footer.Add(std::move(hotspot));
     }
 
     s.Append(msg);
@@ -1934,7 +2010,10 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
 {
     const uint32 content_top = 1 + !!m_hex_mode;
 
-    // Clink in scrollbar.
+    // FUTURE:  Could hover effects be feasible/useful?  (To show clickable
+    // spots and tooltips?)
+
+    // Click in scrollbar.
     if (m_can_scrollbar)
     {
         if (m_can_scrollbar)
@@ -2019,13 +2098,31 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
         }
     }
 
-    // TODO:  Click on file path in header?
-    // TODO:  Click on line number (or offset) in header?
-    // TODO:  Click on Command in footer?
-    // TODO:  Click on encoding in footer?
-    // TODO:  Click on options in footer?
+    // Click in header.
+    if (input.mouse_pos.Y == 0)
+    {
+        switch (m_hotspots_header.InterpretInput(input))
+        {
+        case 0:
+            break;
+        }
+        return;
+    }
 
-    // TODO:  Could hover effects be feasible/useful?  (To show clickable spots and tooltips?)
+    // Click in footer.
+    if (input.mouse_pos.Y == m_terminal_height - 1)
+    {
+        switch (m_hotspots_footer.InterpretInput(input))
+        {
+        case ID_ENCODING:
+            ChooseEncoding();
+            break;
+        case ID_HEXEDIT:
+            ToggleHexEditMode(e);
+            break;
+        }
+        return;
+    }
 }
 
 void Viewer::EnsureAltFiles()
@@ -2175,14 +2272,8 @@ size_t Viewer::CountForDisplay() const
 
 void Viewer::DoSearch(bool next, bool caseless)
 {
-    StrW s;
-    StrW tmp;
-    tmp.Printf(L"Search%s ", c_prompt_char);
-    MakeCommandLine(s, tmp.Text());
-    OutputConsole(s.Text(), s.Length());
-
     Error e;
-    auto searcher = ReadSearchInput(m_terminal_width, caseless, false, e);
+    auto searcher = ReadSearchInput(m_terminal_height - 1, m_terminal_width, caseless, false, e);
 
     OutputConsole(c_norm);
     m_force_update = true;

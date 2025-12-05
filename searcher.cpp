@@ -183,10 +183,13 @@ void TrimLineEnding(StrW& s)
     }
 }
 
-std::unique_ptr<Searcher> ReadSearchInput(unsigned terminal_width, bool caseless, bool regex, Error& e)
+std::unique_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, bool regex, Error& e)
 {
     StrW s;
+    ClickableHotspotManager mgr;
     bool done = false;
+
+    enum { ID_NONE, ID_IGNORECASE, ID_REGEXP };
 
     auto callback = [&](const InputRecord& input)
     {
@@ -197,6 +200,7 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned terminal_width, bool caseless
             {
             case 'X'-'@':
                 // 'Ctrl-X' toggles regex mode.
+toggle_regex:
                 regex = !regex;
                 done = false;
                 return -1;
@@ -208,9 +212,19 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned terminal_width, bool caseless
             case Key::TAB:
                 // 'Ctrl-I' toggles ignore case.
                 if (input.modifier == Modifier::CTRL)
+                {
+toggle_caseless:
                     caseless = !caseless;
+                }
                 done = false;
                 return -1;
+            }
+            break;
+        case InputType::Mouse:
+            switch (mgr.InterpretInput(input))
+            {
+            case ID_IGNORECASE:     goto toggle_caseless;
+            case ID_REGEXP:         goto toggle_regex;
             }
             break;
         }
@@ -220,14 +234,36 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned terminal_width, bool caseless
     StrW right;
     while (!done)
     {
+        unsigned short right_width = 0;
+        std::vector<ClickableHotspot> hotspots;
         right.Clear();
-        AppendKeyName(right, L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ");
+        {
+            s.Clear();
+            AppendKeyName(s, L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ");
+            ClickableHotspot h(s.Text(), ID_IGNORECASE, right_width, row);
+            right.Append(s.Text());
+            right_width += h.m_width;
+            hotspots.emplace_back(std::move(h));
+        }
         right.AppendSpaces(3);
-        AppendKeyName(right, L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal");
+        right_width += 3;
+        {
+            s.Clear();
+            AppendKeyName(s, L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal");
+            ClickableHotspot h(s.Text(), ID_REGEXP, right_width, row);
+            right.Append(s.Text());
+            right_width += h.m_width;
+            hotspots.emplace_back(std::move(h));
+        }
+        for (auto& h : hotspots)
+        {
+            h.m_coord.X += (terminal_width - right_width);
+            mgr.Add(std::move(h));
+        }
 
         s.Clear();
         s.AppendColor(GetColor(ColorElement::Command));
-        s.Printf(L"\r\x1b[K\x1b[%uG%s\rSearch%s ", terminal_width + 1 - cell_count(right.Text()), right.Text(), c_prompt_char);
+        s.Printf(L"\r\x1b[K\x1b[%uG%s\rSearch%s ", terminal_width + 1 - right_width, right.Text(), c_prompt_char);
         OutputConsole(s.Text(), s.Length());
 
         done = true;

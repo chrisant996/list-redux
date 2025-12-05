@@ -1436,6 +1436,69 @@ bool ParseULongLong(const WCHAR* s, ULONGLONG& out, int radix)
     return wcstonum(s, radix, out);
 }
 
+ClickableHotspot::ClickableHotspot(const WCHAR* s, DWORD id, SHORT x, SHORT y)
+: m_s(s)
+, m_id(id)
+{
+    m_coord.X = x;
+    m_coord.Y = y;
+    m_width = cell_count(s);
+}
+
+ClickableHotspot& ClickableHotspot::operator=(const ClickableHotspot& other)
+{
+    m_s.Set(other.m_s);
+    m_id = other.m_id;
+    m_coord = other.m_coord;
+    m_width = other.m_width;
+    return *this;
+}
+
+void ClickableHotspot::AppendOutput(StrW& out) const
+{
+    out.Printf(L"\x1b[%u;%uH%s%s", m_coord.Y + 1, m_coord.X + 1, m_s.Text(), c_norm);
+}
+
+void ClickableHotspotManager::Clear()
+{
+    m_hotspots.clear();
+    m_hotspot_widths.clear();
+}
+
+void ClickableHotspotManager::Add(ClickableHotspot&& hotspot)
+{
+    m_hotspot_widths.emplace_back(cell_count(hotspot.m_s.Text()));
+    m_hotspots.emplace_back(std::move(hotspot));
+}
+
+DWORD ClickableHotspotManager::InterpretInput(const InputRecord& input) const
+{
+    if (input.type != InputType::Mouse)
+        return 0;
+// FUTURE:  Showing visual click feedback requires a new Key::MouseLeftRelease.
+    if (input.key != Key::MouseLeftClick && input.key != Key::MouseLeftDblClick)
+        return 0;
+
+    for (size_t i = 0; i < m_hotspots.size(); ++i)
+    {
+        const auto& hotspot = m_hotspots[i];
+        if (input.mouse_pos.Y == hotspot.m_coord.Y &&
+            input.mouse_pos.X >= hotspot.m_coord.X &&
+            input.mouse_pos.X < hotspot.m_coord.X + m_hotspot_widths[i])
+        {
+            return hotspot.m_id;
+        }
+    }
+
+    return 0;
+}
+
+void ClickableHotspotManager::AppendOutput(StrW& out) const
+{
+    for (const auto& hotspot : m_hotspots)
+        hotspot.AppendOutput(out);
+}
+
 int32 MouseHelper::LinesFromRecord(const InputRecord& input)
 {
     assert(input.type == InputType::Mouse);
