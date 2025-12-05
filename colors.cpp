@@ -55,13 +55,15 @@ static const WCHAR* c_default_colors[] =
     L"7",               // SweepDivider
     L"96",              // SweepFile
     L"90",              // FloatingScrollBar
-    L"90",              // PopupBorder
-    L"38;5;247",        // PopupScrollCar
-    L"93;1",            // PopupHeader
-    L"38;5;247",        // PopupFooter
-    L"",                // PopupContent
-    L"38;5;242",        // PopupContentDim
-    L"7",               // PopupSelect
+    L"90",              // ScrollBar
+    L"37",              // ScrollBarCar
+    L"47;90",           // PopupBorder
+    L"47;30",           // PopupScrollCar
+    L"47;30",           // PopupHeader
+    L"47;30",           // PopupFooter
+    L"47;30",           // PopupContent
+    L"47;90",           // PopupContentDim
+    L"40;37",           // PopupSelect
     L"97;45",           // EditedByte
     L"97;42",           // SavedByte
     L"47;30",           // KeyName
@@ -825,6 +827,8 @@ static const WCHAR* const c_reg_color_name[] =
     L"SweepDivider",
     L"SweepFile",
     L"FloatingScrollBar",
+    L"ScrollBar",
+    L"ScrollBarCar",
     L"PopupBorder",
     L"PopupScrollCar",
     L"PopupHeader",

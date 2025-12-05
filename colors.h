@@ -47,6 +47,8 @@ enum class ColorElement
     SweepDivider,
     SweepFile,
     FloatingScrollBar,
+    ScrollBar,
+    ScrollBarCar,
     PopupBorder,
     PopupScrollCar,
     PopupHeader,

@@ -342,10 +342,10 @@ void Chooser::UpdateDisplay()
                             else
                             {
                                 if (car)
-                                    s2.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
+                                    s2.AppendColor(ConvertColorParams(ColorElement::ScrollBarCar, ColorConversion::TextOnly));
                                 else
                                     car = L" ";
-                                s2.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                                s2.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
                             }
                             s2.Append(car);                     // ┃ or etc
                             s2.Append(c_norm);

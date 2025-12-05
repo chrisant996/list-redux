@@ -855,8 +855,8 @@ LAutoFitContentWidth:
                         else
                         {
                             if (car)
-                                s.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
-                            s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                                s.AppendColor(ConvertColorParams(ColorElement::ScrollBarCar, ColorConversion::TextOnly));
+                            s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
                         }
                         s.Append(car ? car : L" ");
                         s.Append(c_norm);
@@ -931,8 +931,8 @@ LAutoFitContentWidth:
                         else
                         {
                             if (car)
-                                s.AppendColor(ConvertColorParams(ColorElement::PopupScrollCar, ColorConversion::TextOnly));
-                            s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextAsBack));
+                                s.AppendColor(ConvertColorParams(ColorElement::ScrollBarCar, ColorConversion::TextOnly));
+                            s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
                         }
                     }
                     else
