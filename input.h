@@ -127,31 +127,41 @@ private:
     bool            m_allow_acceleration = false;
 };
 
-struct ClickableHotspot
+class ClickableRow
 {
-    StrW            m_s;
-    DWORD           m_id;
-    COORD           m_coord;
-    unsigned short  m_width;
+    struct Element
+    {
+        StrW        m_text;
+        uint16      m_width;
+        int16       m_id;
+        int16       m_priority;
+        int16       m_left;
+    };
 
-                    ClickableHotspot(const WCHAR* s, DWORD id, SHORT x=0, SHORT y=0);
-                    ~ClickableHotspot() = default;
-    ClickableHotspot& operator=(const ClickableHotspot& other);
-    void            AppendOutput(StrW& out) const;
-};
-
-class ClickableHotspotManager
-{
 public:
-                    ClickableHotspotManager() = default;
-                    ~ClickableHotspotManager() = default;
-    void            Clear();
-    void            Add(ClickableHotspot&& hotspot);
-    DWORD           InterpretInput(const InputRecord& input) const;
-    void            AppendOutput(StrW& out) const;
+                    ClickableRow() = default;
+                    ~ClickableRow() = default;
+
+    void            Init(uint16 row, uint16 terminal_width);
+    void            Add(const WCHAR* text, int16 id, int16 priority, bool right_align);
+    uint16          GetLeftWidth();
+    uint16          GetRightWidth();
+    void            BuildOutput(StrW& out, const WCHAR* color=nullptr);
+    int16           InterpretInput(const InputRecord& input) const;
+
 private:
-    std::vector<ClickableHotspot> m_hotspots;
-    std::vector<unsigned short> m_hotspot_widths;
+    void            EnsureLayout();
+    uint16          AppendOutput(StrW& out, const Element& elm, const WCHAR* color);
+
+private:
+    uint16          m_row = 0;
+    uint16          m_terminal_width = 0;
+    int16           m_threshold = 0x7fff;
+    uint16          m_left_width = 0;
+    uint16          m_right_width = 0;
+    std::vector<Element> m_left_elements;
+    std::vector<Element> m_right_elements;
+    bool            m_need_layout = false;
 };
 
 InputRecord SelectInput(DWORD timeout=INFINITE, AutoMouseConsoleMode* mouse=nullptr);

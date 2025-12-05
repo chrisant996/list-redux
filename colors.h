@@ -67,4 +67,5 @@ const WCHAR* GetColor(ColorElement element);
 StrW MakeColor(ColorElement element);
 
 extern const WCHAR c_norm[];
+extern const WCHAR c_clreol[];
 

@@ -22,6 +22,7 @@
 #include <strsafe.h>
 
 extern const WCHAR c_norm[] = L"\x1b[m";
+extern const WCHAR c_clreol[] = L"\x1b[K";
 
 static double s_min_luminance = 0.4;
 static double s_hidden_opacity = 0.0;

@@ -186,10 +186,10 @@ void TrimLineEnding(StrW& s)
 std::unique_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, bool regex, Error& e)
 {
     StrW s;
-    ClickableHotspotManager mgr;
+    ClickableRow cr;
     bool done = false;
 
-    enum { ID_NONE, ID_IGNORECASE, ID_REGEXP };
+    enum { ID_IGNORECASE, ID_REGEXP };
 
     auto callback = [&](const InputRecord& input)
     {
@@ -221,7 +221,7 @@ toggle_caseless:
             }
             break;
         case InputType::Mouse:
-            switch (mgr.InterpretInput(input))
+            switch (cr.InterpretInput(input))
             {
             case ID_IGNORECASE:     goto toggle_caseless;
             case ID_REGEXP:         goto toggle_regex;
@@ -234,40 +234,25 @@ toggle_caseless:
     StrW right;
     while (!done)
     {
-        unsigned short right_width = 0;
-        std::vector<ClickableHotspot> hotspots;
-        right.Clear();
-        {
-            s.Clear();
-            AppendKeyName(s, L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ");
-            ClickableHotspot h(s.Text(), ID_IGNORECASE, right_width, row);
-            right.Append(s.Text());
-            right_width += h.m_width;
-            hotspots.emplace_back(std::move(h));
-        }
-        right.AppendSpaces(3);
-        right_width += 3;
-        {
-            s.Clear();
-            AppendKeyName(s, L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal");
-            ClickableHotspot h(s.Text(), ID_REGEXP, right_width, row);
-            right.Append(s.Text());
-            right_width += h.m_width;
-            hotspots.emplace_back(std::move(h));
-        }
-        for (auto& h : hotspots)
-        {
-            h.m_coord.X += (terminal_width - right_width);
-            mgr.Add(std::move(h));
-        }
+        cr.Init(row, terminal_width);
 
         s.Clear();
-        s.AppendColor(GetColor(ColorElement::Command));
-        s.Printf(L"\r\x1b[K\x1b[%uG%s\rSearch%s ", terminal_width + 1 - right_width, right.Text(), c_prompt_char);
+        AppendKeyName(s, L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ");
+        cr.Add(s.Text(), ID_IGNORECASE, 0, true);
+
+        cr.Add(nullptr, 3, 0, true);
+
+        s.Clear();
+        AppendKeyName(s, L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal");
+        cr.Add(s.Text(), ID_REGEXP, 0, true);
+
+        s.Set(L"\r");
+        cr.BuildOutput(s, GetColor(ColorElement::Command));
+        s.Printf(L"\rSearch%s ", c_prompt_char);
         OutputConsole(s.Text(), s.Length());
 
         done = true;
-        ReadInput(s, History::Search, 1024, 32, callback);
+        ReadInput(s, History::Search, 1024, terminal_width - 12 - cr.GetRightWidth(), callback);
 
         OutputConsole(c_norm);
     }

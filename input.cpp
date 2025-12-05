@@ -8,6 +8,9 @@
 #include "colors.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
+#include "ellipsify.h"
+
+#include <set>
 
 static HANDLE s_interrupt = NULL;
 static bool s_sending_terminal_request = false;
@@ -726,8 +729,8 @@ public:
                     ReadInputState();
                     ~ReadInputState();
 
-    void            SetMaxWidth(DWORD m) { m_max_width = static_cast<unsigned short>(min<DWORD>(m, 0x7fff)); }
-    void            SetMaxLength(DWORD m) { m_max_length = static_cast<unsigned short>(min<DWORD>(m, 0x7fff)); }
+    void            SetMaxWidth(DWORD m) { m_max_width = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
+    void            SetMaxLength(DWORD m) { m_max_length = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
 
     void            EnsureLeft();
     void            PrintVisible(unsigned short x);
@@ -1174,7 +1177,6 @@ void ReadInputState::EndUndoGroup()
     {
         m_undo_tail->m_s.Set(m_s);
         m_undo_tail->m_sel_after = m_sel;
-DumpUndoStack();
     }
 }
 
@@ -1436,67 +1438,217 @@ bool ParseULongLong(const WCHAR* s, ULONGLONG& out, int radix)
     return wcstonum(s, radix, out);
 }
 
-ClickableHotspot::ClickableHotspot(const WCHAR* s, DWORD id, SHORT x, SHORT y)
-: m_s(s)
-, m_id(id)
+void ClickableRow::Init(uint16 row, uint16 terminal_width)
 {
-    m_coord.X = x;
-    m_coord.Y = y;
-    m_width = cell_count(s);
+    m_row = row;
+    m_terminal_width = terminal_width;
+    m_threshold = INT16_MAX;
+    m_left_width = 0;
+    m_right_width = 0;
+    m_left_elements.clear();
+    m_right_elements.clear();
+    m_need_layout = true;
 }
 
-ClickableHotspot& ClickableHotspot::operator=(const ClickableHotspot& other)
+void ClickableRow::Add(const WCHAR* text, int16 id, int16 priority, bool right_align)
 {
-    m_s.Set(other.m_s);
-    m_id = other.m_id;
-    m_coord = other.m_coord;
-    m_width = other.m_width;
-    return *this;
-}
+    Element elm;
+    std::vector<Element>& vec = right_align ? m_right_elements : m_left_elements;
 
-void ClickableHotspot::AppendOutput(StrW& out) const
-{
-    out.Printf(L"\x1b[%u;%uH%s%s", m_coord.Y + 1, m_coord.X + 1, m_s.Text(), c_norm);
-}
-
-void ClickableHotspotManager::Clear()
-{
-    m_hotspots.clear();
-    m_hotspot_widths.clear();
-}
-
-void ClickableHotspotManager::Add(ClickableHotspot&& hotspot)
-{
-    m_hotspot_widths.emplace_back(cell_count(hotspot.m_s.Text()));
-    m_hotspots.emplace_back(std::move(hotspot));
-}
-
-DWORD ClickableHotspotManager::InterpretInput(const InputRecord& input) const
-{
-    if (input.type != InputType::Mouse)
-        return 0;
-// FUTURE:  Showing visual click feedback requires a new Key::MouseLeftRelease.
-    if (input.key != Key::MouseLeftClick && input.key != Key::MouseLeftDblClick)
-        return 0;
-
-    for (size_t i = 0; i < m_hotspots.size(); ++i)
+    if (text)
     {
-        const auto& hotspot = m_hotspots[i];
-        if (input.mouse_pos.Y == hotspot.m_coord.Y &&
-            input.mouse_pos.X >= hotspot.m_coord.X &&
-            input.mouse_pos.X < hotspot.m_coord.X + m_hotspot_widths[i])
+        elm.m_text.Set(text);
+        elm.m_width = cell_count(text);
+        elm.m_id = id;
+    }
+    else
+    {
+        elm.m_width = id;
+        elm.m_id = -1;
+    }
+    elm.m_priority = priority;
+    elm.m_left = 0;
+
+    vec.emplace_back(std::move(elm));
+
+    m_need_layout = true;
+}
+
+uint16 ClickableRow::GetLeftWidth()
+{
+    EnsureLayout();
+    return m_left_width;
+}
+
+uint16 ClickableRow::GetRightWidth()
+{
+    EnsureLayout();
+    return m_right_width;
+}
+
+void ClickableRow::BuildOutput(StrW& out, const WCHAR* color)
+{
+    EnsureLayout();
+
+    if (color)
+        out.AppendColor(color);
+
+    uint16 width = 0;
+    uint16 orig_length = out.Length();
+
+    for (const auto& elm : m_left_elements)
+        width += AppendOutput(out, elm, color);
+
+    if (width > m_terminal_width)
+    {
+        StrW tmp;
+        width = ellipsify_ex(out.Text() + orig_length, m_terminal_width - 1, ellipsify_mode::LEFT, tmp, L"", false, nullptr);
+        if (width < m_terminal_width)
+            tmp.Append(c_clreol);
+        out.SetLength(orig_length);
+        out.Append(tmp);
+    }
+    else
+    {
+        const uint16 right_width = GetRightWidth();
+        if (right_width)
+            out.AppendSpaces(m_terminal_width - width - right_width);
+        else if (width < m_terminal_width)
+            out.Append(c_clreol);
+    }
+
+    for (const auto& elm : m_right_elements)
+        AppendOutput(out, elm, color);
+}
+
+void ClickableRow::EnsureLayout()
+{
+    if (!m_need_layout)
+        return;
+
+    // Calculate total needed width.
+    uint16 total_width = 0;
+    for (const auto& elm : m_left_elements)
+        total_width += elm.m_width;
+    for (const auto& elm : m_right_elements)
+        total_width += elm.m_width;
+
+    // Drop elements in priority order until something fits.
+    m_threshold = INT16_MIN;
+    if (total_width > m_terminal_width)
+    {
+        // Collect priority groups.
+        std::set<int16> priorities;
+        for (const auto& elm : m_left_elements)
+            priorities.emplace(elm.m_priority);
+        for (const auto& elm : m_right_elements)
+            priorities.emplace(elm.m_priority);
+
+        // Iterate over the priority groups.
+        for (auto iter = priorities.begin(); iter != priorities.end(); ++iter)
         {
-            return hotspot.m_id;
+            // Keep the highest priority group (it will be truncated).
+            auto next = iter;
+            ++next;
+            if (next == priorities.end())
+                break;
+
+            // Calculate width of the priority group.
+            uint16 priority_width = 0;
+            for (const auto& elm : m_left_elements)
+            {
+                if (elm.m_priority == (*iter))
+                    priority_width += elm.m_width;
+            }
+            for (const auto& elm : m_right_elements)
+            {
+                if (elm.m_priority == (*iter))
+                    priority_width += elm.m_width;
+            }
+
+            // Drop the priority group.
+            total_width -= priority_width;
+            m_threshold = (*iter) + 1;
+            if (total_width <= m_terminal_width)
+                break;
         }
     }
 
-    return 0;
+    // Layout.
+    m_left_width = 0;
+    for (auto& elm : m_left_elements)
+    {
+        if (elm.m_priority >= m_threshold)
+        {
+            elm.m_left = m_left_width;
+            m_left_width += elm.m_width;
+        }
+    }
+    uint16 x = m_terminal_width;
+    for (size_t i = m_right_elements.size(); i--;)
+    {
+        auto& elm = m_right_elements[i];
+        if (elm.m_priority >= m_threshold)
+        {
+            x -= elm.m_width;
+            elm.m_left = x;
+            m_right_width += elm.m_width;
+        }
+    }
+    m_right_width = m_terminal_width - x;
+    if (m_left_width > m_terminal_width)
+    {
+        m_left_width = m_terminal_width;
+        assert(!m_right_width);
+    }
+    assert(m_left_width + m_right_width <= m_terminal_width);
+
+    m_need_layout = false;
 }
 
-void ClickableHotspotManager::AppendOutput(StrW& out) const
+uint16 ClickableRow::AppendOutput(StrW& out, const Element& elm, const WCHAR* color)
 {
-    for (const auto& hotspot : m_hotspots)
-        hotspot.AppendOutput(out);
+    if (elm.m_priority < m_threshold)
+        return 0;
+
+    if (elm.m_text.Empty())
+    {
+        out.AppendSpaces(elm.m_width);
+    }
+    else
+    {
+        out.Append(elm.m_text);
+        if (color && wcschr(elm.m_text.Text(), '\x1b'))
+            out.AppendColor(color);
+    }
+    return elm.m_width;
+}
+
+int16 ClickableRow::InterpretInput(const InputRecord& input) const
+{
+    if (input.type != InputType::Mouse)
+        return -1;
+// FUTURE:  Showing visual click feedback requires a new Key::MouseLeftRelease.
+    if (input.key != Key::MouseLeftClick && input.key != Key::MouseLeftDblClick)
+        return -1;
+    if (input.mouse_pos.Y != m_row)
+        return -1;
+
+    for (uint16 pass = 0; pass < 2; ++pass)
+    {
+        const std::vector<Element>& vec = !pass ? m_left_elements : m_right_elements;
+        for (const auto& elm : vec)
+        {
+            if (elm.m_id >= 0 &&
+                input.mouse_pos.X >= elm.m_left &&
+                input.mouse_pos.X < elm.m_left + elm.m_width)
+            {
+                return elm.m_id;
+            }
+        }
+    }
+
+    return -1;
 }
 
 int32 MouseHelper::LinesFromRecord(const InputRecord& input)

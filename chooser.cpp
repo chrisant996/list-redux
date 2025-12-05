@@ -24,8 +24,6 @@
 constexpr bool c_floating = true;
 constexpr scroll_bar_style c_sbstyle = scroll_bar_style::half_line_chars;
 
-static const WCHAR c_clreol[] = L"\x1b[K";
-
 static const WCHAR c_no_files_tagged[] = L"*** No Files Tagged ***";
 static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
 static const WCHAR c_canceled[] = L"*** Canceled ***";

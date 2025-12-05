@@ -24,7 +24,6 @@
 constexpr bool c_floating = false;
 constexpr scroll_bar_style c_sbstyle = scroll_bar_style::eighths_block_chars;
 
-static const WCHAR c_clreol[] = L"\x1b[K";
 static const WCHAR c_no_file_open[] = L"*** No File Open ***";
 static const WCHAR c_endoffile_marker[] = L"*** End Of File ***";
 static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
@@ -44,10 +43,17 @@ constexpr unsigned c_horiz_scroll_amount = 10;
 
 enum
 {
-    ID_NONE,
-
     ID_ENCODING,
     ID_HEXEDIT,
+    ID_OPTION_LINEENDINGS,
+    ID_OPTION_LINENUMBERS,
+    ID_OPTION_FILEOFFSETS,
+    ID_OPTION_SHOWWHITESPACE,
+    ID_OPTION_WRAP,
+    ID_OPTION_EXPANDTABS,
+    ID_OPTION_CTRLMODE,
+    ID_OPTION_SHOWRULER,
+    ID_OPTION_SHOWDEBUGINFO,
 };
 
 uint32 GetMaxMaxLineLength()
@@ -270,6 +276,15 @@ private:
     void            OpenNewFile(Error& e);
     ViewerOutcome   CloseCurrentFile();
     bool            ToggleHexEditMode(Error& e);
+    void            ToggleLineEndings();
+    void            ToggleLineNumbers();
+    void            ToggleFileOffsets();
+    void            ToggleShowWhitespace();
+    void            ToggleWrap();
+    void            ToggleExpandTabs();
+    void            ToggleCtrlMode();
+    void            ToggleShowRuler();
+    void            ToggleShowDebugInfo();
 
 private:
     unsigned        m_terminal_width = 0;
@@ -307,8 +322,8 @@ private:
 
     bool            m_can_drag = false;
     bool            m_can_scrollbar = false;
-    ClickableHotspotManager m_hotspots_header;
-    ClickableHotspotManager m_hotspots_footer;
+    ClickableRow    m_clickable_header;
+    ClickableRow    m_clickable_footer;
 
     intptr_t        m_last_index = -1;
     size_t          m_last_top = 0;
@@ -1113,128 +1128,50 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg)
 #endif
     };
 
-    s.Printf(L"\x1b[%uH", m_terminal_height);
-    s.AppendColor(GetColor(ColorElement::Command));
-
+    StrW tmp;
     uint32 msg_width = cell_count(msg);
 
-    StrW tmp;
-    StrW right;
-    unsigned short right_width = 0;
-    std::vector<ClickableHotspot> hotspots;
+    m_clickable_footer.Init(m_terminal_height - 1, m_terminal_width);
 
-    auto shift_by = [&](short x_delta)
-    {
-        for (size_t i = 0; i < hotspots.size(); ++i)
-            hotspots[i].m_coord.X += x_delta;
-    };
+    m_clickable_footer.Add(msg, -1, 100, false);
 
-    auto prepend = [&](const WCHAR* s, unsigned short width, unsigned short left_padding)
-    {
-        tmp = std::move(right);
-        assert(right.Empty());
-        right.AppendSpaces(left_padding);
-        right.Append(s);
-        right.Append(tmp);
-        shift_by(left_padding + width);
-        right_width += left_padding + width;
-    };
+    if (m_multifile_search)
+        m_clickable_footer.Add(L"    MultiFile", -1, 10, true);
 
-    auto add_end = [&](const WCHAR* s, DWORD id, unsigned short left_padding) -> bool
-    {
-        ClickableHotspot hotspot(s, id);
-        if (msg_width + 3 + left_padding + hotspot.m_width + right_width > m_terminal_width)
-            return false;
-        right.AppendSpaces(left_padding);
-        right.Append(s);
-        if (id != ID_NONE)
-        {
-            hotspot.m_coord.X = right_width + left_padding;
-            hotspot.m_coord.Y = m_terminal_height - 1;
-            hotspots.emplace_back(std::move(hotspot));
-        }
-        right_width += left_padding + hotspot.m_width;
-        return true;
-    };
+    m_clickable_footer.Add(nullptr, 4, 15, true);
+    m_clickable_footer.Add(m_context.GetEncodingName(m_hex_mode), ID_ENCODING, 15, true);
 
-    auto add_begin = [&](const WCHAR* s, DWORD id, unsigned short left_padding) -> bool
-    {
-        ClickableHotspot hotspot(s, id);
-        if (msg_width + 3 + left_padding + hotspot.m_width + right_width > m_terminal_width)
-            return false;
-        prepend(s, hotspot.m_width, left_padding);
-        if (id != ID_NONE)
-        {
-            hotspot.m_coord.X = left_padding;
-            hotspot.m_coord.Y = m_terminal_height - 1;
-            hotspots.insert(hotspots.begin(), std::move(hotspot));
-            assert(hotspots.front().m_s.Equal(s));
-        }
-        return true;
-    };
-
-    assert(right.Empty());
-    assert(!right_width);
     if (m_hex_mode)
     {
         tmp.Clear();
         AppendKeyName(tmp, L"Alt-E", ColorElement::Command, m_hex_edit ? L"EDITING " : L"EditMode");
-        add_end(tmp.Text(), ID_HEXEDIT, 4);
+        m_clickable_footer.Add(nullptr, 4, 10, true);
+        m_clickable_footer.Add(tmp.Text(), ID_HEXEDIT, 25, true);
     }
     else
     {
-        right.Append(L"    Options: ");
+        m_clickable_footer.Add(L"    Options: ", -1, 25, true);
         if (!m_text /*&& !m_context.IsBinaryFile()*/)
-            right.Append(g_options.show_line_endings ? L"E" : L"e");
-        right.Append(g_options.show_line_numbers ? L"N" : L"n");
+            m_clickable_footer.Add(g_options.show_line_endings ? L"E" : L"e", ID_OPTION_LINEENDINGS, 25, true);
+        m_clickable_footer.Add(g_options.show_line_numbers ? L"N" : L"n", ID_OPTION_LINENUMBERS, 25, true);
         if (!m_text)
-            right.Append(g_options.show_file_offsets ? L"O" : L"o");
-        right.Append(g_options.show_whitespace ? L"S" : L"s");
-        right.Append(m_wrap ? L"W" : L"w");
+            m_clickable_footer.Add(g_options.show_file_offsets ? L"O" : L"o", ID_OPTION_FILEOFFSETS, 25, true);
+        m_clickable_footer.Add(g_options.show_whitespace ? L"S" : L"s", ID_OPTION_SHOWWHITESPACE, 25, true);
+        m_clickable_footer.Add(m_wrap ? L"W" : L"w", ID_OPTION_WRAP, 25, true);
         if (!m_text)
         {
-            right.Append(g_options.expand_tabs ? L"T" : L"t");
-            right.Append(c_ctrl_indicator[int(g_options.ctrl_mode)]);
+            m_clickable_footer.Add(g_options.expand_tabs ? L"T" : L"t", ID_OPTION_EXPANDTABS, 25, true);
+            m_clickable_footer.Add(c_ctrl_indicator[int(g_options.ctrl_mode)], ID_OPTION_CTRLMODE, 25, true);
         }
         if (!m_text)
-           right.Append(g_options.show_ruler ? L"R" : L"r");
+           m_clickable_footer.Add(g_options.show_ruler ? L"R" : L"r", ID_OPTION_SHOWRULER, 25, true);
 #ifdef DEBUG
-        right.Append(g_options.show_debug_info ? L"D" : L"d");
+        m_clickable_footer.Add(g_options.show_debug_info ? L"D" : L"d", ID_OPTION_SHOWDEBUGINFO, 25, true);
 #endif
-        right_width = cell_count(right.Text());
     }
 
-    if (add_begin(m_context.GetEncodingName(m_hex_mode), ID_ENCODING, 4))
-    {
-        if (m_multifile_search)
-            add_begin(L"MultiFile", ID_NONE, 4);
-    }
-
-    if (msg_width >= m_terminal_width)
-    {
-        bool truncated = false;
-        msg_width = ellipsify_ex(msg, m_terminal_width - 1, ellipsify_mode::LEFT, tmp, L"", false, &truncated);
-        if (truncated)
-            msg = tmp.Text();
-    }
-
-    m_hotspots_footer.Clear();
-    if (msg_width + 3 + right_width > m_terminal_width)
-    {
-        right.Clear();
-        right_width = 0;
-    }
-    else
-    {
-        shift_by(m_terminal_width - right_width);
-        for (auto& hotspot : hotspots)
-            m_hotspots_footer.Add(std::move(hotspot));
-    }
-
-    s.Append(msg);
-    s.AppendSpaces(m_terminal_width - (msg_width + right_width));
-    s.Append(right);
-
+    s.Printf(L"\x1b[%uH\r", m_terminal_height);
+    m_clickable_footer.BuildOutput(s, GetColor(ColorElement::Command));
     s.Printf(L"\x1b[%uG", msg_width + 1);
 }
 
@@ -1793,19 +1730,13 @@ hex_edit_right:
         case '^':
             if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
             {
-                if (!m_hex_mode && !m_text)
-                {
-                    g_options.ctrl_mode = CtrlMode((int(g_options.ctrl_mode) + 1) % int(CtrlMode::__MAX));
-                    m_context.ClearProcessed();
-                    m_force_update = true;
-                }
+                ToggleCtrlMode();
             }
             break;
         case 'd':
             if (input.modifier == Modifier::ALT)
             {
-                g_options.show_debug_info = !g_options.show_debug_info;
-                m_force_update = true;
+                ToggleShowDebugInfo();
             }
             break;
         case 'e':
@@ -1815,11 +1746,7 @@ hex_edit_right:
             }
             else if (input.modifier == Modifier::None)
             {
-                if (!m_hex_mode)
-                {
-                    g_options.show_line_endings = !g_options.show_line_endings;
-                    m_force_update = true;
-                }
+                ToggleLineEndings();
             }
             break;
         case 'g':
@@ -1882,18 +1809,13 @@ hex_edit_right:
         case 'n':
             if ((input.modifier & ~Modifier::ALT) == Modifier::None)
             {
-                g_options.show_line_numbers = !g_options.show_line_numbers;
-                m_force_update = true;
+                ToggleLineNumbers();
             }
             break;
         case 'o':
             if (input.modifier == Modifier::None)
             {
-                if (!m_hex_mode && !m_text)
-                {
-                    g_options.show_file_offsets = !g_options.show_file_offsets;
-                    m_force_update = true;
-                }
+                ToggleFileOffsets();
             }
             else if (input.modifier == Modifier::ALT)
             {
@@ -1904,32 +1826,19 @@ hex_edit_right:
         case 'r':
             if (input.modifier == Modifier::None)
             {
-                if (!m_text)
-                {
-                    g_options.show_ruler = !g_options.show_ruler;
-                    m_force_update_header = true;
-                }
+                ToggleShowRuler();
             }
             break;
         case ' ':
             if (input.modifier == Modifier::None)
             {
-                if (!m_hex_mode)
-                {
-                    g_options.show_whitespace = !g_options.show_whitespace;
-                    m_force_update = true;
-                }
+                ToggleShowWhitespace();
             }
             break;
         case 't':
             if (input.modifier == Modifier::None)
             {
-                if (!m_hex_mode && !m_text)
-                {
-                    g_options.expand_tabs = !g_options.expand_tabs;
-                    m_context.ClearProcessed();
-                    m_force_update = true;
-                }
+                ToggleExpandTabs();
             }
             break;
         case 'u':
@@ -1945,12 +1854,7 @@ hex_edit_right:
         case 'w':
             if (input.modifier == Modifier::None)
             {
-                if (!m_hex_mode)
-                {
-                    g_options.wrapping = !g_options.wrapping;
-                    m_wrap = g_options.wrapping;
-                    m_force_update = true;
-                }
+                ToggleWrap();
             }
             break;
 
@@ -2101,7 +2005,7 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
     // Click in header.
     if (input.mouse_pos.Y == 0)
     {
-        switch (m_hotspots_header.InterpretInput(input))
+        switch (m_clickable_header.InterpretInput(input))
         {
         case 0:
             break;
@@ -2112,13 +2016,40 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
     // Click in footer.
     if (input.mouse_pos.Y == m_terminal_height - 1)
     {
-        switch (m_hotspots_footer.InterpretInput(input))
+        switch (m_clickable_footer.InterpretInput(input))
         {
         case ID_ENCODING:
             ChooseEncoding();
             break;
         case ID_HEXEDIT:
             ToggleHexEditMode(e);
+            break;
+        case ID_OPTION_LINEENDINGS:
+            ToggleLineEndings();
+            break;
+        case ID_OPTION_LINENUMBERS:
+            ToggleLineNumbers();
+            break;
+        case ID_OPTION_FILEOFFSETS:
+            ToggleFileOffsets();
+            break;
+        case ID_OPTION_SHOWWHITESPACE:
+            ToggleShowWhitespace();
+            break;
+        case ID_OPTION_WRAP:
+            ToggleWrap();
+            break;
+        case ID_OPTION_EXPANDTABS:
+            ToggleExpandTabs();
+            break;
+        case ID_OPTION_CTRLMODE:
+            ToggleCtrlMode();
+            break;
+        case ID_OPTION_SHOWRULER:
+            ToggleShowRuler();
+            break;
+        case ID_OPTION_SHOWDEBUGINFO:
+            ToggleShowDebugInfo();
             break;
         }
         return;
@@ -2672,6 +2603,84 @@ bool Viewer::ToggleHexEditMode(Error& e)
     m_hex_edit = !m_hex_edit;
     m_force_update_footer = true;
     return true;
+}
+
+void Viewer::ToggleLineEndings()
+{
+    if (!m_hex_mode)
+    {
+        g_options.show_line_endings = !g_options.show_line_endings;
+        m_force_update = true;
+    }
+}
+
+void Viewer::ToggleLineNumbers()
+{
+    g_options.show_line_numbers = !g_options.show_line_numbers;
+    m_force_update = true;
+}
+
+void Viewer::ToggleFileOffsets()
+{
+    if (!m_hex_mode && !m_text)
+    {
+        g_options.show_file_offsets = !g_options.show_file_offsets;
+        m_force_update = true;
+    }
+}
+
+void Viewer::ToggleShowWhitespace()
+{
+    if (!m_hex_mode)
+    {
+        g_options.show_whitespace = !g_options.show_whitespace;
+        m_force_update = true;
+    }
+}
+
+void Viewer::ToggleWrap()
+{
+    if (!m_hex_mode)
+    {
+        g_options.wrapping = !g_options.wrapping;
+        m_wrap = g_options.wrapping;
+        m_force_update = true;
+    }
+}
+
+void Viewer::ToggleExpandTabs()
+{
+    if (!m_hex_mode && !m_text)
+    {
+        g_options.expand_tabs = !g_options.expand_tabs;
+        m_context.ClearProcessed();
+        m_force_update = true;
+    }
+}
+
+void Viewer::ToggleCtrlMode()
+{
+    if (!m_hex_mode && !m_text)
+    {
+        g_options.ctrl_mode = CtrlMode((int(g_options.ctrl_mode) + 1) % int(CtrlMode::__MAX));
+        m_context.ClearProcessed();
+        m_force_update = true;
+    }
+}
+
+void Viewer::ToggleShowRuler()
+{
+    if (!m_text)
+    {
+        g_options.show_ruler = !g_options.show_ruler;
+        m_force_update_header = true;
+    }
+}
+
+void Viewer::ToggleShowDebugInfo()
+{
+    g_options.show_debug_info = !g_options.show_debug_info;
+    m_force_update = true;
 }
 
 ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e)
