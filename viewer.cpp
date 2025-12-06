@@ -43,6 +43,8 @@ constexpr unsigned c_horiz_scroll_amount = 10;
 
 enum
 {
+    ID_FILENAME,
+    ID_GOTO,
     ID_ENCODING,
     ID_HEXEDIT,
     ID_OPTION_LINEENDINGS,
@@ -640,37 +642,37 @@ LAutoFitContentWidth:
     // Header.
     if (update_header)
     {
-        StrW left;
-        StrW right;
-        StrW file;
+        StrW tmp;
+        StrW tmp2;
         StrW details;
-        const unsigned c_min_filename_width = 16;
+        const unsigned c_min_filename_width = 24;
 
-        s.Clear();
+        m_clickable_header.Init(0, m_terminal_width);
+
         s.Append(L"\x1b[1H");
         s.AppendColor(GetColor(ColorElement::Header));
 
         if (g_options.show_ruler && !m_hex_mode)
         {
             s.AppendSpaces(margin_width);
-            left.Set(L"\u252c\u252c\u252c\u252c\u253c\u252c\u252c\u252c");
+            tmp.Set(L"\u252c\u252c\u252c\u252c\u253c\u252c\u252c\u252c");
             for (unsigned width = 0; width < m_content_width; width += 10)
             {
-                right.Clear();
-                right.Printf(L"%u", m_left + width + 10);
-                left.SetLength(std::min<unsigned>(10 - right.Length(), m_content_width - width));
-                left.Append(right);
-                if (width + left.Length() > m_content_width)
-                    left.SetLength(m_content_width - width);
-                s.Append(left);
+                tmp2.Clear();
+                tmp2.Printf(L"%u", m_left + width + 10);
+                tmp.SetLength(std::min<unsigned>(10 - tmp2.Length(), m_content_width - width));
+                tmp.Append(tmp2);
+                if (width + tmp.Length() > m_content_width)
+                    tmp.SetLength(m_content_width - width);
+                s.Append(tmp);
             }
             if (m_terminal_width > m_content_width)
                 s.Append(c_clreol);
         }
         else
         {
-            StrW pos;
-            left.Printf(L"LIST - ");
+            m_clickable_header.Add(L"LIST - ", -1, 999, false);
+            m_clickable_header.Add(GetCurrentFile().Text(), ID_FILENAME, 999, false, ellipsify_mode::PATH, c_min_filename_width);
 
             size_t bottom_line_plusone;
             FileOffset bottom_offset;
@@ -684,64 +686,56 @@ LAutoFitContentWidth:
                 bottom_line_plusone = std::min<size_t>(m_top + m_content_height, m_context.Count());
                 bottom_offset = !bottom_line_plusone ? 0 : m_context.GetOffset(bottom_line_plusone - 1) + m_context.GetLength(bottom_line_plusone - 1);
             }
+
             if (m_hex_edit)
-                pos.Printf(L"    Pos: %06lx (%lu)", m_hex_pos, m_hex_pos);
+            {
+                tmp.Clear();
+                tmp.Printf(L"Pos: %06lx (%lu)", m_hex_pos, m_hex_pos);
+                m_clickable_header.Add(nullptr, 4, 10, true);
+                m_clickable_header.Add(tmp.Text(), -1, 10, true);
+            }
+
+            tmp.Clear();
             if (m_hex_mode)
-                right.Printf(L"    Offset: %06lx-%06lx", m_hex_top, bottom_offset);
+                tmp.Printf(L"Offset: %06lx-%06lx", m_hex_top, bottom_offset);
             else if (g_options.show_file_offsets)
-                right.Printf(L"    Offset: %06lx-%06lx", m_context.GetOffset(m_top), bottom_offset);
+                tmp.Printf(L"Offset: %06lx-%06lx", m_context.GetOffset(m_top), bottom_offset);
             else
-                right.Printf(L"    Line: %lu", m_top + 1);
+                tmp.Printf(L"Line: %lu", m_top + 1);
             if (g_options.show_file_offsets || m_hex_mode)
-                right.Printf(L" of %06lx", m_context.GetFileSize());
+                tmp.Printf(L" of %06lx", m_context.GetFileSize());
             else if (!m_context.Completed())
-                right.Printf(L"   (%u%%)", LinePercent(bottom_line_plusone));
+                tmp.Printf(L"   (%u%%)", LinePercent(bottom_line_plusone));
             else
-                right.Printf(L" of %lu", m_context.Count());
-            if (m_left && !m_hex_mode)
-                right.Printf(L"  Col: %u-%u", m_left + 1, m_left + m_content_width);
-            PadToWidth(right, 30);
-            right.AppendSpaces(4);
+                tmp.Printf(L" of %lu", m_context.Count());
+            const uint16 goto_width = cell_count(tmp.Text());
+            m_clickable_header.Add(nullptr, 4, 50, true);
+            m_clickable_header.Add(tmp.Text(), ID_GOTO, 50, true);
 
             unsigned details_width = 0;
             if (m_fd.cFileName[0])
             {
                 details_width = FormatFileData(details, m_fd);
-                if (details_width + right.Length() + pos.Length() + left.Length() + c_min_filename_width <= m_terminal_width)
-                {
-                    right.AppendSpaces(std::max<unsigned>(details_width, 16) - details_width);
-                    right.Append(details);
-                }
-                else
-                {
-                    details_width = 0;
-                }
+                PadToWidth(details, 16);
             }
-#if 0
-            if (!details_width)
-                PadToWidth(right, 50);
-#endif
-
-            if (left.Length() + pos.Length() + right.Length() + c_min_filename_width > m_terminal_width)
-                right.Clear();
-            if (left.Length() + pos.Length() + c_min_filename_width > m_terminal_width)
-                pos.Clear();
-            const unsigned limit_len = m_terminal_width - (left.Length() + pos.Length() + right.Length());
-            ellipsify_ex(GetCurrentFile().Text(), limit_len, ellipsify_mode::PATH, file);
-
-            s.Append(left);
-            s.Append(file);
-            if (pos.Length() + right.Length())
+            if (m_left && !m_hex_mode)
             {
-                s.AppendSpaces(m_terminal_width - (left.Length() + cell_count(file.Text()) + pos.Length() + right.Length()));
-                s.Append(pos);
-                s.Append(right);
+                tmp.Clear();
+                tmp.Printf(L"  Col: %u-%u", m_left + 1, m_left + m_content_width);
+                PadToWidth(tmp, 16);
+                details.Clear();
+                if (details_width + 4 > tmp.Length())
+                    details.AppendSpaces(details_width + 4 - tmp.Length());
+                details.Append(tmp);
+                m_clickable_header.Add(details.Text(), -1, 25, true);
             }
-            else
+            else if (details_width)
             {
-                if (m_terminal_width > left.Length() + cell_count(file.Text()))
-                    s.Append(c_clreol);
+                m_clickable_header.Add(nullptr, 4, 25, true);
+                m_clickable_header.Add(details.Text(), -1, 25, true);
             }
+
+            m_clickable_header.BuildOutput(s);
         }
 
         s.Append(c_norm);
@@ -2007,7 +2001,11 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
     {
         switch (m_clickable_header.InterpretInput(input))
         {
-        case 0:
+        case ID_FILENAME:
+            ShowFileList();
+            break;
+        case ID_GOTO:
+            GoTo(e);
             break;
         }
         return;
@@ -2601,6 +2599,7 @@ bool Viewer::ToggleHexEditMode(Error& e)
     }
 
     m_hex_edit = !m_hex_edit;
+    m_force_update_header = true;
     m_force_update_footer = true;
     return true;
 }

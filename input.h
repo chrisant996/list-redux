@@ -7,6 +7,8 @@
 #include <functional>
 #include <optional>
 
+#include "ellipsify.h"
+
 enum class InputType
 {
     None,
@@ -132,10 +134,14 @@ class ClickableRow
     struct Element
     {
         StrW        m_text;
+        StrW        m_fitted;
         uint16      m_width;
+        uint16      m_effective_width;
         int16       m_id;
         int16       m_priority;
         int16       m_left;
+        ellipsify_mode m_fit_mode;
+        uint16      m_min_fit_width;
     };
 
 public:
@@ -143,7 +149,7 @@ public:
                     ~ClickableRow() = default;
 
     void            Init(uint16 row, uint16 terminal_width);
-    void            Add(const WCHAR* text, int16 id, int16 priority, bool right_align);
+    void            Add(const WCHAR* text, int16 id, int16 priority, bool right_align, ellipsify_mode fit_mode=ellipsify_mode::INVALID, uint16 min_fit_width=20);
     uint16          GetLeftWidth();
     uint16          GetRightWidth();
     void            BuildOutput(StrW& out, const WCHAR* color=nullptr);

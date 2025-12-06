@@ -1450,7 +1450,7 @@ void ClickableRow::Init(uint16 row, uint16 terminal_width)
     m_need_layout = true;
 }
 
-void ClickableRow::Add(const WCHAR* text, int16 id, int16 priority, bool right_align)
+void ClickableRow::Add(const WCHAR* text, int16 id, int16 priority, bool right_align, ellipsify_mode fit_mode, uint16 min_fit_width)
 {
     Element elm;
     std::vector<Element>& vec = right_align ? m_right_elements : m_left_elements;
@@ -1468,6 +1468,8 @@ void ClickableRow::Add(const WCHAR* text, int16 id, int16 priority, bool right_a
     }
     elm.m_priority = priority;
     elm.m_left = 0;
+    elm.m_fit_mode = fit_mode;
+    elm.m_min_fit_width = min_fit_width;
 
     vec.emplace_back(std::move(elm));
 
@@ -1502,7 +1504,7 @@ void ClickableRow::BuildOutput(StrW& out, const WCHAR* color)
     if (width > m_terminal_width)
     {
         StrW tmp;
-        width = ellipsify_ex(out.Text() + orig_length, m_terminal_width - 1, ellipsify_mode::LEFT, tmp, L"", false, nullptr);
+        width = ellipsify_ex(out.Text() + orig_length, m_terminal_width, ellipsify_mode::RIGHT, tmp);
         if (width < m_terminal_width)
             tmp.Append(c_clreol);
         out.SetLength(orig_length);
@@ -1528,13 +1530,36 @@ void ClickableRow::EnsureLayout()
 
     // Calculate total needed width.
     uint16 total_width = 0;
-    for (const auto& elm : m_left_elements)
+    uint16 min_fit_width = 0;
+    uint16 num_fit_elements = 0;
+    for (auto& elm : m_left_elements)
+    {
         total_width += elm.m_width;
-    for (const auto& elm : m_right_elements)
+        elm.m_fitted.Clear();
+        elm.m_effective_width = 0;
+        if (elm.m_fit_mode != ellipsify_mode::INVALID && elm.m_width > elm.m_min_fit_width)
+        {
+            total_width -= elm.m_width;
+            total_width += elm.m_min_fit_width;
+            ++num_fit_elements;
+        }
+    }
+    for (auto& elm : m_right_elements)
+    {
         total_width += elm.m_width;
+        elm.m_fitted.Clear();
+        elm.m_effective_width = 0;
+        if (elm.m_fit_mode != ellipsify_mode::INVALID && elm.m_width > elm.m_min_fit_width)
+        {
+            total_width -= elm.m_width;
+            total_width += elm.m_min_fit_width;
+            ++num_fit_elements;
+        }
+    }
 
     // Drop elements in priority order until something fits.
     m_threshold = INT16_MIN;
+    uint16 priority_width = 0;
     if (total_width > m_terminal_width)
     {
         // Collect priority groups.
@@ -1554,16 +1579,26 @@ void ClickableRow::EnsureLayout()
                 break;
 
             // Calculate width of the priority group.
-            uint16 priority_width = 0;
+            priority_width = 0;
             for (const auto& elm : m_left_elements)
             {
                 if (elm.m_priority == (*iter))
-                    priority_width += elm.m_width;
+                {
+                    if (elm.m_fit_mode != ellipsify_mode::INVALID && elm.m_width > elm.m_min_fit_width)
+                        priority_width += elm.m_min_fit_width;
+                    else
+                        priority_width += elm.m_width;
+                }
             }
             for (const auto& elm : m_right_elements)
             {
                 if (elm.m_priority == (*iter))
-                    priority_width += elm.m_width;
+                {
+                    if (elm.m_fit_mode != ellipsify_mode::INVALID && elm.m_width > elm.m_min_fit_width)
+                        priority_width += elm.m_min_fit_width;
+                    else
+                        priority_width += elm.m_width;
+                }
             }
 
             // Drop the priority group.
@@ -1574,34 +1609,59 @@ void ClickableRow::EnsureLayout()
         }
     }
 
-    // Layout.
+    // Calculate effective widths.
+    const uint16 each_extra = (!num_fit_elements || m_terminal_width < total_width) ? 0 : (m_terminal_width - total_width) / num_fit_elements;
     m_left_width = 0;
     for (auto& elm : m_left_elements)
     {
         if (elm.m_priority >= m_threshold)
         {
-            elm.m_left = m_left_width;
-            m_left_width += elm.m_width;
+            if (elm.m_fit_mode != ellipsify_mode::INVALID && elm.m_width > elm.m_min_fit_width)
+                elm.m_effective_width = ellipsify_ex(elm.m_text.Text(), elm.m_min_fit_width + each_extra, elm.m_fit_mode, elm.m_fitted);
+            else
+                elm.m_effective_width = elm.m_width;
         }
+        m_left_width += elm.m_effective_width;
     }
-    uint16 x = m_terminal_width;
-    for (size_t i = m_right_elements.size(); i--;)
+    m_right_width = 0;
+    for (auto& elm : m_right_elements)
     {
-        auto& elm = m_right_elements[i];
         if (elm.m_priority >= m_threshold)
         {
-            x -= elm.m_width;
+            if (elm.m_fit_mode != ellipsify_mode::INVALID && elm.m_width > elm.m_min_fit_width)
+               elm.m_effective_width = ellipsify_ex(elm.m_text.Text(), elm.m_min_fit_width + each_extra, elm.m_fit_mode, elm.m_fitted);
+            else
+                elm.m_effective_width = elm.m_width;
+        }
+        m_right_width += elm.m_effective_width;
+    }
+
+    // Special case when there's only one priority group and it's still too
+    // large to fit.
+    if (m_left_width + m_right_width > m_terminal_width)
+    {
+        // TODO:  This should redo ellipsify_ex for left elements.
+        m_right_width = 0;
+    }
+
+    // Layout.
+    uint16 x = 0;
+    for (auto& elm : m_left_elements)
+    {
+        elm.m_left = x;
+        if (elm.m_priority >= m_threshold)
+            x += elm.m_effective_width;
+    }
+    if (m_right_width)
+    {
+        x = m_terminal_width - m_right_width;
+        for (auto& elm : m_right_elements)
+        {
             elm.m_left = x;
-            m_right_width += elm.m_width;
+            if (elm.m_priority >= m_threshold)
+                x += elm.m_effective_width;
         }
     }
-    m_right_width = m_terminal_width - x;
-    if (m_left_width > m_terminal_width)
-    {
-        m_left_width = m_terminal_width;
-        assert(!m_right_width);
-    }
-    assert(m_left_width + m_right_width <= m_terminal_width);
 
     m_need_layout = false;
 }
@@ -1617,11 +1677,14 @@ uint16 ClickableRow::AppendOutput(StrW& out, const Element& elm, const WCHAR* co
     }
     else
     {
-        out.Append(elm.m_text);
+        if (elm.m_fitted.Empty())
+            out.Append(elm.m_text);
+        else
+            out.Append(elm.m_fitted);
         if (color && wcschr(elm.m_text.Text(), '\x1b'))
             out.AppendColor(color);
     }
-    return elm.m_width;
+    return elm.m_effective_width;
 }
 
 int16 ClickableRow::InterpretInput(const InputRecord& input) const
@@ -1634,7 +1697,8 @@ int16 ClickableRow::InterpretInput(const InputRecord& input) const
     if (input.mouse_pos.Y != m_row)
         return -1;
 
-    for (uint16 pass = 0; pass < 2; ++pass)
+    const uint16 max_pass = (m_right_width ? 2 : 1);
+    for (uint16 pass = 0; pass < max_pass; ++pass)
     {
         const std::vector<Element>& vec = !pass ? m_left_elements : m_right_elements;
         for (const auto& elm : vec)

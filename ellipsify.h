@@ -6,7 +6,7 @@
 class StrW;
 
 typedef void (*vstrlen_func_t)(const WCHAR* s, int32 len);
-enum ellipsify_mode { INVALID=-1, RIGHT, LEFT, PATH };
+enum ellipsify_mode : int16 { INVALID=-1, RIGHT, LEFT, PATH };
 
 int32 ellipsify(const WCHAR* in, int32 limit, StrW& out, bool expand_ctrl);
 int32 ellipsify_to_callback(const WCHAR* in, int32 limit, int32 expand_ctrl, vstrlen_func_t callback);
