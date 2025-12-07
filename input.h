@@ -8,6 +8,7 @@
 #include <optional>
 
 #include "ellipsify.h"
+#include "colors.h"
 
 enum class InputType
 {
@@ -150,6 +151,7 @@ public:
 
     void            Init(uint16 row, uint16 terminal_width);
     void            Add(const WCHAR* text, int16 id, int16 priority, bool right_align, ellipsify_mode fit_mode=ellipsify_mode::INVALID, uint16 min_fit_width=20);
+    void            AddKeyName(const WCHAR* key, ColorElement color_after, const WCHAR* desc, int16 id, int16 priority, bool right_align);
     uint16          GetLeftWidth();
     uint16          GetRightWidth();
     void            BuildOutput(StrW& out, const WCHAR* color=nullptr);

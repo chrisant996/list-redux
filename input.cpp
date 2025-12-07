@@ -1476,6 +1476,13 @@ void ClickableRow::Add(const WCHAR* text, int16 id, int16 priority, bool right_a
     m_need_layout = true;
 }
 
+void ClickableRow::AddKeyName(const WCHAR* key, ColorElement color_after, const WCHAR* desc, int16 id, int16 priority, bool right_align)
+{
+    StrW tmp;
+    AppendKeyName(tmp, key, color_after, desc);
+    Add(tmp.Text(), id, priority, right_align);
+}
+
 uint16 ClickableRow::GetLeftWidth()
 {
     EnsureLayout();

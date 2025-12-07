@@ -1137,10 +1137,8 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg)
 
     if (m_hex_mode)
     {
-        tmp.Clear();
-        AppendKeyName(tmp, L"Alt-E", ColorElement::Command, m_hex_edit ? L"EDITING " : L"EditMode");
         m_clickable_footer.Add(nullptr, 4, 10, true);
-        m_clickable_footer.Add(tmp.Text(), ID_HEXEDIT, 25, true);
+        m_clickable_footer.AddKeyName(L"Alt-E", ColorElement::Command, m_hex_edit ? L"EDITING " : L"EditMode", ID_HEXEDIT, 25, true);
     }
     else
     {

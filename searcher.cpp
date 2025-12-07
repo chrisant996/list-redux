@@ -236,15 +236,9 @@ toggle_caseless:
     {
         cr.Init(row, terminal_width);
 
-        s.Clear();
-        AppendKeyName(s, L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ");
-        cr.Add(s.Text(), ID_IGNORECASE, 0, true);
-
+        cr.AddKeyName(L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ", ID_IGNORECASE, 0, true);
         cr.Add(nullptr, 3, 0, true);
-
-        s.Clear();
-        AppendKeyName(s, L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal");
-        cr.Add(s.Text(), ID_REGEXP, 0, true);
+        cr.AddKeyName(L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal", ID_REGEXP, 0, true);
 
         s.Set(L"\r");
         cr.BuildOutput(s, GetColor(ColorElement::Command));
