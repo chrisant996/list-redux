@@ -17,7 +17,8 @@
   - [x] wheel in chooser
   - [x] left click in hex edit mode in viewer
   - [x] left click in scrollbars
-  - [ ] left click hotspots in viewer
+  - [x] left click hotspots in chooser
+  - [x] left click hotspots in viewer
   - [x] mouse input in popup list
 - improve input routine
   - [x] scrollable bounds
@@ -140,7 +141,7 @@
   - [ ] encapsulate in a class, and have ability to stop processing one instance and start processing a different instance (effectively making it possible to navigate between different input boxes)
 - [ ] improve message box routine (make it not full terminal width, have clickable buttons, etc)
   - [ ] mouse input in message box routine
-- [ ] search (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)
+- [ ] command line flags for searching (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)
 - [ ] some way to configure colors inside the app (could benefit from ability to navigate between different input boxes)
 - [ ] some way to revert to default colors inside the app
 - [ ] save current settings into `.listredux` file as defaults
