@@ -1317,7 +1317,7 @@ hex_bottom:
             break;
         case Key::UP:
 key_up:
-            while (amount-- > 0)
+            for (; amount > 0; --amount)
             {
                 if (!m_hex_mode)
                 {
@@ -1338,7 +1338,7 @@ key_up:
             break;
         case Key::DOWN:
 key_down:
-            while (amount-- > 0)
+            for (; amount > 0; --amount)
             {
                 if (!m_hex_mode)
                 {

@@ -675,7 +675,7 @@ LEnd:
 
         case Key::UP:
 DoKeyUp:
-            while (amount-- > 0)
+            for (; amount > 0; --amount)
             {
                 if (m_index)
                     SetIndex(m_index - 1);
@@ -684,7 +684,7 @@ DoKeyUp:
             break;
         case Key::DOWN:
 DoKeyDown:
-            while (amount-- > 0)
+            for (; amount > 0; --amount)
             {
                 if (m_index == m_count - 1)
                     m_prev_latched = true;
