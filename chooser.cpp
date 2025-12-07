@@ -28,6 +28,13 @@ static const WCHAR c_no_files_tagged[] = L"*** No Files Tagged ***";
 static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
 static const WCHAR c_canceled[] = L"*** Canceled ***";
 
+enum
+{
+    ID_PATH,
+    ID_FILELIST,
+    ID_ONE_ATTR,
+};
+
 static void ApplyAttr(DWORD& mask, DWORD& attr, bool& minus, DWORD flag)
 {
     mask |= flag;
@@ -241,6 +248,7 @@ void Chooser::UpdateDisplay()
     }
 
     StrW s;
+    StrW tmp;
 
     EnsureColumnWidths();
     EnsureTop();
@@ -258,42 +266,20 @@ void Chooser::UpdateDisplay()
     // Header.
     if (m_dirty_header)
     {
-        StrW left;
-        StrW right;
-        StrW dir;
+        m_clickable_header.Init(0, m_terminal_width);
+
+        m_clickable_header.Add(L"LIST - ", -1, 100, false);
+        m_clickable_header.Add(L"Path: ", ID_PATH, 100, false);
+        m_clickable_header.Add(m_dir.Text(), ID_PATH, 100, false, ellipsify_mode::PATH);
+
+#ifdef DEBUG
+        tmp.Clear();
+        tmp.Printf(L"    (%lu rows, %lu visible)", m_num_rows, m_visible_rows);
+        m_clickable_header.Add(tmp.Text(), -1, 5, true);
+#endif
 
         s.Append(L"\x1b[1H");
-        s.AppendColor(GetColor(ColorElement::Header));
-
-        left.Printf(L"LIST - Path: ");
-#ifdef DEBUG
-        right.Printf(L"    (%lu rows, %lu visible)", m_num_rows, m_visible_rows);
-#endif
-        if (left.Length() + right.Length() + 40 > m_terminal_width)
-            right.Clear();
-        if (left.Length() >= m_terminal_width)
-        {
-            left.Set(L"LIST");
-        }
-        else
-        {
-            const unsigned limit_len = m_terminal_width - (left.Length() + right.Length());
-            ellipsify_ex(m_dir.Text(), limit_len, ellipsify_mode::PATH, dir);
-        }
-
-        s.Append(left);
-        s.Append(dir);
-        if (right.Length())
-        {
-            s.AppendSpaces(m_terminal_width - (left.Length() + cell_count(dir.Text()) + right.Length()));
-            s.Append(right);
-        }
-        else
-        {
-            if (m_terminal_width > left.Length() + cell_count(dir.Text()))
-                s.Append(c_clreol);
-        }
-        s.Append(c_norm);
+        m_clickable_header.BuildOutput(s, GetColor(ColorElement::Header));
         m_dirty_header = false;
     }
 
@@ -302,14 +288,13 @@ void Chooser::UpdateDisplay()
     {
         s.Append(L"\x1b[2H");
 
-        StrW s2;
         const intptr_t num_add = m_num_rows;
         for (intptr_t ii = 0; ii < m_visible_rows; ii++)
         {
             intptr_t iItem = m_top + ii;
             if (m_dirty.IsMarked(iItem))
             {
-                s2.Clear();
+                tmp.Clear();
                 unsigned row_width = 0;
 
                 for (intptr_t jj = 0; jj < m_num_per_row && iItem < m_count; jj++, iItem += num_add)
@@ -317,12 +302,12 @@ void Chooser::UpdateDisplay()
                     const FileInfo* pfi = &m_files[iItem];
                     if (jj)
                     {
-                        s2.AppendSpaces(m_padding);
+                        tmp.AppendSpaces(m_padding);
                         row_width += m_padding;
                     }
                     const bool selected = iItem == m_index;
                     const bool tagged = m_tagged.IsMarked(iItem) && !pfi->IsDirectory();
-                    row_width += FormatFileInfo(s2, pfi, m_col_widths[jj], m_details, selected, tagged, m_max_size_width);
+                    row_width += FormatFileInfo(tmp, pfi, m_col_widths[jj], m_details, selected, tagged, m_max_size_width);
                 }
 
                 if (m_vert_scroll_car.has_car())
@@ -334,21 +319,21 @@ void Chooser::UpdateDisplay()
                         const uint32 pad_to = m_terminal_width - 1;
                         if (pad_to >= row_width)
                         {
-                            s2.AppendSpaces(pad_to - row_width);
+                            tmp.AppendSpaces(pad_to - row_width);
                             if (c_floating)
                             {
-                                s2.AppendColor(GetColor(ColorElement::FloatingScrollBar));
+                                tmp.AppendColor(GetColor(ColorElement::FloatingScrollBar));
                             }
                             else
                             {
                                 if (car)
-                                    s2.AppendColor(ConvertColorParams(ColorElement::ScrollBarCar, ColorConversion::TextOnly));
+                                    tmp.AppendColor(ConvertColorParams(ColorElement::ScrollBarCar, ColorConversion::TextOnly));
                                 else
                                     car = L" ";
-                                s2.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
+                                tmp.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
                             }
-                            s2.Append(car);                     // ┃ or etc
-                            s2.Append(c_norm);
+                            tmp.Append(car);                     // ┃ or etc
+                            tmp.Append(c_norm);
                         }
                         row_width = pad_to + 1;
                     }
@@ -356,9 +341,9 @@ void Chooser::UpdateDisplay()
 
                 assert(row_width <= m_terminal_width);
                 if (row_width < m_terminal_width)
-                    s2.Append(c_clreol);
+                    tmp.Append(c_clreol);
 
-                s.Append(s2);
+                s.Append(tmp);
             }
 
             s.Append(L"\n");
@@ -427,38 +412,32 @@ void Chooser::UpdateDisplay()
     // Command line.
     if (m_dirty_footer)
     {
-        s.Printf(L"\x1b[%uH", m_terminal_height);
-        s.AppendColor(GetColor(ColorElement::Command));
+        m_clickable_footer.Init(m_terminal_height - 1, m_terminal_width);
 
-        const unsigned offset = s.Length();
-        StrW left;
-        StrW right;
-        left.Printf(L"Files: %lu of %lu", m_index + 1, m_count);
-        if (size_t(m_index) < m_files.size())
-        {
-            right.AppendSpaces(4);
-            FormatFileData(right, m_files[m_index]);
-        }
+        tmp.Clear();
+        tmp.Printf(L"Files: %lu of %lu", m_index + 1, m_count);
+        m_clickable_footer.Add(tmp.Text(), ID_FILELIST, 25, false);
+        const int padding = (20 - tmp.Length());
+        if (padding > 0)
+            m_clickable_footer.Add(nullptr, padding, 25, false);
+
         if (m_feedback.Length())
         {
-            if (left.Length() < 20)
-                left.AppendSpaces(20 - left.Length());
-            left.AppendSpaces(4);
-            left.Append(m_feedback);
+            m_clickable_footer.Add(nullptr, 4, 25, false);
+            m_clickable_footer.Add(m_feedback.Text(), -1, 100, false);
         }
-        if (left.Length() + right.Length() > m_terminal_width)
-            right.Clear();
-        if (left.Length() > m_terminal_width)
+
+        if (size_t(m_index) < m_files.size())
         {
-            ellipsify(left.Text(), m_terminal_width, right, false);
-            left = std::move(right);
+            tmp.Clear();
+            FormatFileData(tmp, m_files[m_index]);
+            m_clickable_footer.Add(nullptr, 4, 50, true);
+// TODO:  Separate the timestamp and the attributes.
+            m_clickable_footer.Add(tmp.Text(), ID_ONE_ATTR, 50, true);
         }
 
-        s.Append(left);
-        s.AppendSpaces(m_terminal_width - (left.Length() + right.Length()));
-        s.Append(right);
-
-        s.Append(c_norm);
+        s.Printf(L"\x1b[%uH", m_terminal_height);
+        m_clickable_footer.BuildOutput(s, GetColor(ColorElement::Command));
         m_dirty_footer = false;
     }
 
@@ -1304,9 +1283,35 @@ bool Chooser::OnLeftClick(const InputRecord& input, Error& e)
 
     m_can_drag = false;
 
-    // TODO:  Click in header?
-    // TODO:  Click in footer?
     // TODO:  Could hover effects be feasible/useful?  (To show clickable spots and tooltips?)
+
+    // Click in header.
+    if (input.mouse_pos.Y == 0)
+    {
+        switch (m_clickable_header.InterpretInput(input))
+        {
+        case ID_PATH:
+            NewFileMask(e);
+            break;
+        }
+        return false;
+    }
+
+    // Click in footer.
+    if (input.mouse_pos.Y == m_terminal_height - 1)
+    {
+        switch (m_clickable_footer.InterpretInput(input))
+        {
+        case ID_FILELIST:
+            ShowFileList();
+            break;
+        case ID_ONE_ATTR:
+            ChangeAttributes(e, true/*only_current*/);
+            break;
+        }
+        return false;
+    }
+
     return false;
 }
 
@@ -1346,15 +1351,10 @@ void Chooser::NewFileMask(Error& e)
     Navigate(path.Text(), e);
 }
 
-void Chooser::ChangeAttributes(Error& e)
+void Chooser::ChangeAttributes(Error& e, bool only_current)
 {
-    if (size_t(m_index) >= m_files.size())
-        return;
-    if (m_files[m_index].IsPseudoDirectory())
-        return;
-
     std::vector<intptr_t> indices;
-    if (m_tagged.AnyMarked())
+    if (!only_current && m_tagged.AnyMarked())
         indices = GetTaggedIndices();
     else if (size_t(m_index) < m_files.size() && !m_files[m_index].IsPseudoDirectory())
         indices.emplace_back(m_index);

@@ -66,7 +66,7 @@ private:
 
     bool            OnLeftClick(const InputRecord& input, Error& e);
     void            NewFileMask(Error& e);
-    void            ChangeAttributes(Error& e);
+    void            ChangeAttributes(Error& e, bool only_current=false);
     void            NewDirectory(Error& e);
     void            RenameEntry(Error& e);
     void            DeleteEntries(Error& e, bool recycle);
@@ -94,6 +94,8 @@ private:
     int32           m_visible_rows = 0;
     int32           m_vert_scroll_column = 0;
     scroll_car      m_vert_scroll_car;
+    ClickableRow    m_clickable_header;
+    ClickableRow    m_clickable_footer;
     MouseHelper     m_mouse;
     StrW            m_feedback;
 
