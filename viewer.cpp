@@ -117,7 +117,7 @@ void SetViewerHexEditMode(bool hex_edit)
 static int ConfirmSaveChanges()
 {
     const WCHAR* const msg = L"Do you want to save your changes to this file?";
-    const WCHAR* const directive = L"Press Y to save, N to discard, or any other key to cancel...";
+    const WCHAR* const directive = L"Press S to save, D to discard, or any other key to cancel...";
     // TODO:  ColorElement::Command might not be the most appropriate color.
     const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
     OutputConsole(s.Text(), s.Length());
@@ -137,11 +137,11 @@ static int ConfirmSaveChanges()
         {
             switch (input.key_char)
             {
-            case 'y':
-            case 'Y':
+            case 's':
+            case 'S':
                 return 1;
-            case 'n':
-            case 'N':
+            case 'd':
+            case 'D':
                 return 0;
             }
         }
@@ -155,7 +155,7 @@ static int ConfirmSaveChanges()
 static bool ConfirmDiscardBytes()
 {
     const WCHAR* const msg = L"Do you want to discard all unsaved changes to this file?";
-    const WCHAR* const directive = L"Press Y to discard, or any other key to cancel...";
+    const WCHAR* const directive = L"Press D to discard, or any other key to cancel...";
     // TODO:  ColorElement::Command might not be the most appropriate color.
     const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
     OutputConsole(s.Text(), s.Length());
@@ -175,8 +175,8 @@ static bool ConfirmDiscardBytes()
         {
             switch (input.key_char)
             {
-            case 'y':
-            case 'Y':
+            case 'd':
+            case 'D':
                 return true;
             }
         }
@@ -190,7 +190,7 @@ static bool ConfirmDiscardBytes()
 static bool ConfirmUndoSave()
 {
     const WCHAR* const msg = L"Do you want to undo all saved changes to this file?";
-    const WCHAR* const directive = L"Press Y to undo, or any other key to cancel...";
+    const WCHAR* const directive = L"Press U to undo, or any other key to cancel...";
     // TODO:  ColorElement::Command might not be the most appropriate color.
     const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
     OutputConsole(s.Text(), s.Length());
@@ -210,8 +210,8 @@ static bool ConfirmUndoSave()
         {
             switch (input.key_char)
             {
-            case 'y':
-            case 'Y':
+            case 'u':
+            case 'U':
                 return true;
             }
         }
