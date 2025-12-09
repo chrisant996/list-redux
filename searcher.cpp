@@ -187,9 +187,22 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
 {
     StrW s;
     ClickableRow cr;
-    bool done = false;
 
     enum { ID_IGNORECASE, ID_REGEXP };
+
+    auto printcontext = [&]()
+    {
+        cr.Init(row, terminal_width);
+
+        cr.AddKeyName(L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ", ID_IGNORECASE, 0, true);
+        cr.Add(nullptr, 3, 0, true);
+        cr.AddKeyName(L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal", ID_REGEXP, 0, true);
+
+        s.Set(L"\r");
+        cr.BuildOutput(s, GetColor(ColorElement::Command));
+        s.Printf(L"\rSearch%s ", c_prompt_char);
+        OutputConsole(s.Text(), s.Length());
+    };
 
     auto callback = [&](const InputRecord& input)
     {
@@ -202,8 +215,8 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
                 // 'Ctrl-X' toggles regex mode.
 toggle_regex:
                 regex = !regex;
-                done = false;
-                return -1;
+                printcontext();
+                return 1;
             }
             break;
         case InputType::Key:
@@ -215,9 +228,9 @@ toggle_regex:
                 {
 toggle_caseless:
                     caseless = !caseless;
+                    printcontext();
                 }
-                done = false;
-                return -1;
+                return 1;
             }
             break;
         case InputType::Mouse:
@@ -231,25 +244,11 @@ toggle_caseless:
         return 0; // Accept.
     };
 
-    StrW right;
-    while (!done)
-    {
-        cr.Init(row, terminal_width);
+    printcontext();
 
-        cr.AddKeyName(L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ", ID_IGNORECASE, 0, true);
-        cr.Add(nullptr, 3, 0, true);
-        cr.AddKeyName(L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal", ID_REGEXP, 0, true);
+    ReadInput(s, History::Search, 1024, terminal_width - 12 - cr.GetRightWidth(), callback);
 
-        s.Set(L"\r");
-        cr.BuildOutput(s, GetColor(ColorElement::Command));
-        s.Printf(L"\rSearch%s ", c_prompt_char);
-        OutputConsole(s.Text(), s.Length());
-
-        done = true;
-        ReadInput(s, History::Search, 1024, terminal_width - 12 - cr.GetRightWidth(), callback);
-
-        OutputConsole(c_norm);
-    }
+    OutputConsole(c_norm);
 
     std::unique_ptr<Searcher> searcher;
     if (s.Length())
