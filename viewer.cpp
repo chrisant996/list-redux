@@ -2199,6 +2199,10 @@ size_t Viewer::CountForDisplay() const
 
 void Viewer::DoSearch(bool next, bool caseless)
 {
+    StrW s;
+    s.Printf(L"\x1b[%uH\r", m_terminal_height);
+    OutputConsole(s.Text(), s.Length());
+
     Error e;
     auto searcher = ReadSearchInput(m_terminal_height - 1, m_terminal_width, caseless, false, e);
 
