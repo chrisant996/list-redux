@@ -825,30 +825,34 @@ void ReadInputState::PrintVisible(unsigned short x)
 
     unsigned width = 0;
     const unsigned len = FitsInWcwidth(m_s.Text() + m_left, m_s.Length() - m_left, m_max_width, &width);
+    const unsigned lo_limit = m_left;
+    const unsigned hi_limit = m_left + len;
 
     tmp.Clear();
     tmp.AppendColor(GetColor(ColorElement::Input));
 
     if (m_sel.GetAnchor() <= m_s.Length())
     {
-        const unsigned short begin = clamp<unsigned short>(m_sel.GetSelBegin(), m_left, m_left + len);
-        const unsigned short end = clamp<unsigned short>(m_sel.GetSelEnd(), m_left, m_left + len);
-        tmp.Append(m_s.Text() + m_left, begin - m_left);
+        const unsigned short begin = clamp<unsigned short>(m_sel.GetSelBegin(), lo_limit, hi_limit);
+        const unsigned short end = clamp<unsigned short>(m_sel.GetSelEnd(), lo_limit, hi_limit);
+        tmp.Append(m_s.Text() + lo_limit, begin - lo_limit);
         if (begin < end)
+        {
             tmp.AppendColor(GetColor(ColorElement::InputSelection));
-        tmp.Append(m_s.Text() + begin, end - begin);
-        if (begin < end)
+            tmp.Append(m_s.Text() + begin, end - begin);
             // REVIEW:  Should this append a space here if the selection isn't fully drawn due to character width clipping?
             tmp.AppendColor(GetColor(ColorElement::Input));
-        tmp.Append(m_s.Text() + end, len - end);
+        }
+        if (hi_limit > end)
+            tmp.Append(m_s.Text() + end, hi_limit - end);
     }
     else
     {
-        tmp.Append(m_s.Text() + m_left, len);
+        tmp.Append(m_s.Text() + lo_limit, len);
     }
 
     tmp.AppendSpaces(m_max_width - width);
-    tmp.Printf(L"\x1b[%uG%s", x + 1 + __wcswidth(m_s.Text() + m_left, m_sel.GetCaret() - m_left), c_show_cursor);
+    tmp.Printf(L"\x1b[%uG%s", x + 1 + __wcswidth(m_s.Text() + lo_limit, m_sel.GetCaret() - lo_limit), c_show_cursor);
     OutputConsole(tmp.Text(), tmp.Length());
 }
 
