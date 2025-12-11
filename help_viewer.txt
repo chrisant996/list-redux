@@ -27,6 +27,7 @@ GENERAL KEYS:
         Ctrl-P  Previous file.
          Alt-C  Close the current file.
          Alt-O  Open a new file.
+            F5  Reload file.
 
 TEXT VIEWER KEYS:
 
