@@ -992,7 +992,7 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
         s.Append(c_div_char);
     }
 
-    s.AppendNormalIf(color || div_color);
+    s.AppendColor(GetColor(ColorElement::File));
 
     assert(filename_width + details_width == cell_count(s.Text() + orig_len));
 

@@ -760,6 +760,7 @@ LAutoFitContentWidth:
         Error e;
         const WCHAR* msg_text = nullptr;
         const WCHAR* msg_color = nullptr;
+        const WCHAR* norm = GetColor(ColorElement::Content);
 
         if (m_errmsg.Length() || !m_context.HasContent())
         {
@@ -790,14 +791,17 @@ LAutoFitContentWidth:
                     if (msg_color)
                         s.AppendColor(msg_color);
                     s.Append(msg_text, len_row);
-                    s.AppendNormalIf(msg_color && !*end);
+                    if (msg_color && !*end)
+                        s.AppendColor(norm);
                     if (cells < m_terminal_width)
                         s.Append(c_clreol);
-                    s.AppendNormalIf(msg_color && *end);
+                    if (msg_color && *end)
+                        s.AppendColor(norm);
                     msg_text = end;
                 }
                 else
                 {
+                    s.AppendColor(norm);
                     s.Append(c_clreol);
                 }
                 s.Append(L"\n");
@@ -853,7 +857,7 @@ LAutoFitContentWidth:
                             s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
                         }
                         s.Append(car ? car : L" ");
-                        s.Append(c_norm);
+                        s.AppendColor(norm);
                     }
                     else
                     {
@@ -880,11 +884,10 @@ LAutoFitContentWidth:
                     s2.Clear();
                     const uint32 content_width = m_terminal_width - !!show_scrollbar;
                     const unsigned cells = ellipsify_ex(msg_text, content_width, ellipsify_mode::RIGHT, s2, L"");
-                    if (msg_color)
-                        s.AppendColor(msg_color);
+                    s.AppendColor(msg_color ? msg_color : norm);
                     s.Append(s2);
                     if (msg_color)
-                        s.Append(c_norm);
+                        s.AppendColor(norm);
                     if (cells < content_width || show_scrollbar)
                         s.Append(c_clreol);
                     msg_text = nullptr;
@@ -892,7 +895,7 @@ LAutoFitContentWidth:
                 }
                 else if (m_top + row < m_context.Count())
                 {
-                    const WCHAR* color = nullptr;
+                    const WCHAR* color = norm;
                     if (found_line)
                     {
                         const FileOffset row_offset = m_context.GetOffset(m_top + row);
@@ -903,11 +906,11 @@ LAutoFitContentWidth:
                     const unsigned width = m_context.FormatLineData(m_top + row, m_left, s, m_content_width, e, color, found_line);
                     if (width < m_content_width || show_scrollbar)
                         s.Append(c_clreol);
-                    if (color)
-                        s.Append(c_norm);
+                    // s.AppendColor(norm);
                 }
                 else
                 {
+                    s.AppendColor(norm);
                     s.Append(c_clreol);
                 }
 
@@ -935,7 +938,6 @@ LAutoFitContentWidth:
                         s.AppendColor(ConvertColorParams(ColorElement::PopupBorder, ColorConversion::TextOnly));
                     }
                     s.Append(car ? car : L" ");
-                    s.Append(c_norm);
                 }
 
                 s.Append(L"\n");
@@ -1133,7 +1135,7 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg)
         m_clickable_footer.Add(L"    MultiFile", -1, 10, true);
 
     m_clickable_footer.Add(nullptr, 4, 15, true);
-    m_clickable_footer.Add(m_context.GetEncodingName(m_hex_mode), ID_ENCODING, 15, true);
+    m_clickable_footer.Add(m_context.GetEncodingName(m_hex_mode), m_hex_mode ? -1 : ID_ENCODING, 15, true);
 
     if (m_hex_mode)
     {

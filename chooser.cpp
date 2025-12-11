@@ -249,6 +249,7 @@ void Chooser::UpdateDisplay()
 
     StrW s;
     StrW tmp;
+    const WCHAR* const norm = GetColor(ColorElement::File);
 
     EnsureColumnWidths();
     EnsureTop();
@@ -333,7 +334,7 @@ void Chooser::UpdateDisplay()
                                 tmp.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
                             }
                             tmp.Append(car);                     // ┃ or etc
-                            tmp.Append(c_norm);
+                            tmp.AppendColor(norm);
                         }
                         row_width = pad_to + 1;
                     }
@@ -356,6 +357,7 @@ void Chooser::UpdateDisplay()
     if (m_visible_rows < m_prev_visible_rows)
     {
         s.Printf(L"\x1b[%uH", 2 + m_visible_rows);
+        s.AppendColor(norm);
 
         for (intptr_t ii = m_visible_rows + 2; ii < m_terminal_height; ++ii)
         {
