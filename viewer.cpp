@@ -1147,16 +1147,17 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg)
             m_clickable_footer.Add(g_options.show_line_endings ? L"E" : L"e", ID_OPTION_LINEENDINGS, 25, true);
         m_clickable_footer.Add(g_options.show_line_numbers ? L"N" : L"n", ID_OPTION_LINENUMBERS, 25, true);
         if (!m_text)
+        {
             m_clickable_footer.Add(g_options.show_file_offsets ? L"O" : L"o", ID_OPTION_FILEOFFSETS, 25, true);
-        m_clickable_footer.Add(g_options.show_whitespace ? L"S" : L"s", ID_OPTION_SHOWWHITESPACE, 25, true);
+            m_clickable_footer.Add(g_options.show_whitespace ? L"S" : L"s", ID_OPTION_SHOWWHITESPACE, 25, true);
+        }
         m_clickable_footer.Add(m_wrap ? L"W" : L"w", ID_OPTION_WRAP, 25, true);
         if (!m_text)
         {
             m_clickable_footer.Add(g_options.expand_tabs ? L"T" : L"t", ID_OPTION_EXPANDTABS, 25, true);
             m_clickable_footer.Add(c_ctrl_indicator[int(g_options.ctrl_mode)], ID_OPTION_CTRLMODE, 25, true);
+            m_clickable_footer.Add(g_options.show_ruler ? L"R" : L"r", ID_OPTION_SHOWRULER, 25, true);
         }
-        if (!m_text)
-           m_clickable_footer.Add(g_options.show_ruler ? L"R" : L"r", ID_OPTION_SHOWRULER, 25, true);
 #ifdef DEBUG
         m_clickable_footer.Add(g_options.show_debug_info ? L"D" : L"d", ID_OPTION_SHOWDEBUGINFO, 25, true);
 #endif
@@ -2632,7 +2633,7 @@ void Viewer::ToggleFileOffsets()
 
 void Viewer::ToggleShowWhitespace()
 {
-    if (!m_hex_mode)
+    if (!m_hex_mode && !m_text)
     {
         g_options.show_whitespace = !g_options.show_whitespace;
         m_force_update = true;
