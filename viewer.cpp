@@ -1172,12 +1172,12 @@ void Viewer::InitHexWidth()
     m_hex_width = 0;
     if (m_hex_mode)
     {
-        const unsigned available = (m_terminal_width - (8/*ofs*/ + 2/*spc*/ + 0/*bytes*/ + 2/*spc*/ + 1/*edge*/ + 0/*bytes*/ + 1/*edge*/ + 2/*margin*/));
-        if (available >= 32*3 + 3 + 32)
+        const unsigned available = (m_terminal_width - (m_context.CalcMarginWidth(true) + 0/*bytes*/ + 2/*spc*/ + 1/*edge*/ + 0/*bytes*/ + 1/*edge*/ + 2/*margin*/));
+        if (available >= (32/*bytes*/ * (2/*digit*/ + 1/*spc*/)) + 3/*gaps*/ + 32/*characters*/)
             m_hex_width = 32;
-        else if (available >= 16*3 + 1 + 16)
+        else if (available >= (16/*bytes*/ * (2/*digit*/ + 1/*spc*/)) + 1/*gaps*/ + 16/*characters*/)
             m_hex_width = 16;
-        else if (available >= 8*3 + 0 + 8)
+        else if (available >= (8/*bytes*/ * (2/*digit*/ + 1/*spc*/)) + 0/*gaps*/ + 8/*characters*/)
             m_hex_width = 8;
         else
         {
