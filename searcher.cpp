@@ -204,7 +204,7 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
         OutputConsole(tmp.Text(), tmp.Length());
     };
 
-    auto callback = [&](const InputRecord& input)
+    auto callback = [&](const InputRecord& input, void* /*cookie*/)
     {
         switch (input.type)
         {

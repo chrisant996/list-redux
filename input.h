@@ -173,6 +173,6 @@ private:
 };
 
 InputRecord SelectInput(DWORD timeout=INFINITE, AutoMouseConsoleMode* mouse=nullptr);
-bool ReadInput(StrW& out, History history=History::MAX, DWORD max_length=32, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&)>> input_callback=std::nullopt);
+bool ReadInput(StrW& out, History history=History::MAX, DWORD max_length=32, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&, void*)>> input_callback=std::nullopt);
 
 bool ParseULongLong(const WCHAR* s, ULONGLONG& out, int radix=10);

@@ -731,11 +731,11 @@ public:
 
     void            SetMaxWidth(DWORD m) { m_max_width = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
     void            SetMaxLength(DWORD m) { m_max_length = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
-    void            SetCallback(std::optional<std::function<int32(const InputRecord&)>> input_callback);
+    void            SetCallback(std::optional<std::function<int32(const InputRecord&, void*)>> input_callback);
     void            SetHistory(std::vector<StrW>* history);
     void            InitializeText(const WCHAR* s, int32 len=-1);
 
-    int32           Go();
+    int32           Go(void* cookie=nullptr);
 
     void            EnsureLeft();
     void            PrintVisible(unsigned short x);
@@ -794,7 +794,7 @@ private:
     StrW            m_curr_input_history;
 
     // Callback.
-    std::optional<std::function<int32(const InputRecord&)>> m_callback;
+    std::optional<std::function<int32(const InputRecord&, void*)>> m_callback;
 };
 
 ReadInputState::ReadInputState()
@@ -807,7 +807,7 @@ ReadInputState::~ReadInputState()
     ClearUndoInternal();
 }
 
-void ReadInputState::SetCallback(std::optional<std::function<int32(const InputRecord&)>> input_callback)
+void ReadInputState::SetCallback(std::optional<std::function<int32(const InputRecord&, void*)>> input_callback)
 {
     m_callback = input_callback;
 }
@@ -846,7 +846,7 @@ void ReadInputState::InitializeText(const WCHAR* s, int32 len)
     m_history_index = m_history ? m_history->size() : 0;
 }
 
-int32 ReadInputState::Go()
+int32 ReadInputState::Go(void* cookie)
 {
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -876,7 +876,7 @@ int32 ReadInputState::Go()
 
         if (m_callback)
         {
-            const int32 result = (*m_callback)(input);
+            const int32 result = (*m_callback)(input, cookie);
             // Negative means break out of the loop.
             if (result < 0)
                 return -1;
@@ -1437,7 +1437,7 @@ void ReadInputState::DumpUndoStack()
 }
 #endif
 
-bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
+bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std::optional<std::function<int32(const InputRecord&, void*)>> input_callback)
 {
     static std::vector<StrW> s_histories[size_t(History::MAX)];
 

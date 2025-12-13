@@ -2353,7 +2353,7 @@ void Viewer::GoTo(Error& e)
     bool lineno = !m_hex_mode;
     bool done = false;
 
-    auto callback = [&](const InputRecord& input)
+    auto callback = [&](const InputRecord& input, void* /*cookie*/)
     {
         if (input.type != InputType::Char)
             return 0; // Accept.
