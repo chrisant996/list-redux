@@ -39,6 +39,7 @@ static const WCHAR* c_default_colors[] =
     L"93",              // Command
     L"93",              // Input
     L"43;30",           // InputSelection
+    L"46;30",           // InputHorizScroll
     L"90",              // Divider
     L"90",              // LineNumber
     L"",                // Content
@@ -811,6 +812,7 @@ static const WCHAR* const c_reg_color_name[] =
     L"Command",
     L"Input",
     L"InputSelection",
+    L"InputHorizScroll",
     L"Divider",
     L"LineNumber",
     L"Content",

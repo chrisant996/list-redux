@@ -31,6 +31,7 @@ enum class ColorElement
     Command,
     Input,
     InputSelection,
+    InputHorizScroll,
     Divider,
     LineNumber,
     Content,

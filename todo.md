@@ -138,8 +138,8 @@
 - [ ] option to enable/disable mouse input
 - improve input routine
   - [ ] mouse input
-  - [ ] show markers at left/right end when scrolled horizontally
-  - [ ] encapsulate in a class, and have ability to stop processing one instance and start processing a different instance (effectively making it possible to navigate between different input boxes)
+  - [x] show markers at left/right end when scrolled horizontally
+  - [x] encapsulate in a class, and have ability to stop processing one instance and start processing a different instance (effectively making it possible to navigate between different input boxes)
 - [ ] improve message box routine (make it not full terminal width, have clickable buttons, etc)
   - [ ] mouse input in message box routine
 - [ ] command line flags for searching (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)

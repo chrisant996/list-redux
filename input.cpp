@@ -1015,12 +1015,51 @@ void ReadInputState::PrintVisible(unsigned short x)
     tmp.Printf(L"%s\x1b[%uG", c_hide_cursor, x + 1);
     OutputConsole(tmp.Text(), tmp.Length());
 
+    unsigned short max_width = m_max_width;
+    bool left_marker = (m_left > 0);
+    bool right_marker = false;
+    unsigned lo_limit = m_left;
+    unsigned hi_limit = 0;
+
+    if (left_marker)
+    {
+        wcwidth_iter wi(m_s.Text() + m_left);
+        if (wi.next())
+        {
+            lo_limit += wi.character_length();
+            max_width -= 1; // Width of left marker, not the iter character.
+        }
+    }
+
     unsigned width = 0;
-    const unsigned len = FitsInWcwidth(m_s.Text() + m_left, m_s.Length() - m_left, m_max_width, &width);
-    const unsigned lo_limit = m_left;
-    const unsigned hi_limit = m_left + len;
+    const unsigned len = FitsInWcwidth(m_s.Text() + lo_limit, m_s.Length() - lo_limit, max_width - 1, &width);
+    hi_limit = lo_limit + len;
+
+    if (width > 0)
+    {
+        wcwidth_iter wi(m_s.Text() + lo_limit + len);
+        if (wi.next())
+        {
+            if (hi_limit + wi.character_length() == m_s.Length() &&
+                width + wi.character_wcwidth_onectrl() <= max_width)
+            {
+                hi_limit = m_s.Length();
+                width += wi.character_wcwidth_onectrl();
+            }
+            else
+            {
+                right_marker = true;
+                --max_width;
+            }
+        }
+    }
 
     tmp.Clear();
+    if (left_marker)
+    {
+        tmp.AppendColor(GetColor(ColorElement::InputHorizScroll));
+        tmp.Append(L"<", 1);
+    }
     tmp.AppendColor(GetColor(ColorElement::Input));
 
     if (m_sel.GetAnchor() <= m_s.Length())
@@ -1043,8 +1082,13 @@ void ReadInputState::PrintVisible(unsigned short x)
         tmp.Append(m_s.Text() + lo_limit, len);
     }
 
-    tmp.AppendSpaces(m_max_width - width);
-    tmp.Printf(L"\x1b[%uG%s", x + 1 + __wcswidth(m_s.Text() + lo_limit, m_sel.GetCaret() - lo_limit), c_show_cursor);
+    tmp.AppendSpaces(max_width - width);
+    if (right_marker)
+    {
+        tmp.AppendColor(GetColor(ColorElement::InputHorizScroll));
+        tmp.Append(L">", 1);
+    }
+    tmp.Printf(L"\x1b[%uG%s", x + 1 + left_marker + __wcswidth(m_s.Text() + lo_limit, m_sel.GetCaret() - lo_limit), c_show_cursor);
     OutputConsole(tmp.Text(), tmp.Length());
 }
 
