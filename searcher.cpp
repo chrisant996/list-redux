@@ -185,7 +185,7 @@ void TrimLineEnding(StrW& s)
 
 std::unique_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, bool regex, Error& e)
 {
-    StrW s;
+    StrW tmp;
     ClickableRow cr;
 
     enum { ID_IGNORECASE, ID_REGEXP };
@@ -198,10 +198,10 @@ std::unique_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
         cr.Add(nullptr, 3, 0, true);
         cr.AddKeyName(L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal", ID_REGEXP, 0, true);
 
-        s.Set(L"\r");
-        cr.BuildOutput(s, GetColor(ColorElement::Command));
-        s.Printf(L"\rSearch%s ", c_prompt_char);
-        OutputConsole(s.Text(), s.Length());
+        tmp.Set(L"\r");
+        cr.BuildOutput(tmp, GetColor(ColorElement::Command));
+        tmp.Printf(L"\rSearch%s ", c_prompt_char);
+        OutputConsole(tmp.Text(), tmp.Length());
     };
 
     auto callback = [&](const InputRecord& input)
@@ -246,6 +246,7 @@ toggle_caseless:
 
     printcontext();
 
+    StrW s;
     ReadInput(s, History::Search, 1024, terminal_width - 12 - cr.GetRightWidth(), callback);
 
     OutputConsole(c_norm);
