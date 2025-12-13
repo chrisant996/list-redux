@@ -731,6 +731,11 @@ public:
 
     void            SetMaxWidth(DWORD m) { m_max_width = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
     void            SetMaxLength(DWORD m) { m_max_length = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
+    void            SetCallback(std::optional<std::function<int32(const InputRecord&)>> input_callback);
+    void            SetHistory(std::vector<StrW>* history);
+    void            InitializeText(const WCHAR* s, int32 len=-1);
+
+    int32           Go();
 
     void            EnsureLeft();
     void            PrintVisible(unsigned short x);
@@ -758,7 +763,7 @@ public:
     void            Undo();
     void            Redo();
 
-    void            TransferText(StrW& out) { out = std::move(m_s); }
+    void            TransferText(StrW& out);
 
 #ifdef DEBUG
     void            DumpUndoStack();
@@ -782,6 +787,14 @@ private:
     UndoEntry*      m_undo_current = nullptr;
     short           m_grouping = 0;  // >0 means an undo group is in progress.
     bool            m_defer_init_undo = false;
+
+    // History.
+    std::vector<StrW>* m_history = nullptr;
+    size_t          m_history_index = 0;
+    StrW            m_curr_input_history;
+
+    // Callback.
+    std::optional<std::function<int32(const InputRecord&)>> m_callback;
 };
 
 ReadInputState::ReadInputState()
@@ -792,6 +805,185 @@ ReadInputState::ReadInputState()
 ReadInputState::~ReadInputState()
 {
     ClearUndoInternal();
+}
+
+void ReadInputState::SetCallback(std::optional<std::function<int32(const InputRecord&)>> input_callback)
+{
+    m_callback = input_callback;
+}
+
+void ReadInputState::SetHistory(std::vector<StrW>* history)
+{
+    m_history = history;
+    m_history_index = m_history ? m_history->size() : 0;
+}
+
+void ReadInputState::InitializeText(const WCHAR* s, int32 len)
+{
+    if (!s)
+    {
+        s = L"";
+        len = 0;
+    }
+    else if (len < 0)
+    {
+        len = int32(min<size_t>(INT16_MAX, wcslen(s)));
+    }
+
+    ClearUndoInternal();
+    m_sel.SetCaret(0);
+    InsertText(s, len);
+    m_sel.ClearDirty();
+    m_left = m_s.Length();
+    InitUndo();
+
+    assert(!m_sel.IsDirty());
+    assert(!m_sel.GetCaret());
+    assert(!m_sel.GetAnchor());
+    assert(m_s.Empty());
+    assert(!m_defer_init_undo);
+
+    m_history_index = m_history ? m_history->size() : 0;
+}
+
+int32 ReadInputState::Go()
+{
+    const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
+    const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    GetConsoleScreenBufferInfo(hout, &csbi);
+
+    if (unsigned(csbi.dwCursorPosition.X) + 8 >= unsigned(csbi.dwSize.X))
+        return false;
+    if (unsigned(csbi.dwCursorPosition.X) + m_max_width >= unsigned(csbi.dwSize.X))
+        m_max_width = csbi.dwSize.X - csbi.dwCursorPosition.X;
+
+    while (true)
+    {
+        EnsureLeft();
+        PrintVisible(csbi.dwCursorPosition.X);
+
+        const InputRecord input = SelectInput();
+        switch (input.type)
+        {
+        case InputType::None:
+        case InputType::Error:
+            continue;
+        case InputType::Resize:
+            return false;
+        }
+
+        if (m_callback)
+        {
+            const int32 result = (*m_callback)(input);
+            // Negative means break out of the loop.
+            if (result < 0)
+                return -1;
+            // Positive means do not process (already handled).
+            if (result > 0)
+                continue;
+            // Zero means allow normal processing.
+        }
+
+        if (input.type == InputType::Key)
+        {
+            switch (input.key)
+            {
+            case Key::ESC:
+                return false;
+            case Key::BACK:
+                if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
+                    Backspace((input.modifier & Modifier::CTRL) == Modifier::CTRL);
+                break;
+            case Key::INS:
+                if (input.modifier == Modifier::CTRL)
+                    CopyToClipboard();
+                else if (input.modifier == Modifier::SHIFT)
+                    PasteFromClipboard();
+            case Key::DEL:
+                if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
+                    Delete((input.modifier & Modifier::CTRL) == Modifier::CTRL);
+                if (input.modifier == Modifier::SHIFT)
+                    goto cut_to_clip;
+                break;
+            case Key::ENTER:
+                if (m_history && m_s.Length())
+                    m_history->emplace_back(m_s);
+                return true;
+            case Key::HOME:
+                Home(input.modifier);
+                continue;
+            case Key::END:
+                End(input.modifier);
+                continue;
+            case Key::UP:
+                if (m_history && m_history_index)
+                {
+                    if (m_history_index == m_history->size())
+                        TransferText(m_curr_input_history);
+                    --m_history_index;
+                    ReplaceFromHistory((*m_history)[m_history_index], false/*keep_undo*/);
+                }
+                continue; // Avoid resetting m_history_index.
+            case Key::DOWN:
+                if (m_history && m_history_index < m_history->size())
+                {
+                    ++m_history_index;
+                    if (m_history_index == m_history->size())
+                        ReplaceFromHistory(m_curr_input_history, true/*keep_undo*/);
+                    else
+                        ReplaceFromHistory((*m_history)[m_history_index], false/*keep_undo*/);
+                }
+                continue; // Avoid resetting m_history_index.
+            case Key::LEFT:
+                Left(input.modifier);
+                break;
+            case Key::RIGHT:
+                Right(input.modifier);
+                break;
+            }
+        }
+        else if (input.type == InputType::Char)
+        {
+            if (input.key_char >= ' ')
+            {
+                InsertChar(input.key_char, input.key_char2);
+            }
+            else
+            {
+                switch (input.key_char)
+                {
+                case 'A'-'@':
+                    Home(Modifier::None);
+                    End(Modifier::SHIFT);
+                    break;
+                case 'C'-'@':
+                    CopyToClipboard();
+                    break;
+                case 'V'-'@':
+                    PasteFromClipboard();
+                    break;
+                case 'X'-'@':
+cut_to_clip:
+                    BeginUndoGroup();
+                    CopyToClipboard();
+                    ElideSelectedText();
+                    EndUndoGroup();
+                    break;
+                case 'Y'-'@':
+                    Redo();
+                    break;
+                case 'Z'-'@':
+                    Undo();
+                    break;
+                }
+            }
+        }
+
+        if (m_history && m_history_index < m_history->size())
+            m_history_index = m_history->size();
+    }
 }
 
 void ReadInputState::EnsureLeft()
@@ -1223,6 +1415,12 @@ void ReadInputState::Redo()
     m_undo_current = r;
 }
 
+void ReadInputState::TransferText(StrW& out)
+{
+    out = std::move(m_s);
+    InitializeText(nullptr, 0);
+}
+
 #ifdef DEBUG
 void ReadInputState::DumpUndoStack()
 {
@@ -1242,157 +1440,25 @@ void ReadInputState::DumpUndoStack()
 bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std::optional<std::function<int32(const InputRecord&)>> input_callback)
 {
     static std::vector<StrW> s_histories[size_t(History::MAX)];
-    std::vector<StrW>* const history = (size_t(hindex) < _countof(s_histories)) ? &s_histories[size_t(hindex)] : nullptr;
+
     max_length = max<DWORD>(max_length, 1);
     max_length = min<DWORD>(max_length, 1024);
-
     out.Clear();
-
-    const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
-    const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    GetConsoleScreenBufferInfo(hout, &csbi);
-
-    if (unsigned(csbi.dwCursorPosition.X) + 8 >= unsigned(csbi.dwSize.X))
-        return false;
-    if (unsigned(csbi.dwCursorPosition.X) + max_width >= unsigned(csbi.dwSize.X))
-        max_width = csbi.dwSize.X - csbi.dwCursorPosition.X;
-
-    StrW curr_input_history;
-    size_t history_index = history ? history->size() : 0;
 
     ReadInputState state;
     state.SetMaxWidth(max_width);
     state.SetMaxLength(max_length);
+    state.SetCallback(input_callback);
+    state.SetHistory((size_t(hindex) < _countof(s_histories)) ? &s_histories[size_t(hindex)] : nullptr);
 
-    while (true)
+    const int32 result = state.Go();
+    if (result > 0)
     {
-        state.EnsureLeft();
-        state.PrintVisible(csbi.dwCursorPosition.X);
-
-        const InputRecord input = SelectInput();
-        switch (input.type)
-        {
-        case InputType::None:
-        case InputType::Error:
-            continue;
-        case InputType::Resize:
-            return false;
-        }
-
-        if (input_callback)
-        {
-            const int32 result = (*input_callback)(input);
-            // Negative means cancel (like ESC).
-            if (result < 0)
-                return false;
-            // Positive means do not process (already handled).
-            if (result > 0)
-                continue;
-            // Zero means allow normal processing.
-        }
-
-        if (input.type == InputType::Key)
-        {
-            switch (input.key)
-            {
-            case Key::ESC:
-                out.Clear();
-                return false;
-            case Key::BACK:
-                if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
-                    state.Backspace((input.modifier & Modifier::CTRL) == Modifier::CTRL);
-                break;
-            case Key::INS:
-                if (input.modifier == Modifier::CTRL)
-                    state.CopyToClipboard();
-                else if (input.modifier == Modifier::SHIFT)
-                    state.PasteFromClipboard();
-            case Key::DEL:
-                if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
-                    state.Delete((input.modifier & Modifier::CTRL) == Modifier::CTRL);
-                if (input.modifier == Modifier::SHIFT)
-                    goto cut_to_clip;
-                break;
-            case Key::ENTER:
-                state.TransferText(out);
-                if (history && out.Length())
-                    history->emplace_back(out);
-                return true;
-            case Key::HOME:
-                state.Home(input.modifier);
-                continue;
-            case Key::END:
-                state.End(input.modifier);
-                continue;
-            case Key::UP:
-                if (history && history_index)
-                {
-                    if (history_index == history->size())
-                        state.TransferText(curr_input_history);
-                    --history_index;
-                    state.ReplaceFromHistory((*history)[history_index], false/*keep_undo*/);
-                }
-                continue; // Avoid resetting history_index.
-            case Key::DOWN:
-                if (history && history_index < history->size())
-                {
-                    ++history_index;
-                    if (history_index == history->size())
-                        state.ReplaceFromHistory(curr_input_history, true/*keep_undo*/);
-                    else
-                        state.ReplaceFromHistory((*history)[history_index], false/*keep_undo*/);
-                }
-                continue; // Avoid resetting history_index.
-            case Key::LEFT:
-                state.Left(input.modifier);
-                break;
-            case Key::RIGHT:
-                state.Right(input.modifier);
-                break;
-            }
-        }
-        else if (input.type == InputType::Char)
-        {
-            if (input.key_char >= ' ')
-            {
-                state.InsertChar(input.key_char, input.key_char2);
-            }
-            else
-            {
-                switch (input.key_char)
-                {
-                case 'A'-'@':
-                    state.Home(Modifier::None);
-                    state.End(Modifier::SHIFT);
-                    break;
-                case 'C'-'@':
-                    state.CopyToClipboard();
-                    break;
-                case 'V'-'@':
-                    state.PasteFromClipboard();
-                    break;
-                case 'X'-'@':
-cut_to_clip:
-                    state.BeginUndoGroup();
-                    state.CopyToClipboard();
-                    state.ElideSelectedText();
-                    state.EndUndoGroup();
-                    break;
-                case 'Y'-'@':
-                    state.Redo();
-                    break;
-                case 'Z'-'@':
-                    state.Undo();
-                    break;
-                }
-            }
-        }
-
-        if (history && history_index < history->size())
-            history_index = history->size();
+        state.TransferText(out);
+        return true;
     }
+
+    return false;
 }
 
 static bool wcstonum(const WCHAR* text, unsigned radix, unsigned __int64& out)
