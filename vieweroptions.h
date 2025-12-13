@@ -9,6 +9,8 @@
 #define USE_SMALL_DATA_BUFFER
 #endif
 
+#include "searcher.h"
+
 const DWORD c_default_tab_width = 8;
 #ifdef USE_SMALL_DATA_BUFFER
 const DWORD c_data_buffer_slop = 256;
@@ -54,6 +56,7 @@ struct ViewerOptions
     uint8 hex_grouping = 0;             // Power of 2.
     WCHAR filter_byte_char = '.';
     unsigned hanging_extra = 8;         // How much to add to leading indent to create hanging indent.
+    std::shared_ptr<Searcher> searcher;
 
     bool internal_help_mode = false;    // Applies special hanging indent rules for the built in help text.
 #ifdef INCLUDE_MENU_ROW

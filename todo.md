@@ -95,7 +95,7 @@
   - [x] `F4` toggle multi-file search (next/prev cross file boundaries)
   - [x] make search interruptible with `Ctrl-Break`
   - [x] search for regex (search line by line)
-  - [ ] viewer should inherit most recent search string from chooser (unless viewer has a more recent search string?)
+  - [x] viewer should inherit most recent search string from chooser (unless viewer has a more recent search string?)
 - hex mode
   - [x] always show hex ruler on a second header row
   - [x] go to offset

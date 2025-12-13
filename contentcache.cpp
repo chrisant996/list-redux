@@ -1964,7 +1964,7 @@ unsigned ContentCache::GetLength(size_t line) const
     return 0;
 }
 
-bool ContentCache::Find(bool next, const std::unique_ptr<Searcher>& searcher, unsigned max_width, FoundOffset& found_line, unsigned& left_offset, Error& e)
+bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned max_width, FoundOffset& found_line, unsigned& left_offset, Error& e)
 {
     StrW tmp;
     const unsigned needle_delta = searcher->GetNeedleDelta();
@@ -2118,7 +2118,7 @@ bool ContentCache::Find(bool next, const std::unique_ptr<Searcher>& searcher, un
     }
 }
 
-bool ContentCache::Find(bool next, const std::unique_ptr<Searcher>& searcher, unsigned hex_width, FoundOffset& found_line, Error& e)
+bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned hex_width, FoundOffset& found_line, Error& e)
 {
     StrW tmp;
     const unsigned needle_delta = searcher->GetNeedleDelta();

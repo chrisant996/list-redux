@@ -119,23 +119,23 @@ bool Searcher_ECMAScriptRegex::DoNext(const WCHAR* line, unsigned length, Error&
     return true;
 }
 
-std::unique_ptr<Searcher> Searcher::Create(SearcherType type, const WCHAR* s, bool caseless, bool optimize, Error& e)
+std::shared_ptr<Searcher> Searcher::Create(SearcherType type, const WCHAR* s, bool caseless, bool optimize, Error& e)
 {
-    std::unique_ptr<Searcher> searcher;
+    std::shared_ptr<Searcher> searcher;
 
     switch (type)
     {
     default:
     case SearcherType::Literal:
-        searcher = std::make_unique<Searcher_Literal>(s, caseless, optimize, e);
+        searcher = std::make_shared<Searcher_Literal>(s, caseless, optimize, e);
         break;
     case SearcherType::ECMAScriptRegex:
-        searcher = std::make_unique<Searcher_ECMAScriptRegex>(s, caseless, optimize, e);
+        searcher = std::make_shared<Searcher_ECMAScriptRegex>(s, caseless, optimize, e);
         break;
     }
 
     if (e.Test())
-        searcher.release();
+        searcher.reset();
     return searcher;
 }
 
@@ -183,7 +183,7 @@ void TrimLineEnding(StrW& s)
     }
 }
 
-std::unique_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, bool regex, Error& e)
+std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, bool regex, Error& e)
 {
     StrW tmp;
     ClickableRow cr;
@@ -251,7 +251,7 @@ toggle_caseless:
 
     OutputConsole(c_norm);
 
-    std::unique_ptr<Searcher> searcher;
+    std::shared_ptr<Searcher> searcher;
     if (s.Length())
         searcher = Searcher::Create(regex ? SearcherType::ECMAScriptRegex : SearcherType::Literal, s.Text(), caseless, true, e);
     return searcher;

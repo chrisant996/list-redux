@@ -1832,6 +1832,8 @@ void Chooser::SearchAndTag(Error& e, bool caseless)
     if (!searcher)
         return;
 
+    g_options.searcher = searcher;
+
     bool canceled = false;
     size_t num_found = 0;
     FoundOffset found_line;

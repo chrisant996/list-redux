@@ -345,7 +345,6 @@ private:
     bool            m_searching = false;
     StrW            m_searching_file;
 
-    std::unique_ptr<Searcher> m_searcher;
     bool            m_multifile_search = false;
     FoundOffset     m_found_line;
 };
@@ -1485,7 +1484,7 @@ hex_edit_right:
             {
                 // F3 = forward, Shift-F3 = backward.
                 const bool next = (input.modifier & Modifier::SHIFT) == Modifier::None;
-                if (!m_searcher)
+                if (!g_options.searcher)
                 {
                     if (!next && m_found_line.Empty())
                     {
@@ -2221,14 +2220,14 @@ void Viewer::DoSearch(bool next, bool caseless)
     if (!searcher)
         return;
 
-    m_searcher = std::move(searcher);
+    g_options.searcher = searcher;
     m_found_line.Clear();
     FindNext(next);
 }
 
 void Viewer::FindNext(bool next)
 {
-    assert(m_searcher);
+    assert(g_options.searcher);
 
     // TODO:  When should a search start over at the top of the file?
 
@@ -2243,8 +2242,8 @@ void Viewer::FindNext(bool next)
     Error e;
     unsigned left_offset = m_left;
     bool found = (m_hex_mode ?
-            m_context.Find(next, m_searcher, m_hex_width, m_found_line, e) :
-            m_context.Find(next, m_searcher, m_content_width, m_found_line, left_offset, e));
+            m_context.Find(next, g_options.searcher, m_hex_width, m_found_line, e) :
+            m_context.Find(next, g_options.searcher, m_content_width, m_found_line, left_offset, e));
     bool canceled = (e.Code() == E_ABORT);
 
     if (!found && !canceled && !m_text && m_multifile_search && m_files)
@@ -2279,8 +2278,8 @@ void Viewer::FindNext(bool next)
             FoundOffset found_line;
             ctx.SetWrapWidth(m_wrap ? m_content_width : 0);
             found = (m_hex_mode ?
-                    ctx.Find(next, m_searcher, m_hex_width, found_line, e) :
-                    ctx.Find(next, m_searcher, m_content_width, found_line, left_offset, e));
+                    ctx.Find(next, g_options.searcher, m_hex_width, found_line, e) :
+                    ctx.Find(next, g_options.searcher, m_content_width, found_line, left_offset, e));
             if (e.Code() == E_ABORT)
             {
                 SetFile(index, &ctx);

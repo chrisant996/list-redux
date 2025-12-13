@@ -10,10 +10,10 @@
 
 enum class SearcherType { Literal, ECMAScriptRegex };
 
-class Searcher
+class Searcher : public std::enable_shared_from_this<Searcher>
 {
 public:
-    static std::unique_ptr<Searcher> Create(SearcherType type, const WCHAR* s, bool caseless, bool optimize, Error& e);
+    static std::shared_ptr<Searcher> Create(SearcherType type, const WCHAR* s, bool caseless, bool optimize, Error& e);
 
                     ~Searcher() = default;
 
@@ -50,4 +50,4 @@ private:
 
 void TrimLineEnding(StrW& s);
 
-std::unique_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, bool regex, Error& e);
+std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, bool regex, Error& e);
