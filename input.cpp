@@ -733,7 +733,7 @@ public:
     void            SetMaxLength(DWORD m) { m_max_length = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
     void            SetCallback(std::optional<std::function<int32(const InputRecord&, void*)>> input_callback);
     void            SetHistory(std::vector<StrW>* history);
-    void            SetHorizScrollMarkers(bool show);
+    void            SetHorizScrollMarkers(bool show) { m_horiz_scroll_markers = show; }
 
     void            InitializeText(const WCHAR* s, int32 len=-1);
 
