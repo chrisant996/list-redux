@@ -10,6 +10,8 @@
 #include "ellipsify.h"
 #include "colors.h"
 
+typedef uint16 textpos_t;
+
 enum class InputType
 {
     None,
@@ -121,13 +123,23 @@ class MouseHelper
         DWORD       m_last_tick = 0;
     };
 public:
-                    MouseHelper(bool allow=false) : m_allow_acceleration(allow) {}
+                    MouseHelper(bool allow=false) : m_allow_acceleration(allow) { ClearClicks(); }
     void            AllowAcceleration(bool allow) { m_allow_acceleration = allow; }
     int32           LinesFromRecord(const InputRecord& input);
+    uint8           OnClick(COORD coord, bool dblclk);
+    uint8           GetClicks() const { return m_clicks; }
+    void            ClearClicks();
+    void            SetAnchors(textpos_t a1, textpos_t a2);
+    bool            GetAnchor(textpos_t pos, textpos_t& anchor, textpos_t& caret) const;
 private:
     AccelerationHelper m_vert_accel;
     AccelerationHelper m_horz_accel;
     bool            m_allow_acceleration = false;
+    uint8           m_clicks;
+    COORD           m_coord;
+    DWORD           m_tick;
+    textpos_t       m_anchor1;
+    textpos_t       m_anchor2;
 };
 
 class ClickableRow

@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "input.h"
 #include "output.h"
+#include "vieweroptions.h"
 #include "colors.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
@@ -501,7 +502,7 @@ static std::vector<GraphemeInfo> ParseGraphemes(const WCHAR* s, const unsigned l
     return characters;
 }
 
-static void BackUpByAmount(unsigned short& pos, const WCHAR* s, unsigned len, unsigned backup)
+static void BackUpByAmount(textpos_t& pos, const WCHAR* s, unsigned len, unsigned backup)
 {
     if (pos)
     {
@@ -532,7 +533,7 @@ static void BackUpByAmount(unsigned short& pos, const WCHAR* s, unsigned len, un
     }
 }
 
-static unsigned short PosMover(const WCHAR* s, const unsigned len, unsigned short& pos, const bool forward, const bool word)
+static textpos_t PosMover(const WCHAR* s, const unsigned len, textpos_t& pos, const bool forward, const bool word)
 {
     size_t index_pos = 0;
     std::vector<GraphemeInfo> characters = ParseGraphemes(s, len, pos, index_pos);
@@ -617,7 +618,7 @@ static unsigned short PosMover(const WCHAR* s, const unsigned len, unsigned shor
         }
     }
 
-    unsigned short moved = 0;
+    textpos_t moved = 0;
     const size_t begin = min(index_pos, orig_index_pos);
     const size_t end = max(index_pos, orig_index_pos);
     for (size_t i = begin; i < end; ++i)
@@ -628,22 +629,22 @@ static unsigned short PosMover(const WCHAR* s, const unsigned len, unsigned shor
 struct SelectionState
 {
                     SelectionState() : m_anchor(0), m_caret(0), m_dirty(false) { ResetWordAnchor(); }
-                    SelectionState(unsigned short caret) : m_anchor(caret), m_caret(caret), m_dirty(false) { ResetWordAnchor(); }
-                    SelectionState(unsigned short anchor, unsigned short caret) : m_anchor(anchor), m_caret(caret), m_dirty(false) { ResetWordAnchor(); }
+                    SelectionState(textpos_t caret) : m_anchor(caret), m_caret(caret), m_dirty(false) { ResetWordAnchor(); }
+                    SelectionState(textpos_t anchor, textpos_t caret) : m_anchor(anchor), m_caret(caret), m_dirty(false) { ResetWordAnchor(); }
 
-    void            SetCaret(unsigned short caret) { SetSelection(caret, caret); }
-    void            SetSelection(unsigned short anchor, unsigned short caret);
+    void            SetCaret(textpos_t caret) { SetSelection(caret, caret); }
+    void            SetSelection(textpos_t anchor, textpos_t caret);
 #if 0
     void            ResetWordAnchor() { m_word_anchor_begin = m_anchor; m_word_anchor_end = m_caret; }
-    void            ResetWordAnchor(unsigned short caret) { m_word_anchor_begin = m_anchor; m_word_anchor_end = caret; }
+    void            ResetWordAnchor(textpos_t caret) { m_word_anchor_begin = m_anchor; m_word_anchor_end = caret; }
 #else
     void            ResetWordAnchor() {}
 #endif
 
-    unsigned short  GetAnchor() const { return m_anchor; }
-    unsigned short  GetCaret() const { return m_caret; }
-    unsigned short  GetSelBegin() const { return min(m_anchor, m_caret); }
-    unsigned short  GetSelEnd() const { return max(m_anchor, m_caret); }
+    textpos_t       GetAnchor() const { return m_anchor; }
+    textpos_t       GetCaret() const { return m_caret; }
+    textpos_t       GetSelBegin() const { return min(m_anchor, m_caret); }
+    textpos_t       GetSelEnd() const { return max(m_anchor, m_caret); }
 #if 0
     int             GetWordAnchorBegin() const { return m_word_anchor_begin; }
     int             GetWordAnchorEnd() const { return m_word_anchor_end; }
@@ -653,12 +654,12 @@ struct SelectionState
     bool            IsDirty() const { return m_dirty; }
     void            ClearDirty() { m_dirty = false; }
 
-    unsigned short& GetAnchorOut() { return m_anchor; }
-    unsigned short& GetCaretOut() { return m_caret; }
+    textpos_t&      GetAnchorOut() { return m_anchor; }
+    textpos_t&      GetCaretOut() { return m_caret; }
 
 private:
-    unsigned short  m_anchor;
-    unsigned short  m_caret;
+    textpos_t       m_anchor;
+    textpos_t       m_caret;
 #if 0
     short           m_word_anchor_begin;
     short           m_word_anchor_end;
@@ -666,10 +667,10 @@ private:
     bool            m_dirty;
 };
 
-void SelectionState::SetSelection(unsigned short anchor, unsigned short caret)
+void SelectionState::SetSelection(textpos_t anchor, textpos_t caret)
 {
-    assert(anchor != static_cast<unsigned short>(-1));
-    assert(caret != static_cast<unsigned short>(-1));
+    assert(anchor != static_cast<textpos_t>(-1));
+    assert(caret != static_cast<textpos_t>(-1));
     if (anchor != m_anchor || caret != m_caret)
         m_dirty = true;
     m_anchor = anchor;
@@ -725,22 +726,22 @@ void UndoEntry::Unlink(UndoEntry*& head, UndoEntry*& tail)
 
 class ReadInputState
 {
+    enum class Outcome { Cancelled, Done, DontResetHistoryIndex, ResetHistoryIndex };
+
 public:
                     ReadInputState();
                     ~ReadInputState();
 
-    void            SetMaxWidth(DWORD m) { m_max_width = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
-    void            SetMaxLength(DWORD m) { m_max_length = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
+    void            SetMaxWidth(DWORD m) { m_max_width = static_cast<textpos_t>(min<DWORD>(m, INT16_MAX)); }
+    void            SetMaxLength(DWORD m) { m_max_length = static_cast<textpos_t>(min<DWORD>(m, INT16_MAX)); }
     void            SetCallback(std::optional<std::function<int32(const InputRecord&, void*)>> input_callback);
     void            SetHistory(std::vector<StrW>* history);
     void            SetHorizScrollMarkers(bool show) { m_horiz_scroll_markers = show; }
+    void            SetOrigin(COORD coord) { m_origin = coord; }
 
     void            InitializeText(const WCHAR* s, int32 len=-1);
 
     int32           Go(void* cookie=nullptr);
-
-    void            EnsureLeft();
-    void            PrintVisible(unsigned short x);
 
     void            Home(Modifier modifier);
     void            End(Modifier modifier);
@@ -749,14 +750,18 @@ public:
     void            Backspace(bool word=false);
     void            Delete(bool word=false);
 
+    void            SetSelection(textpos_t anchor, textpos_t caret);
+    void            SelectWord();
+
     void            CopyToClipboard();
+    void            CutToClipboard();
     void            PasteFromClipboard();
 
-    unsigned short  GetCaret() const { return m_sel.GetCaret(); }
+    textpos_t       GetCaret() const { return m_sel.GetCaret(); }
     void            ReplaceFromHistory(const StrW& s, bool keep_undo);
     void            InsertChar(WCHAR c, WCHAR c2=0);
     void            InsertText(const WCHAR* s, size_t len);
-    void            RemoveText(unsigned short begin, unsigned short end);
+    void            RemoveText(textpos_t begin, textpos_t end);
     bool            ElideSelectedText();
 
     void            ClearUndo() { InitUndo(); }
@@ -772,20 +777,27 @@ public:
 #endif
 
 private:
+    void            EnsureLeft();
+    void            PrintVisible();
+    Outcome         HandleInput(const InputRecord& input);
     void            InitUndo();
     void            ClearUndoInternal();
     void            UnlinkUndoEntry(UndoEntry* p);
 
 private:
     // Configuration.
-    unsigned short  m_max_width = 32;
-    unsigned short  m_max_length = 32;
+    uint16          m_max_width = 32;
+    uint16          m_max_length = 32;
+    COORD           m_origin = { -1, -1 };
     bool            m_horiz_scroll_markers = true;
 
     // Content and state.
     StrW            m_s;
-    unsigned short  m_left = 0;
+    uint16          m_terminal_row = 0;
+    textpos_t       m_left = 0;
     SelectionState  m_sel;
+    MouseHelper     m_mouse_helper;
+    bool            m_can_drag = false;
 
     // Undo/Redo queue.
     UndoEntry*      m_undo_head = nullptr;
@@ -865,12 +877,19 @@ int32 ReadInputState::Go(void* cookie)
     if (unsigned(csbi.dwCursorPosition.X) + m_max_width >= unsigned(csbi.dwSize.X))
         m_max_width = csbi.dwSize.X - csbi.dwCursorPosition.X;
 
+    if (m_origin.X < 0 || m_origin.Y < 0)
+        SetOrigin(csbi.dwCursorPosition);
+
+    AutoMouseConsoleMode mouse(0, g_options.allow_mouse);
+    m_mouse_helper.ClearClicks();
+    m_can_drag = false;
+
     while (true)
     {
         EnsureLeft();
-        PrintVisible(csbi.dwCursorPosition.X);
+        PrintVisible();
 
-        const InputRecord input = SelectInput();
+        const InputRecord input = SelectInput(INFINITE, &mouse);
         switch (input.type)
         {
         case InputType::None:
@@ -878,118 +897,257 @@ int32 ReadInputState::Go(void* cookie)
             continue;
         case InputType::Resize:
             return false;
-        }
 
-        if (m_callback)
-        {
-            const int32 result = (*m_callback)(input, cookie);
-            // Negative means break out of the loop.
-            if (result < 0)
-                return -1;
-            // Positive means do not process (already handled).
-            if (result > 0)
-                continue;
-            // Zero means allow normal processing.
-        }
-
-        if (input.type == InputType::Key)
-        {
-            switch (input.key)
+        case InputType::Key:
+        case InputType::Char:
+        case InputType::Mouse:
+            if (m_callback)
             {
-            case Key::ESC:
+                const int32 result = (*m_callback)(input, cookie);
+                // Negative means break out of the loop.
+                if (result < 0)
+                    return -1;
+                // Positive means do not process (already handled).
+                if (result > 0)
+                    continue;
+                // Zero means allow normal processing.
+            }
+            switch (HandleInput(input))
+            {
+            case Outcome::Cancelled:
                 return false;
-            case Key::BACK:
-                if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
-                    Backspace((input.modifier & Modifier::CTRL) == Modifier::CTRL);
-                break;
-            case Key::INS:
-                if (input.modifier == Modifier::CTRL)
-                    CopyToClipboard();
-                else if (input.modifier == Modifier::SHIFT)
-                    PasteFromClipboard();
-            case Key::DEL:
-                if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
-                    Delete((input.modifier & Modifier::CTRL) == Modifier::CTRL);
-                if (input.modifier == Modifier::SHIFT)
-                    goto cut_to_clip;
-                break;
-            case Key::ENTER:
-                if (m_history && m_s.Length())
-                    m_history->emplace_back(m_s);
+            case Outcome::Done:
                 return true;
-            case Key::HOME:
-                Home(input.modifier);
-                continue;
-            case Key::END:
-                End(input.modifier);
-                continue;
-            case Key::UP:
-                if (m_history && m_history_index)
-                {
-                    if (m_history_index == m_history->size())
-                        TransferText(m_curr_input_history);
-                    --m_history_index;
-                    ReplaceFromHistory((*m_history)[m_history_index], false/*keep_undo*/);
-                }
-                continue; // Avoid resetting m_history_index.
-            case Key::DOWN:
+            case Outcome::DontResetHistoryIndex:
+                break;
+            case Outcome::ResetHistoryIndex:
                 if (m_history && m_history_index < m_history->size())
-                {
-                    ++m_history_index;
-                    if (m_history_index == m_history->size())
-                        ReplaceFromHistory(m_curr_input_history, true/*keep_undo*/);
-                    else
-                        ReplaceFromHistory((*m_history)[m_history_index], false/*keep_undo*/);
-                }
-                continue; // Avoid resetting m_history_index.
-            case Key::LEFT:
-                Left(input.modifier);
+                    m_history_index = m_history->size();
                 break;
-            case Key::RIGHT:
-                Right(input.modifier);
+            default:
+                assert(false);
                 break;
             }
-        }
-        else if (input.type == InputType::Char)
-        {
-            if (input.key_char >= ' ')
-            {
-                InsertChar(input.key_char, input.key_char2);
-            }
-            else
-            {
-                switch (input.key_char)
-                {
-                case 'A'-'@':
-                    Home(Modifier::None);
-                    End(Modifier::SHIFT);
-                    break;
-                case 'C'-'@':
-                    CopyToClipboard();
-                    break;
-                case 'V'-'@':
-                    PasteFromClipboard();
-                    break;
-                case 'X'-'@':
-cut_to_clip:
-                    BeginUndoGroup();
-                    CopyToClipboard();
-                    ElideSelectedText();
-                    EndUndoGroup();
-                    break;
-                case 'Y'-'@':
-                    Redo();
-                    break;
-                case 'Z'-'@':
-                    Undo();
-                    break;
-                }
-            }
-        }
+            break;
 
-        if (m_history && m_history_index < m_history->size())
-            m_history_index = m_history->size();
+        default:
+            assert(false);
+            break;
+        }
     }
+}
+
+ReadInputState::Outcome ReadInputState::HandleInput(const InputRecord& input)
+{
+    AutoCleanup cleanup;
+
+    if (input.type == InputType::Key)
+    {
+        cleanup.Set([&]() {
+            m_can_drag = false;
+        });
+
+        switch (input.key)
+        {
+        case Key::ESC:
+            return Outcome::Cancelled;
+        case Key::BACK:
+            if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
+                Backspace((input.modifier & Modifier::CTRL) == Modifier::CTRL);
+            break;
+        case Key::INS:
+            if (input.modifier == Modifier::CTRL)
+                CopyToClipboard();
+            else if (input.modifier == Modifier::SHIFT)
+                PasteFromClipboard();
+        case Key::DEL:
+            if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
+                Delete((input.modifier & Modifier::CTRL) == Modifier::CTRL);
+            if (input.modifier == Modifier::SHIFT)
+                CutToClipboard();
+            break;
+        case Key::ENTER:
+            if (m_history && m_s.Length())
+                m_history->emplace_back(m_s);
+            return Outcome::Done;
+        case Key::HOME:
+            Home(input.modifier);
+            return Outcome::DontResetHistoryIndex;
+        case Key::END:
+            End(input.modifier);
+            return Outcome::DontResetHistoryIndex;
+        case Key::UP:
+            if (m_history && m_history_index)
+            {
+                if (m_history_index == m_history->size())
+                    TransferText(m_curr_input_history);
+                --m_history_index;
+                ReplaceFromHistory((*m_history)[m_history_index], false/*keep_undo*/);
+            }
+            return Outcome::DontResetHistoryIndex;
+        case Key::DOWN:
+            if (m_history && m_history_index < m_history->size())
+            {
+                ++m_history_index;
+                if (m_history_index == m_history->size())
+                    ReplaceFromHistory(m_curr_input_history, true/*keep_undo*/);
+                else
+                    ReplaceFromHistory((*m_history)[m_history_index], false/*keep_undo*/);
+            }
+            return Outcome::DontResetHistoryIndex;
+        case Key::LEFT:
+            Left(input.modifier);
+            break;
+        case Key::RIGHT:
+            Right(input.modifier);
+            break;
+        default:
+            return Outcome::DontResetHistoryIndex;
+        }
+    }
+    else if (input.type == InputType::Char)
+    {
+        cleanup.Set([&]() {
+            m_can_drag = false;
+        });
+
+        if (input.key_char >= ' ')
+        {
+            InsertChar(input.key_char, input.key_char2);
+        }
+        else
+        {
+            switch (input.key_char)
+            {
+            case 'A'-'@':
+                Home(Modifier::None);
+                End(Modifier::SHIFT);
+                break;
+            case 'C'-'@':
+                CopyToClipboard();
+                break;
+            case 'V'-'@':
+                PasteFromClipboard();
+                break;
+            case 'X'-'@':
+                CutToClipboard();
+                break;
+            case 'Y'-'@':
+                Redo();
+                break;
+            case 'Z'-'@':
+                Undo();
+                break;
+            default:
+                return Outcome::DontResetHistoryIndex;
+            }
+        }
+    }
+    else if (input.type == InputType::Mouse)
+    {
+        switch (input.key)
+        {
+        case Key::MouseWheel:
+            break;
+        case Key::MouseLeftClick:
+        case Key::MouseLeftDblClick:
+            m_can_drag = true;
+            __fallthrough;
+        case Key::MouseDrag:
+            if (m_can_drag)
+            {
+                const bool drag = (input.key == Key::MouseDrag);
+                if (drag || (input.mouse_pos.Y == m_origin.Y &&
+                             input.mouse_pos.X >= m_origin.X && input.mouse_pos.X < m_origin.X + m_max_width))
+                {
+                    const uint8 clicks = (drag ?
+                        m_mouse_helper.GetClicks() :
+                        m_mouse_helper.OnClick(input.mouse_pos, (input.key == Key::MouseLeftDblClick)));
+                    if (clicks == 3)
+                    {
+                        m_sel.SetSelection(0, m_s.Length());
+                    }
+                    else if (clicks)
+                    {
+                        // Translate input.mouse_pos to textpos_t.
+                        textpos_t pos = 0;
+                        int x = input.mouse_pos.X - m_origin.X;
+                        wcwidth_iter iter(m_s.Text(), m_s.Length());
+                        while (iter.next())
+                        {
+                            if (pos < m_left)
+                            {
+                                pos += iter.character_length();
+                                continue;
+                            }
+                            if (x <= 0)
+                                break;
+                            pos += iter.character_length();
+                            x -= iter.character_wcwidth_onectrl();
+                        }
+
+                        if (drag)
+                        {
+                            textpos_t anchor;
+                            if (m_mouse_helper.GetAnchor(pos, anchor, pos) && clicks == 2)
+                            {
+                                SelectionState old = m_sel;
+                                if (pos < anchor)
+                                {
+                                    Right(Modifier::CTRL);
+                                    Left(Modifier::CTRL);
+                                    if (m_sel.GetCaret() > pos)
+                                    {
+                                        m_sel.SetCaret(pos);
+                                        Left(Modifier::CTRL);
+                                    }
+                                }
+                                else
+                                {
+                                    Left(Modifier::CTRL);
+                                    Right(Modifier::CTRL);
+                                    if (m_sel.GetCaret() <= pos)
+                                    {
+                                        m_sel.SetCaret(pos);
+                                        Right(Modifier::CTRL);
+                                    }
+                                }
+                                pos = m_sel.GetCaret();
+                                m_sel = old;
+                            }
+                            m_sel.SetSelection(anchor, pos);
+                        }
+                        else
+                        {
+                            const bool moved = (pos != m_sel.GetCaret());
+                            m_sel.SetCaret(pos);
+                            m_mouse_helper.SetAnchors(pos, pos);
+                            if (clicks == 2)
+                            {
+                                SelectWord();
+                                m_mouse_helper.SetAnchors(m_sel.GetAnchor(), m_sel.GetCaret());
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    m_mouse_helper.ClearClicks();
+                }
+            }
+            break;
+        default:
+            m_can_drag = false;
+            break;
+        }
+    }
+    else
+    {
+        assert(false);
+        return Outcome::DontResetHistoryIndex;
+    }
+
+    return Outcome::ResetHistoryIndex;
 }
 
 void ReadInputState::EnsureLeft()
@@ -1008,20 +1166,20 @@ void ReadInputState::EnsureLeft()
     // Auto-scroll horizontally backward.
     assert(m_sel.GetCaret() >= m_left);
     {
-        unsigned short backup_left = m_sel.GetCaret();
+        textpos_t backup_left = m_sel.GetCaret();
         BackUpByAmount(backup_left, m_s.Text(), m_sel.GetCaret(), 4);
         if (m_left > backup_left)
             m_left = backup_left;
     }
 }
 
-void ReadInputState::PrintVisible(unsigned short x)
+void ReadInputState::PrintVisible()
 {
     StrW tmp;
-    tmp.Printf(L"%s\x1b[%uG", c_hide_cursor, x + 1);
+    tmp.Printf(L"%s\x1b[%u;%uH", c_hide_cursor, m_origin.Y + 1, m_origin.X + 1);
     OutputConsole(tmp.Text(), tmp.Length());
 
-    unsigned short max_width = m_max_width;
+    uint16 max_width = m_max_width;
     bool left_marker = m_horiz_scroll_markers && (m_left > 0);
     bool right_marker = false;
     unsigned lo_limit = m_left;
@@ -1070,8 +1228,8 @@ void ReadInputState::PrintVisible(unsigned short x)
 
     if (m_sel.GetAnchor() <= m_s.Length())
     {
-        const unsigned short begin = clamp<unsigned short>(m_sel.GetSelBegin(), lo_limit, hi_limit);
-        const unsigned short end = clamp<unsigned short>(m_sel.GetSelEnd(), lo_limit, hi_limit);
+        const textpos_t begin = clamp<textpos_t>(m_sel.GetSelBegin(), lo_limit, hi_limit);
+        const textpos_t end = clamp<textpos_t>(m_sel.GetSelEnd(), lo_limit, hi_limit);
         tmp.Append(m_s.Text() + lo_limit, begin - lo_limit);
         if (begin < end)
         {
@@ -1094,7 +1252,7 @@ void ReadInputState::PrintVisible(unsigned short x)
         tmp.AppendColor(GetColor(ColorElement::InputHorizScroll));
         tmp.Append(L">", 1);
     }
-    tmp.Printf(L"\x1b[%uG%s", x + 1 + left_marker + __wcswidth(m_s.Text() + lo_limit, m_sel.GetCaret() - lo_limit), c_show_cursor);
+    tmp.Printf(L"\x1b[%u;%uH%s", m_origin.Y + 1, m_origin.X + 1 + left_marker + __wcswidth(m_s.Text() + lo_limit, m_sel.GetCaret() - lo_limit), c_show_cursor);
     OutputConsole(tmp.Text(), tmp.Length());
 }
 
@@ -1138,8 +1296,8 @@ void ReadInputState::Left(Modifier modifier)
     }
     else if (m_sel.GetCaret() > 0)
     {
-        unsigned short caret = m_sel.GetCaret();
-        unsigned short anchor = m_sel.GetAnchor();
+        textpos_t caret = m_sel.GetCaret();
+        textpos_t anchor = m_sel.GetAnchor();
         const bool word = ((modifier & Modifier::CTRL) == Modifier::CTRL);
         PosMover(m_s.Text(), m_s.Length(), caret, false/*forward*/, word);
         m_sel.SetSelection(shift ? anchor : caret, caret);
@@ -1157,8 +1315,8 @@ void ReadInputState::Right(Modifier modifier)
     }
     else if (m_sel.GetCaret() < m_s.Length())
     {
-        unsigned short caret = m_sel.GetCaret();
-        unsigned short anchor = m_sel.GetAnchor();
+        textpos_t caret = m_sel.GetCaret();
+        textpos_t anchor = m_sel.GetAnchor();
         const bool word = ((modifier & Modifier::CTRL) == Modifier::CTRL);
         PosMover(m_s.Text(), m_s.Length(), caret, true/*forward*/, word);
         m_sel.SetSelection(shift ? anchor : caret, caret);
@@ -1178,9 +1336,9 @@ void ReadInputState::Backspace(bool word)
     if (!ElideSelectedText())
     {
 #ifdef DEBUG
-        const unsigned short old_pos = m_sel.GetCaret();
+        const textpos_t old_pos = m_sel.GetCaret();
 #endif
-        const unsigned short moved = PosMover(m_s.Text(), m_s.Length(), m_sel.GetCaretOut(), false/*forward*/, word);
+        const textpos_t moved = PosMover(m_s.Text(), m_s.Length(), m_sel.GetCaretOut(), false/*forward*/, word);
 #ifdef DEBUG
         assert(old_pos == m_sel.GetCaret() + moved);
 #endif
@@ -1200,8 +1358,8 @@ void ReadInputState::Delete(bool word)
 
     if (!ElideSelectedText())
     {
-        unsigned short del_pos = m_sel.GetCaret();
-        const unsigned short moved = PosMover(m_s.Text(), m_s.Length(), del_pos, true/*forward*/, word);
+        textpos_t del_pos = m_sel.GetCaret();
+        const textpos_t moved = PosMover(m_s.Text(), m_s.Length(), del_pos, true/*forward*/, word);
         m_sel.SetCaret(del_pos - moved);
         RemoveText(m_sel.GetCaret(), m_sel.GetCaret() + moved);
     }
@@ -1209,14 +1367,55 @@ void ReadInputState::Delete(bool word)
     EndUndoGroup();
 }
 
+void ReadInputState::SetSelection(textpos_t anchor, textpos_t caret)
+{
+    m_sel.SetSelection(anchor, caret);
+}
+
+void ReadInputState::SelectWord()
+{
+    const textpos_t orig_pos = m_sel.GetCaret();
+
+    // Look forward for a word.
+    Right(Modifier::CTRL);
+    textpos_t end = m_sel.GetCaret();
+    Left(Modifier::CTRL);
+    const textpos_t high_mid = m_sel.GetCaret();
+
+    m_sel.SetCaret(orig_pos);
+
+    // Look backward for a word.
+    Left(Modifier::CTRL);
+    textpos_t begin = m_sel.GetCaret();
+    Right(Modifier::CTRL);
+    const textpos_t low_mid = m_sel.GetCaret();
+
+    if (high_mid <= orig_pos)
+    {
+        begin = high_mid;
+    }
+    else if (low_mid > orig_pos)
+    {
+        end = low_mid;
+    }
+    else
+    {
+        // The position is between two words; select the text between.
+        begin = low_mid;
+        end = high_mid;
+    }
+
+    m_sel.SetSelection(begin, end);
+}
+
 void ReadInputState::CopyToClipboard()
 {
     if (!m_sel.HasSelection())
         return;
 
-    const unsigned short begin = m_sel.GetSelBegin();
-    const unsigned short end = m_sel.GetSelEnd();
-    const unsigned short len = (end - begin);
+    const textpos_t begin = m_sel.GetSelBegin();
+    const textpos_t end = m_sel.GetSelEnd();
+    const textpos_t len = (end - begin);
 
     HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE|GMEM_ZEROINIT, (len + 1) * sizeof(WCHAR));
     if (mem == nullptr)
@@ -1236,6 +1435,14 @@ void ReadInputState::CopyToClipboard()
     EmptyClipboard();
     SetClipboardData(CF_UNICODETEXT, mem);
     CloseClipboard();
+}
+
+void ReadInputState::CutToClipboard()
+{
+    BeginUndoGroup();
+    CopyToClipboard();
+    ElideSelectedText();
+    EndUndoGroup();
 }
 
 void ReadInputState::PasteFromClipboard()
@@ -1293,8 +1500,8 @@ void ReadInputState::InsertText(const WCHAR* s, size_t available)
     if (available > size_t(m_max_length))
         available = m_max_length;
 
-    unsigned short len = 0;
-    wcwidth_iter iter(s, static_cast<unsigned short>(available));
+    textpos_t len = 0;
+    wcwidth_iter iter(s, static_cast<textpos_t>(available));
     while (iter.next())
     {
         if (m_s.Length() + iter.character_length() > m_max_length)
@@ -1321,7 +1528,7 @@ void ReadInputState::InsertText(const WCHAR* s, size_t available)
     EndUndoGroup();
 }
 
-void ReadInputState::RemoveText(unsigned short begin, unsigned short end)
+void ReadInputState::RemoveText(textpos_t begin, textpos_t end)
 {
     BeginUndoGroup();
 
@@ -1349,8 +1556,8 @@ bool ReadInputState::ElideSelectedText()
     if (!m_sel.HasSelection())
         return false;
 
-    const unsigned short begin = m_sel.GetSelBegin();
-    const unsigned short end = m_sel.GetSelEnd();
+    const textpos_t begin = m_sel.GetSelBegin();
+    const textpos_t end = m_sel.GetSelEnd();
     RemoveText(begin, end);
     return true;
 }
@@ -1900,4 +2107,52 @@ void AutoMouseConsoleMode::DisableMouseInputIfShift()
         if (new_mode != m_prev_mode && SetConsoleMode(m_hin, new_mode))
             m_prev_mode = new_mode;
     }
+}
+
+void MouseHelper::ClearClicks()
+{
+    m_tick = GetTickCount() - 0xffff;
+    m_clicks = 0;
+}
+
+uint8 MouseHelper::OnClick(COORD coord, bool dblclk)
+{
+    const DWORD now = GetTickCount();
+
+    if (dblclk)
+        m_clicks = 2;
+    else if (m_clicks == 2 && coord.X == m_coord.X && coord.Y == m_coord.Y && now - m_tick <= GetDoubleClickTime())
+        m_clicks = 3;
+    else
+        m_clicks = 1;
+
+    m_coord = coord;
+    m_tick = now;
+
+    return m_clicks;
+}
+
+void MouseHelper::SetAnchors(textpos_t a1, textpos_t a2)
+{
+    m_anchor1 = min(a1, a2);
+    m_anchor2 = max(a1, a2);
+}
+
+bool MouseHelper::GetAnchor(textpos_t pos, textpos_t& anchor, textpos_t& caret) const
+{
+    if (pos < m_anchor1)
+    {
+        anchor = m_anchor2;
+        caret = pos;
+        return true;
+    }
+    if (pos >= m_anchor2)
+    {
+        anchor = m_anchor1;
+        caret = pos;
+        return true;
+    }
+    anchor = m_anchor1;
+    caret = m_anchor2;
+    return false;
 }
