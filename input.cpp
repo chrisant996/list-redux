@@ -733,6 +733,8 @@ public:
     void            SetMaxLength(DWORD m) { m_max_length = static_cast<unsigned short>(min<DWORD>(m, INT16_MAX)); }
     void            SetCallback(std::optional<std::function<int32(const InputRecord&, void*)>> input_callback);
     void            SetHistory(std::vector<StrW>* history);
+    void            SetHorizScrollMarkers(bool show);
+
     void            InitializeText(const WCHAR* s, int32 len=-1);
 
     int32           Go(void* cookie=nullptr);
@@ -775,9 +777,13 @@ private:
     void            UnlinkUndoEntry(UndoEntry* p);
 
 private:
-    StrW            m_s;
+    // Configuration.
     unsigned short  m_max_width = 32;
     unsigned short  m_max_length = 32;
+    bool            m_horiz_scroll_markers = true;
+
+    // Content and state.
+    StrW            m_s;
     unsigned short  m_left = 0;
     SelectionState  m_sel;
 
@@ -1016,7 +1022,7 @@ void ReadInputState::PrintVisible(unsigned short x)
     OutputConsole(tmp.Text(), tmp.Length());
 
     unsigned short max_width = m_max_width;
-    bool left_marker = (m_left > 0);
+    bool left_marker = m_horiz_scroll_markers && (m_left > 0);
     bool right_marker = false;
     unsigned lo_limit = m_left;
     unsigned hi_limit = 0;
@@ -1032,10 +1038,10 @@ void ReadInputState::PrintVisible(unsigned short x)
     }
 
     unsigned width = 0;
-    const unsigned len = FitsInWcwidth(m_s.Text() + lo_limit, m_s.Length() - lo_limit, max_width - 1, &width);
+    const unsigned len = FitsInWcwidth(m_s.Text() + lo_limit, m_s.Length() - lo_limit, max_width - m_horiz_scroll_markers, &width);
     hi_limit = lo_limit + len;
 
-    if (width > 0)
+    if (m_horiz_scroll_markers && width > 0)
     {
         wcwidth_iter wi(m_s.Text() + lo_limit + len);
         if (wi.next())
