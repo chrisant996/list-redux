@@ -358,7 +358,6 @@ update_needle:
     }
     else if (input.type == InputType::Mouse)
     {
-        // TODO:  click in scrollbar
         switch (input.key)
         {
         case Key::MouseWheel:
@@ -438,7 +437,6 @@ update_needle:
             m_can_scrollbar = false;
             break;
         }
-
     }
 
     // Keep dispatching input.
