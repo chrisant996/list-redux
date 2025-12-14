@@ -2,6 +2,7 @@
 
 - Added custom color for file content.
 - Added horizontal scroll markers when scrolling input text horizontally.
+- Added mouse input for input text.
 - Changed search in the chooser so the search string carries over into the viewer.
 - Fixed `Esc` in search input after `Ctrl-I` or `Ctrl-X`.
 - Fixed applying colors to blank areas.
