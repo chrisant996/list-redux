@@ -960,10 +960,11 @@ ReadInputState::Outcome ReadInputState::HandleInput(const InputRecord& input)
                 CopyToClipboard();
             else if (input.modifier == Modifier::SHIFT)
                 PasteFromClipboard();
+            break;
         case Key::DEL:
             if ((input.modifier & ~Modifier::CTRL) == Modifier::None)
                 Delete((input.modifier & Modifier::CTRL) == Modifier::CTRL);
-            if (input.modifier == Modifier::SHIFT)
+            else if (input.modifier == Modifier::SHIFT)
                 CutToClipboard();
             break;
         case Key::ENTER:
