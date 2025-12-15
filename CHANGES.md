@@ -1,12 +1,15 @@
 ## v0.26 -- ?
 
+- Added `F12` to show original screen until a key is pressed.
 - Added custom color for file content.
 - Added horizontal scroll markers when scrolling input text horizontally.
 - Added mouse input for input text.
 - Changed search in the chooser so the search string carries over into the viewer.
 - Fixed `Esc` in search input after `Ctrl-I` or `Ctrl-X`.
+- Fixed edge cases for `Ins` and `Del` in input routine.
 - Fixed applying colors to blank areas.
 - Fixed hex mode width calculation.
+- Fixed terminal emulation for restoring original screen.
 
 ## v0.25 -- 2025/12/09
 
