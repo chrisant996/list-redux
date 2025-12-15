@@ -755,6 +755,11 @@ LAutoFitContentWidth:
     {
         s.Printf(L"\x1b[%uH", 2);
 
+        StrW scrollbar_color_car;
+        StrW scrollbar_color_back;
+        scrollbar_color_car.Set(ConvertColorParams(ColorElement::ScrollBarCar, ColorConversion::TextOnly));
+        scrollbar_color_back.Set(ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
+
         StrW s2;
         Error e;
         const WCHAR* msg_text = nullptr;
@@ -852,8 +857,9 @@ LAutoFitContentWidth:
                         else
                         {
                             if (car)
-                                s.AppendColor(ConvertColorParams(ColorElement::ScrollBarCar, ColorConversion::TextOnly));
-                            s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
+                                s.AppendColorOverlay(scrollbar_color_car.Text(), scrollbar_color_back.Text());
+                            else
+                                s.AppendColor(scrollbar_color_back.Text());
                         }
                         s.Append(car ? car : L" ");
                         s.AppendColor(norm);
@@ -927,8 +933,9 @@ LAutoFitContentWidth:
                         else
                         {
                             if (car)
-                                s.AppendColor(ConvertColorParams(ColorElement::ScrollBarCar, ColorConversion::TextOnly));
-                            s.AppendColorOverlay(nullptr, ConvertColorParams(ColorElement::ScrollBar, ColorConversion::TextAsBack));
+                                s.AppendColorOverlay(scrollbar_color_car.Text(), scrollbar_color_back.Text());
+                            else
+                                s.AppendColor(scrollbar_color_back.Text());
                         }
                     }
                     else
