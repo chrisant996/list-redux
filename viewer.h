@@ -13,7 +13,7 @@
 
 enum class ViewerOutcome { CONTINUE, RETURN, EXITAPP };
 
-ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e);
+ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e, bool do_search=false);
 ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title=nullptr, bool help=false);
 
 uint32 GetMaxMaxLineLength();

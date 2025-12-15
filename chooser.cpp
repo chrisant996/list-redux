@@ -146,7 +146,7 @@ void Chooser::Navigate(const WCHAR* dir, Error& e)
     Navigate(dir_out.Text(), std::move(fileinfos));
 }
 
-ChooserOutcome Chooser::Go(Error& e)
+ChooserOutcome Chooser::Go(Error& e, bool do_search)
 {
     ForceUpdateAll();
 
@@ -155,6 +155,21 @@ ChooserOutcome Chooser::Go(Error& e)
     while (true)
     {
         UpdateDisplay();
+
+        if (do_search)
+        {
+            do_search = false;
+            if (g_options.searcher)
+            {
+                SearchAndTag(g_options.searcher, e);
+                if (e.Test())
+                {
+                    ReportError(e);
+                    ForceUpdateAll();
+                }
+                UpdateDisplay();
+            }
+        }
 
         const InputRecord input = SelectInput(INFINITE, &mouse);
         switch (input.type)
@@ -1833,11 +1848,15 @@ void Chooser::SearchAndTag(Error& e, bool caseless)
         return;
     }
 
-    if (!searcher)
-        return;
+    if (searcher)
+        SearchAndTag(searcher, e);
+}
 
+void Chooser::SearchAndTag(std::shared_ptr<Searcher> searcher, Error& e)
+{
     g_options.searcher = searcher;
 
+    StrW s;
     bool canceled = false;
     size_t num_found = 0;
     FoundOffset found_line;
@@ -1889,5 +1908,8 @@ void Chooser::SearchAndTag(Error& e, bool caseless)
     else if (!num_found)
         m_feedback = c_text_not_found;
     else
+    {
         m_feedback.Printf(L"*** Tagged %zu file(s) ***", num_found);
+        ForceUpdateAll();
+    }
 }

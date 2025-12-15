@@ -40,7 +40,7 @@
 #include <memory>
 #include <algorithm>
 
-static const WCHAR c_opts[] = L"/:+?@:V";
+static const WCHAR c_opts[] = L"/:+?@:Vi+f:r:";
 
 static const WCHAR* get_env_prio(const WCHAR* a, const WCHAR* b=nullptr, const WCHAR* c=nullptr, const WCHAR** which=nullptr)
 {
@@ -108,6 +108,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         LOI_CODEPAGE,
         LOI_EMULATE,
         LOI_NO_EMULATE,
+        LOI_EXACT_CASE,
         LOI_GOTO_LINE,
         LOI_GOTO_OFFSET,
         LOI_HEX_EDIT,
@@ -122,18 +123,22 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     static LongOption<WCHAR> long_opts[] =
     {
         { L"help",                  nullptr,            '?' },
-        { L"input-file",            nullptr,            '@', LOHA_REQUIRED },
         { L"version",               nullptr,            'V' },
         { L"codepage",              nullptr,            LOI_CODEPAGE, LOHA_REQUIRED },
         { L"emulate",               nullptr,            LOI_EMULATE, LOHA_OPTIONAL },
         { L"no-emulate",            nullptr,            LOI_NO_EMULATE },
+        { L"exact-case",            nullptr,            LOI_EXACT_CASE },
+        { L"find",                  nullptr,            'f', LOHA_REQUIRED },
         { L"hex",                   nullptr,            LOI_HEX_VIEW },
         { L"hex-edit",              nullptr,            LOI_HEX_EDIT },
+        { L"ignore-case",           nullptr,            'i' },
+        { L"input-file",            nullptr,            '@', LOHA_REQUIRED },
         { L"line",                  nullptr,            LOI_GOTO_LINE, LOHA_REQUIRED },
         { L"max-line-length",       nullptr,            LOI_MAX_LINE_LENGTH, LOHA_REQUIRED },
         { L"multibyte",             nullptr,            LOI_MULTIBYTE },
         { L"no-multibyte",          nullptr,            LOI_NO_MULTIBYTE },
         { L"offset",                nullptr,            LOI_GOTO_OFFSET, LOHA_REQUIRED },
+        { L"regex",                 nullptr,            'r', LOHA_REQUIRED },
         { L"wrap",                  nullptr,            LOI_WRAP },
         { L"no-wrap",               nullptr,            LOI_NO_WRAP },
         { nullptr }
@@ -194,6 +199,9 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     int8 wrapping = -1;
     int8 hex_view = -1;
     int8 hex_edit = -1;
+    bool ignore_case = false;
+    bool use_regex = false;
+    StrW find_text;
 
     for (unsigned ii = 0; !e.Test() && opts.GetValue(ii, ch, opt_value, &long_opt); ii++)
     {
@@ -238,8 +246,16 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
             }
             break;
 
-        case 'X':
-            // TODO:  Etc.
+        case 'f':
+            use_regex = false;
+            find_text.Set(opt_value);
+            break;
+        case 'i':
+            ignore_case = (!opt_value || *opt_value == '+');
+            break;
+        case 'r':
+            use_regex = true;
+            find_text.Set(opt_value);
             break;
 
         default:
@@ -270,6 +286,9 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                     else
                         e.Set(L"Unrecognized value '%1' for option 'emulate'.") << opt_value;
                 }
+                break;
+            case LOI_EXACT_CASE:
+                ignore_case = false;
                 break;
             case LOI_GOTO_LINE:
                 {
@@ -373,12 +392,23 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
             SetViewerHexEditMode(hex_edit > 0);
     }
 
+    bool do_search = false;
+    if (!find_text.Empty())
+    {
+        const SearcherType type = use_regex ? SearcherType::ECMAScriptRegex : SearcherType::Literal;
+        g_options.searcher = Searcher::Create(type, find_text.Text(), ignore_case, true, e);
+        if (e.Test())
+            return e.Report();
+        do_search = true;
+    }
+
     Interactive interactive;
     Chooser chooser(&interactive);
 
     if (piped)
     {
-        ViewFiles(files, s, e);
+        ViewFiles(files, s, e, do_search);
+        do_search = false;
     }
     else if (navigate)
     {
@@ -390,7 +420,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     {
         if (files.size())
         {
-            switch (ViewFiles(files, s, e))
+            switch (ViewFiles(files, s, e, do_search))
             {
             case ViewerOutcome::RETURN:
                 if (navigate)
@@ -405,7 +435,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         }
         else
         {
-            switch (chooser.Go(e))
+            switch (chooser.Go(e, do_search))
             {
             case ChooserOutcome::VIEWONE:
                 files.clear();
@@ -415,12 +445,16 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
                 break;
             case ChooserOutcome::VIEWTAGGED:
                 files = chooser.GetTaggedFiles();
+                if (do_search)
+                    continue;
                 break;
             case ChooserOutcome::EXITAPP:
                 done = true;
                 break;
             }
         }
+
+        do_search = false;
     }
 
     if (e.Test())

@@ -2105,7 +2105,6 @@ bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, un
                 const unsigned line_cells = FormatLineData(index, 0, tmp, -1, e);
                 if (line_cells)
                 {
-                    assert(m_map.GetWrapWidth());
                     if (m_map.GetWrapWidth())
                         left_offset = min<int>(left_offset, int(line_cells) - min(max_width, m_map.GetWrapWidth()));
                     else

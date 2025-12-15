@@ -12,6 +12,7 @@
 #include "input.h"
 #include "output.h"
 #include "scroll_car.h"
+#include "searcher.h"
 
 #include <vector>
 #include <unordered_set>
@@ -44,7 +45,7 @@ public:
 
     void            Navigate(const WCHAR* dir, std::vector<FileInfo>&& files);
     void            Navigate(const WCHAR* dir, Error& e);
-    ChooserOutcome  Go(Error& e);
+    ChooserOutcome  Go(Error& e, bool do_search=false);
     StrW            GetSelectedFile() const;
     std::vector<StrW> GetTaggedFiles(intptr_t* num_before_index=nullptr) const;
     std::vector<intptr_t> GetTaggedIndices(intptr_t* num_before_index=nullptr) const;
@@ -74,6 +75,7 @@ private:
     void            SweepFiles(Error& e);
     void            ShowFileList();
     void            SearchAndTag(Error& e, bool caseless);
+    void            SearchAndTag(std::shared_ptr<Searcher> searcher, Error& e);
 
 private:
     const Interactive* const m_interactive;

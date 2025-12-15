@@ -252,7 +252,7 @@ public:
                     Viewer(const std::vector<StrW>& files);
                     ~Viewer() = default;
 
-    ViewerOutcome   Go(Error& e);
+    ViewerOutcome   Go(Error& e, bool do_search=false);
     StrW            GetCurrentFile() const;
 
 private:
@@ -385,7 +385,7 @@ Viewer::Viewer(const std::vector<StrW>& files)
     m_hex_mode = g_options.hex_mode;
 }
 
-ViewerOutcome Viewer::Go(Error& e)
+ViewerOutcome Viewer::Go(Error& e, bool do_search)
 {
     SetFile(0);
 
@@ -396,6 +396,17 @@ ViewerOutcome Viewer::Go(Error& e)
         e.Clear();
 
         UpdateDisplay();
+
+        if (do_search)
+        {
+            do_search = false;
+            if (g_options.searcher)
+            {
+                m_multifile_search = (m_files->size() > 1);
+                FindNext();
+                UpdateDisplay();
+            }
+        }
 
         const InputRecord input = SelectInput(INFINITE, &mouse);
         switch (input.type)
@@ -2697,11 +2708,11 @@ void Viewer::ToggleShowDebugInfo()
     m_force_update = true;
 }
 
-ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e)
+ViewerOutcome ViewFiles(const std::vector<StrW>& files, StrW& dir, Error& e, bool do_search)
 {
     Viewer viewer(files);
 
-    const ViewerOutcome outcome = viewer.Go(e);
+    const ViewerOutcome outcome = viewer.Go(e, do_search);
 
     dir = viewer.GetCurrentFile();
     dir.SetEnd(FindName(dir.Text()));
