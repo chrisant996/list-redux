@@ -429,6 +429,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         return e.Report();
     }
 
+    OutputConsole(c_norm);
     SetGracefulExit();
     return 0;
 }

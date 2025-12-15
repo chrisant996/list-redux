@@ -804,22 +804,28 @@ bool Terminal::do_alternate_screen(bool alternate)
     const COORD origin = {};
 
     // Get current screen info.
-    const DWORD capacity = csbi.dwSize.X * csbi.dwSize.Y;
     std::vector<CHAR_INFO> buffer;
-    try
+    if (alternate)
     {
-        buffer.reserve(capacity);
-    } catch (...)
-    {
-        SMALL_RECT region = {};
-        region.Right = csbi.dwSize.X - 1;
-        region.Bottom = csbi.dwSize.Y - 1;
-        ReadConsoleOutputW(m_hout, &*buffer.begin(), csbi.dwSize, origin, &region);
+        const DWORD capacity = csbi.dwSize.X * csbi.dwSize.Y;
+        try
+        {
+            buffer.resize(capacity);
+
+            SMALL_RECT region = {};
+            region.Right = csbi.dwSize.X - 1;
+            region.Bottom = csbi.dwSize.Y - 1;
+            ReadConsoleOutputW(m_hout, &*buffer.begin(), csbi.dwSize, origin, &region);
+        }
+        catch (...)
+        {
+        }
     }
 
     // Apply screen info for the screen being activated.
-    if (m_screen_buffer.empty())
+    if (alternate || m_screen_buffer.empty())
     {
+        m_screen_cursor = {};
         do_clear(clear::all);
     }
     else

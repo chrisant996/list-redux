@@ -660,7 +660,7 @@ LDone:
  * Interactive.
  */
 
-static const WCHAR c_swap_to_alternate_and_clear[] = L"\x1b[?1049h\x1b[H\x1b[J";
+static const WCHAR c_swap_to_alternate[] = L"\x1b[?1049h";
 static const WCHAR c_swap_to_primary[] = L"\x1b[?1049l";
 
 Interactive::Interactive(bool begin)
@@ -700,7 +700,7 @@ void Interactive::Begin()
     SetConsoleMode(hout, m_begin_mode_out);
 
     if (!m_inverted)
-        OutputConsole(c_swap_to_alternate_and_clear);
+        OutputConsole(c_swap_to_alternate);
 
     m_active = true;
 }
@@ -716,7 +716,7 @@ void Interactive::End()
     const HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
-    OutputConsole(m_inverted ? c_swap_to_alternate_and_clear : c_swap_to_primary);
+    OutputConsole(m_inverted ? c_swap_to_alternate : c_swap_to_primary);
 
     SetConsoleMode(hout, m_end_mode_out);
     SetConsoleMode(hin, m_end_mode_in);
