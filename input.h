@@ -106,6 +106,7 @@ class AutoMouseConsoleMode
 public:
                     AutoMouseConsoleMode(HANDLE hin=0, bool enable=true);
                     ~AutoMouseConsoleMode();
+    void            DisableMouseInput();
     void            DisableMouseInputIfShift();
 private:
     HANDLE          m_hin = 0;

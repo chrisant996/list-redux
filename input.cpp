@@ -2080,19 +2080,29 @@ int32 MouseHelper::AccelerationHelper::MaybeAccelerate(int32 lines)
 
 AutoMouseConsoleMode::AutoMouseConsoleMode(HANDLE hin, bool enable)
 {
+    m_hin = hin ? hin : GetStdHandle(STD_INPUT_HANDLE);
+    if (m_hin && !GetConsoleMode(m_hin, &m_orig_mode))
+        m_hin = 0;
     if (enable)
-    {
-        m_hin = hin ? hin : GetStdHandle(STD_INPUT_HANDLE);
-        if (m_hin && !GetConsoleMode(m_hin, &m_orig_mode))
-            m_hin = 0;
         DisableMouseInputIfShift();
-    }
+    else
+        DisableMouseInput();
 }
 
 AutoMouseConsoleMode::~AutoMouseConsoleMode()
 {
     if (m_hin)
         SetConsoleMode(m_hin, m_orig_mode);
+}
+
+void AutoMouseConsoleMode::DisableMouseInput()
+{
+    if (m_hin)
+    {
+        const DWORD new_mode = (m_orig_mode & ~ENABLE_MOUSE_INPUT)|ENABLE_QUICK_EDIT_MODE;
+        if (new_mode != m_prev_mode && SetConsoleMode(m_hin, new_mode))
+            m_prev_mode = new_mode;
+    }
 }
 
 void AutoMouseConsoleMode::DisableMouseInputIfShift()
