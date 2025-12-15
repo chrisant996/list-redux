@@ -793,6 +793,7 @@ private:
 
     // Content and state.
     StrW            m_s;
+    uint32          m_change_counter = 0;
     uint16          m_terminal_row = 0;
     textpos_t       m_left = 0;
     SelectionState  m_sel;
@@ -884,10 +885,25 @@ int32 ReadInputState::Go(void* cookie)
     m_mouse_helper.ClearClicks();
     m_can_drag = false;
 
+#ifdef DEBUG
+    StrW prev_text(m_s);
+    uint32 prev_counter = m_change_counter;
+#endif
+
     while (true)
     {
         EnsureLeft();
         PrintVisible();
+
+#ifdef DEBUG
+        // Verify any time m_s changes then m_change_counter also increases.
+        if (!prev_text.Equal(m_s))
+        {
+            assert(int32(m_change_counter) - int32(prev_counter) > 0);
+            prev_text.Set(m_s);
+            prev_counter = m_change_counter;
+        }
+#endif
 
         const InputRecord input = SelectInput(INFINITE, &mouse);
         switch (input.type)
@@ -940,6 +956,7 @@ int32 ReadInputState::Go(void* cookie)
 ReadInputState::Outcome ReadInputState::HandleInput(const InputRecord& input)
 {
     AutoCleanup cleanup;
+    const uint32 prev_counter = m_change_counter;
 
     if (input.type == InputType::Key)
     {
@@ -973,10 +990,10 @@ ReadInputState::Outcome ReadInputState::HandleInput(const InputRecord& input)
             return Outcome::Done;
         case Key::HOME:
             Home(input.modifier);
-            return Outcome::DontResetHistoryIndex;
+            break;
         case Key::END:
             End(input.modifier);
-            return Outcome::DontResetHistoryIndex;
+            break;
         case Key::UP:
             if (m_history && m_history_index)
             {
@@ -985,7 +1002,7 @@ ReadInputState::Outcome ReadInputState::HandleInput(const InputRecord& input)
                 --m_history_index;
                 ReplaceFromHistory((*m_history)[m_history_index], false/*keep_undo*/);
             }
-            return Outcome::DontResetHistoryIndex;
+            break;
         case Key::DOWN:
             if (m_history && m_history_index < m_history->size())
             {
@@ -995,7 +1012,7 @@ ReadInputState::Outcome ReadInputState::HandleInput(const InputRecord& input)
                 else
                     ReplaceFromHistory((*m_history)[m_history_index], false/*keep_undo*/);
             }
-            return Outcome::DontResetHistoryIndex;
+            break;
         case Key::LEFT:
             Left(input.modifier);
             break;
@@ -1003,7 +1020,7 @@ ReadInputState::Outcome ReadInputState::HandleInput(const InputRecord& input)
             Right(input.modifier);
             break;
         default:
-            return Outcome::DontResetHistoryIndex;
+            break;
         }
     }
     else if (input.type == InputType::Char)
@@ -1039,8 +1056,6 @@ ReadInputState::Outcome ReadInputState::HandleInput(const InputRecord& input)
             case 'Z'-'@':
                 Undo();
                 break;
-            default:
-                return Outcome::DontResetHistoryIndex;
             }
         }
     }
@@ -1145,10 +1160,10 @@ ReadInputState::Outcome ReadInputState::HandleInput(const InputRecord& input)
     else
     {
         assert(false);
-        return Outcome::DontResetHistoryIndex;
     }
 
-    return Outcome::ResetHistoryIndex;
+    const bool changed = (prev_counter != m_change_counter);
+    return changed ? Outcome::ResetHistoryIndex : Outcome::DontResetHistoryIndex;
 }
 
 void ReadInputState::EnsureLeft()
@@ -1469,6 +1484,8 @@ void ReadInputState::PasteFromClipboard()
 
 void ReadInputState::ReplaceFromHistory(const StrW& s, bool keep_undo)
 {
+    ++m_change_counter;
+
     m_s.Set(s);
     m_sel.SetCaret(m_s.Length());
     m_defer_init_undo = !keep_undo;
@@ -1510,6 +1527,8 @@ void ReadInputState::InsertText(const WCHAR* s, size_t available)
         len += iter.character_length();
     }
 
+    ++m_change_counter;
+
     if (m_sel.GetCaret() == m_s.Length())
     {
         m_s.Append(s, len);
@@ -1534,6 +1553,8 @@ void ReadInputState::RemoveText(textpos_t begin, textpos_t end)
     BeginUndoGroup();
 
     m_sel.ResetWordAnchor();
+
+    ++m_change_counter;
 
     if (end == m_s.Length())
     {
@@ -1648,6 +1669,7 @@ void ReadInputState::Undo()
     if (!p)
         return;
 
+    ++m_change_counter;
     m_s.Set(p->m_s);
     m_sel = m_undo_current->m_sel_before;
     m_undo_current = p;
@@ -1667,6 +1689,7 @@ void ReadInputState::Redo()
     UndoEntry* r = m_undo_current->m_next;
     assert(r);
 
+    ++m_change_counter;
     m_s.Set(r->m_s);
     m_sel = r->m_sel_after;
 
