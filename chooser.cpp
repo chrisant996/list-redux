@@ -605,6 +605,10 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
             }
             break;
 #endif
+        case Key::F12:
+            ShowOriginalScreen();
+            ForceUpdateAll();
+            break;
 
         case Key::ESC:
             if (m_can_drag || m_can_scrollbar)

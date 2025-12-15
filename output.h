@@ -12,6 +12,7 @@ class Error;
 
 bool IsConsole(HANDLE h);
 void SetEmulation(int emulate=-1); // -1=auto, 1=on, 0=off.
+void ShowOriginalScreen();
 
 DWORD GetConsoleColsRows();
 

@@ -10,6 +10,7 @@
 - [x] read color configuration from `.listredux` file
 - [x] history in ReadInput() prompts
 - [x] include terminal emulation for running on older than Windows 10 build 15063
+- [x] a key to temporarily swap back to the original screen
 - mouse input
   - Mouse wheel input is automatically converted to UP/DOWN keys even when ENABLE_MOUSE_INPUT is omitted, because of switching to the alternate screen.
   - [x] mouse wheel should scroll by _N_ lines
@@ -190,7 +191,6 @@
 - Telephone dialer
 - Printing
 - hex mode: option to end a row at a newline (requires computing and caching hex mode pagination/delineation offsets) _[Too many drawbacks; including that it can't just seek without parsing anymore.]_
-- a key to temporarily swap back to the original screen? _[Not generally very useful, and I don't want to perturb the original screen by printing "Press any key to return".]_
 
 
 

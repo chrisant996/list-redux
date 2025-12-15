@@ -1533,6 +1533,10 @@ hex_edit_right:
                 }
             }
             break;
+        case Key::F12:
+            ShowOriginalScreen();
+            m_force_update = true;
+            break;
 
         case Key::TAB:
             if (m_hex_edit)

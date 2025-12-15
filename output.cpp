@@ -745,3 +745,12 @@ std::unique_ptr<Interactive> Interactive::MakeReverseInteractive() const
     return inverted;
 }
 
+void ShowOriginalScreen()
+{
+    static const WCHAR c_swap_to_primary[] = L"\x1b[?1049l";
+    static const WCHAR c_swap_to_alternate[] = L"\x1b[?1049h";
+    OutputConsole(c_swap_to_primary);
+    SelectInput();
+    OutputConsole(c_swap_to_alternate);
+}
+
