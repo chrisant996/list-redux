@@ -5,7 +5,9 @@
 - Added custom color for file content.
 - Added horizontal scroll markers when scrolling input text horizontally.
 - Added mouse input for input text.
+- Added file size in the file details display in the chooser (bottom right).
 - Changed search in the chooser so the search string carries over into the viewer.
+- Fixed column width in chooser for short filenames.
 - Fixed `Esc` in search input after `Ctrl-I` or `Ctrl-X`.
 - Fixed edge cases for `Ins` and `Del` in input routine.
 - Fixed applying colors to blank areas.
