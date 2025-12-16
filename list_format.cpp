@@ -31,6 +31,8 @@ static bool s_no_dir_tag = false;
 static WCHAR s_size_style = 'm';
 static WCHAR s_time_style = 0;
 
+const unsigned c_min_filename_width = 8;
+
 /*
  * Configuration functions.
  */
@@ -919,8 +921,10 @@ unsigned WidthForFileInfo(const FileInfo* pfi, int details, int size_width)
     if (pfi)
     {
         // Directories add 1 for up/down arrow plus 1 for trailing backslash.
-        width += (pfi->IsDirectory() ? 2 : 0);
-        width += __wcswidth(pfi->GetName().Text());
+        unsigned filename_width = 0;
+        filename_width += (pfi->IsDirectory() ? 2 : 0);
+        filename_width += __wcswidth(pfi->GetName().Text());
+        width += max<unsigned>(filename_width, c_min_filename_width);
     }
 
     width += WidthForFileInfoDetails(pfi, details, size_width);
@@ -942,13 +946,13 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
 
     unsigned details_width = WidthForFileInfoDetails(pfi, details, size_width);
     unsigned filename_width;
-    if (max_width >= details_width + 8)
+    if (max_width >= details_width + c_min_filename_width)
     {
         filename_width = max_width - details_width;
     }
     else
     {
-        filename_width = min(max_width, unsigned(8));
+        filename_width = min(max_width, c_min_filename_width);
         details_width = max_width - filename_width;
     }
 
