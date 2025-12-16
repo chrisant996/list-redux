@@ -1024,20 +1024,23 @@ void FormatFileInfoForPopupList(StrW& s, const FileInfo* pfi, unsigned max_width
 }
 #endif
 
-unsigned FormatFileData(StrW& s, const WIN32_FIND_DATAW& fd)
+unsigned FormatFileData(StrW& s, const WIN32_FIND_DATAW& fd, bool include_size)
 {
     FileInfo info;
     info.Init(&fd);
-    return FormatFileData(s, info);
+    return FormatFileData(s, info, include_size);
 }
 
-unsigned FormatFileData(StrW& s, const FileInfo& info)
+unsigned FormatFileData(StrW& s, const FileInfo& info, bool include_size)
 {
     const unsigned orig_len = s.Length();
 
     FormatTime(s, &info, s_time_style);
-    // s.AppendSpaces(2);
-    // FormatFileSize(s, &info, 's');
+    if (include_size)
+    {
+        s.AppendSpaces(2);
+        FormatFileSize(s, &info, 's');
+    }
     s.AppendSpaces(2);
     FormatAttributes(s, info.GetAttributes());
 

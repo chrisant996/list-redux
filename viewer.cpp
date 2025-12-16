@@ -725,7 +725,7 @@ LAutoFitContentWidth:
             unsigned details_width = 0;
             if (m_fd.cFileName[0])
             {
-                details_width = FormatFileData(details, m_fd);
+                details_width = FormatFileData(details, m_fd, false/*include_size*/);
                 PadToWidth(details, 16);
             }
             if (m_left && !m_hex_mode)

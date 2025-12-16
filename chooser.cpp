@@ -447,7 +447,7 @@ void Chooser::UpdateDisplay()
         if (size_t(m_index) < m_files.size())
         {
             tmp.Clear();
-            FormatFileData(tmp, m_files[m_index]);
+            FormatFileData(tmp, m_files[m_index], true/*include_size*/);
             m_clickable_footer.Add(nullptr, 4, 50, true);
 // TODO:  Separate the timestamp and the attributes.
             m_clickable_footer.Add(tmp.Text(), ID_ONE_ATTR, 50, true);
