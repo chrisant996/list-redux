@@ -448,9 +448,17 @@ void Chooser::UpdateDisplay()
         {
             tmp.Clear();
             FormatFileData(tmp, m_files[m_index], true/*include_size*/);
+            const WCHAR* after_last_space = tmp.Text();
+            for (const WCHAR* p = tmp.Text(); *p; ++p)
+            {
+                if (*p == ' ')
+                    after_last_space = p + 1;
+            }
+            StrW attrs(after_last_space);
+            tmp.SetLength(tmp.Length() - attrs.Length());
             m_clickable_footer.Add(nullptr, 4, 50, true);
-// TODO:  Separate the timestamp and the attributes.
-            m_clickable_footer.Add(tmp.Text(), ID_ONE_ATTR, 50, true);
+            m_clickable_footer.Add(tmp.Text(), -1, 50, true);
+            m_clickable_footer.Add(attrs.Text(), ID_ONE_ATTR, 50, true);
         }
 
         s.Printf(L"\x1b[%uH", m_terminal_height);
@@ -1375,10 +1383,18 @@ void Chooser::NewFileMask(Error& e)
 void Chooser::ChangeAttributes(Error& e, bool only_current)
 {
     std::vector<intptr_t> indices;
+    const WCHAR* scope = nullptr;
     if (!only_current && m_tagged.AnyMarked())
+    {
         indices = GetTaggedIndices();
+        scope = L"tagged entries";
+    }
     else if (size_t(m_index) < m_files.size() && !m_files[m_index].IsPseudoDirectory())
+    {
         indices.emplace_back(m_index);
+        scope = L"current entry";
+    }
+    assert(indices.empty() == !scope);
     if (indices.empty())
         return;
 
@@ -1388,7 +1404,7 @@ void Chooser::ChangeAttributes(Error& e, bool only_current)
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
-    s.Printf(L"\r%s\x1b[%uG%s\r%s%s ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), L"Change attributes", c_prompt_char);
+    s.Printf(L"\r%s\x1b[%uG%s\r%s (%s)%s ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), L"Change attributes", scope, c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 
     ReadInput(s, History::ChangeAttr);
