@@ -84,8 +84,6 @@ private:
     unsigned        m_content_height = 0;
     const unsigned  m_padding = 2;
 
-    int             m_details = 1;
-
     StrW            m_dir;
     std::vector<FileInfo> m_files;
     ColumnWidths    m_col_widths;

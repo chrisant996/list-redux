@@ -9,6 +9,7 @@
 #include "input.h"
 #include "output.h"
 #include "viewer.h"
+#include "vieweroptions.h"
 #include "os.h"
 
 #include <strsafe.h>
@@ -19,6 +20,17 @@
 static void ReadOptions(const WCHAR* ini_filename)
 {
     WCHAR value[256];
+
+    if (ReadConfigString(ini_filename, L"Options", L"Details", value, _countof(value)))
+    {
+        if (wcsicmp(value, L"1") ||
+            wcsicmp(value, L"2") ||
+            wcsicmp(value, L"3") ||
+            wcsicmp(value, L"4"))
+        {
+            g_options.details = value[0] - '1';
+        }
+    }
 
     if (ReadConfigString(ini_filename, L"Options", L"Scrollbar", value, _countof(value)))
         SetViewerScrollbar(!wcsicmp(value, L"true") || !wcsicmp(value, L"1") || !wcsicmp(value, L"on") || !wcsicmp(value, L"yes"));

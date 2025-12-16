@@ -323,7 +323,7 @@ void Chooser::UpdateDisplay()
                     }
                     const bool selected = iItem == m_index;
                     const bool tagged = m_tagged.IsMarked(iItem) && !pfi->IsDirectory();
-                    row_width += FormatFileInfo(tmp, pfi, m_col_widths[jj], m_details, selected, tagged, m_max_size_width);
+                    row_width += FormatFileInfo(tmp, pfi, m_col_widths[jj], g_options.details, selected, tagged, m_max_size_width);
                 }
 
                 if (m_vert_scroll_car.has_car())
@@ -515,15 +515,15 @@ void Chooser::EnsureColumnWidths()
 #endif
 
         m_max_size_width = 0;
-        if (m_details >= 3 && m_files.size())
+        if (g_options.details >= 3 && m_files.size())
         {
             if (m_files[0].IsDirectory())
-                m_max_size_width = WidthForDirectorySize(m_details);
+                m_max_size_width = WidthForDirectorySize(g_options.details);
 
             for (size_t index = 0; index < m_files.size(); ++index)
             {
                 const FileInfo* pfi = &m_files[index];
-                const unsigned size_width = WidthForFileInfoSize(pfi, m_details, -1);
+                const unsigned size_width = WidthForFileInfoSize(pfi, g_options.details, -1);
                 m_max_size_width = std::max<unsigned>(m_max_size_width, size_width);
             }
         }
@@ -539,7 +539,7 @@ void Chooser::EnsureColumnWidths()
             m_col_widths.clear();
             for (size_t index = 0; index < m_files.size(); ++index)
             {
-                width = max<unsigned>(width, WidthForFileInfo(&m_files[index], m_details, m_max_size_width));
+                width = max<unsigned>(width, WidthForFileInfo(&m_files[index], g_options.details, m_max_size_width));
                 if (!--rows || index == last)
                 {
                     rows = m_content_height;
@@ -568,7 +568,7 @@ void Chooser::EnsureColumnWidths()
         {
             target_width -= 2; // Reserve space for scrollbar.
             m_col_widths = CalculateColumns([this](size_t index){
-                return WidthForFileInfo(&m_files[index], m_details, m_max_size_width);
+                return WidthForFileInfo(&m_files[index], g_options.details, m_max_size_width);
             }, m_files.size(), true, m_padding, target_width, target_width / 4);
 
             m_num_per_row = int32(std::max<intptr_t>(1, m_col_widths.size()));
@@ -828,7 +828,7 @@ LNext:
         case '4':
             if (input.modifier == Modifier::None)
             {
-                m_details = input.key_char - '1';
+                g_options.details = input.key_char - '1';
                 Relayout();
             }
             break;
