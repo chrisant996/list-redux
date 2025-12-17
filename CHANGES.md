@@ -2,12 +2,15 @@
 
 - Added `F12` to show original screen until a key is pressed.
 - Added `-f`, `--find`, `-i`, `--ignore-case`, `-i-`, `--exact-case`, `-r`, and `--regex` command line options for searching.
+- Added `Details` config setting in `.listredux` file to set the initial details level in the chooser (accepted values are `1` through `4`).
 - Added custom color for file content.
 - Added horizontal scroll markers when scrolling input text horizontally.
 - Added mouse input for input text.
 - Added file size in the file details display in the chooser (bottom right).
 - Changed search in the chooser so the search string carries over into the viewer.
+- Changed navigating to parent dir in the chooser so it reselects the child dir.
 - Fixed column width in chooser for short filenames.
+- Fixed Change Attributes in the chooser to say whether it will affect the current entry or all tagged entries.
 - Fixed `Esc` in search input after `Ctrl-I` or `Ctrl-X`.
 - Fixed edge cases for `Ins` and `Del` in input routine.
 - Fixed applying colors to blank areas.
