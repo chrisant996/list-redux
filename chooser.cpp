@@ -133,7 +133,7 @@ void Chooser::Navigate(const WCHAR* dir, std::vector<FileInfo>&& files)
     m_count = intptr_t(m_files.size());
 }
 
-void Chooser::Navigate(const WCHAR* dir, Error& e)
+void Chooser::Navigate(const WCHAR* dir, Error& e, const WCHAR* up_from)
 {
     StrW dir_out;
     std::vector<FileInfo> fileinfos;
@@ -144,6 +144,21 @@ void Chooser::Navigate(const WCHAR* dir, Error& e)
 
     std::stable_sort(fileinfos.begin(), fileinfos.end(), CmpFileInfo);
     Navigate(dir_out.Text(), std::move(fileinfos));
+
+    if (up_from && *up_from)
+    {
+        for (size_t i = 0; i < m_files.size(); ++i)
+        {
+            if (!m_files[i].IsDirectory())
+                break;
+            const WCHAR* name = FindName(m_files[i].GetName().Text());
+            if (wcsicmp(up_from, name) == 0)
+            {
+                SetIndex(i);
+                break;
+            }
+        }
+    }
 }
 
 ChooserOutcome Chooser::Go(Error& e, bool do_search)
@@ -646,16 +661,18 @@ viewone:
                 if (info.IsDirectory())
                 {
                     PathW dir;
+                    StrW up_from;
                     info.GetPathName(dir);
                     if (info.IsPseudoDirectory())
                     {
                         const WCHAR* mask = FindName(m_dir.Text());
                         dir.ToParent(); // Strip "..".
+                        up_from = FindName(dir.Text());
                         dir.ToParent(); // Go up to parent.
                         dir.JoinComponent(mask);
                     }
 
-                    Navigate(dir.Text(), e);
+                    Navigate(dir.Text(), e, up_from.Text());
                     if (e.Test())
                     {
                         ReportError(e);
@@ -872,11 +889,13 @@ LNext:
         case '.':
             if (input.modifier == Modifier::None)
             {
+                StrW up_from;
                 PathW dir(m_dir);
                 EnsureTrailingSlash(dir);   // Guarantee trailing slash (just in case).
                 dir.ToParent();             // Eats trailing slash.
+                up_from = FindName(dir.Text());
                 dir.ToParent();             // Actually goes up to parent.
-                Navigate(dir.Text(), e);
+                Navigate(dir.Text(), e, up_from.Text());
                 if (e.Test())
                 {
                     ReportError(e);
@@ -1082,10 +1101,20 @@ void Chooser::SetIndex(intptr_t index)
     if (index < 0)
         index = 0;
     if (m_count)
-        m_dirty.Mark(m_index % m_num_rows, 1);
+    {
+        if (m_num_rows)
+            m_dirty.Mark(m_index % m_num_rows, 1);
+        else
+            m_dirty.MarkAll();
+    }
     m_index = index;
     if (m_count)
-        m_dirty.Mark(m_index % m_num_rows, 1);
+    {
+        if (m_num_rows)
+            m_dirty.Mark(m_index % m_num_rows, 1);
+        else
+            m_dirty.MarkAll();
+    }
     m_dirty_footer = true;
 }
 
