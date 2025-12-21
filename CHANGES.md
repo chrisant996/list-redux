@@ -1,4 +1,4 @@
-## v0.26 -- ?
+## v0.26 -- 2025/12/21
 
 - Added `F12` to show original screen until a key is pressed.
 - Added `-f`, `--find`, `-i`, `--ignore-case`, `-i-`, `--exact-case`, `-r`, and `--regex` command line options for searching.
