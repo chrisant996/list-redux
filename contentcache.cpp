@@ -1491,7 +1491,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                     const bool something_fits = (visible_len + spaces > left_offset);
                     const bool apply_color = (m_options.show_whitespace && something_fits && !color);
                     if (apply_color)
-                        s.AppendColor(GetColor(ColorElement::Whitespace));
+                        s.AppendColorOverlay(norm, GetColor(ColorElement::Whitespace));
                     while (spaces--)
                     {
                         if (m_options.show_whitespace)
@@ -1524,7 +1524,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                         const bool something_fits = (visible_len + 2 > left_offset);
                         const bool apply_color = (ctrl_color && something_fits);
                         if (apply_color)
-                            s.AppendColor(ctrl_color);
+                            s.AppendColorOverlay(norm, ctrl_color);
                         append_text(L"^", 1);
                         if (left_offset || visible_len < max_width)
                         {
@@ -1559,7 +1559,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                         assert(left_offset || visible_len < max_width);
                         const bool apply_color = (ctrl_color && whitespace);
                         if (apply_color)
-                            s.AppendColor(ctrl_color);
+                            s.AppendColorOverlay(norm, ctrl_color);
                         append_text(c_oem437[c], 1);
                         if (apply_color)
                             s.AppendColor(norm);
@@ -1579,7 +1579,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                         if (something_fits)
                         {
                             if (!color)
-                                s.AppendColor(GetColor(c == '\t' ? ColorElement::Whitespace : ColorElement::CtrlCode));
+                                s.AppendColorOverlay(norm, GetColor(c == '\t' ? ColorElement::Whitespace : ColorElement::CtrlCode));
                             // FUTURE:  Maybe '^' for ctrl codes and '?' for
                             // the 0xfffd codepoint?
                             append_text(L"?", 1);
@@ -1613,7 +1613,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                             {
                                 white = true;
                                 if (!color)
-                                    s.AppendColor(GetColor(ColorElement::Whitespace));
+                                    s.AppendColorOverlay(norm, GetColor(ColorElement::Whitespace));
                                 append_text(L"\u00b7", 1, 1);            // ·
                             }
                         }
@@ -1634,14 +1634,11 @@ LOut:
     if (m_options.show_debug_info && visible_len < max_width)
     {
         append_text(c_eol_marker, -1);
-        if (color)
-            s.AppendColor(color);
+        s.AppendColor(color ? color : norm);
     }
     else if (highlighting_found_text)
     {
-        s.AppendColor(norm);
-        if (color)
-            s.AppendColor(color);
+        s.AppendColor(color ? color : norm);
     }
     if (left_offset)
         visible_len = 0;

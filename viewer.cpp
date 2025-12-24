@@ -911,7 +911,7 @@ LAutoFitContentWidth:
                 }
                 else if (m_top + row < m_context.Count())
                 {
-                    const WCHAR* color = norm;
+                    const WCHAR* color = nullptr;
                     if (found_line)
                     {
                         const FileOffset row_offset = m_context.GetOffset(m_top + row);
