@@ -740,14 +740,16 @@ LAutoFitContentWidth:
                 bottom_offset = !bottom_line_plusone ? 0 : m_context.GetOffset(bottom_line_plusone - 1) + m_context.GetLength(bottom_line_plusone - 1);
             }
 
+            // Position, Offset/Line, Total are padded as a connected group.
+            m_clickable_header.Add(nullptr, 4, 50, true);
             if (m_hex_edit)
             {
                 tmp.Clear();
                 tmp.Printf(L"Pos: %06lx (%lu)", m_hex_pos, m_hex_pos);
-                m_clickable_header.Add(nullptr, 4, 10, true);
+                PadToWidth(tmp, 20);
                 m_clickable_header.Add(tmp.Text(), -1, 10, true);
+                m_clickable_header.Add(nullptr, 2, 10, true);
             }
-
             tmp.Clear();
             if (m_hex_mode)
                 tmp.Printf(L"Offset: %06lx-%06lx", m_hex_top, bottom_offset);
@@ -762,7 +764,6 @@ LAutoFitContentWidth:
             else
                 tmp.Printf(L" of %lu", m_context.Count());
             const uint16 goto_width = cell_count(tmp.Text());
-            m_clickable_header.Add(nullptr, 4, 50, true);
             m_clickable_header.Add(tmp.Text(), ID_GOTO, 50, true);
 
             unsigned details_width = 0;
