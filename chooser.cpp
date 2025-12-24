@@ -1047,11 +1047,15 @@ LNext:
     return ChooserOutcome::CONTINUE;
 }
 
-StrW Chooser::GetSelectedFile() const
+StrW Chooser::GetSelectedFile(bool only_files) const
 {
     StrW s;
-    if (m_index >= 0 && size_t(m_index) < m_files.size())
+    if (m_index >= 0 &&
+        size_t(m_index) < m_files.size() &&
+        !(only_files && m_files[m_index].IsDirectory()))
+    {
         m_files[m_index].GetPathName(s);
+    }
     return s;
 }
 
@@ -1690,7 +1694,7 @@ void Chooser::DeleteEntries(Error& e, bool recycle)
 
 void Chooser::RunFile(bool edit, Error& e)
 {
-    const StrW file = GetSelectedFile().Text();
+    const StrW file = GetSelectedFile(true/*only_files*/).Text();
     if (file.Empty())
         return;
 
@@ -1747,9 +1751,9 @@ void Chooser::SweepFiles(Error& e)
     {
         files = GetTaggedFiles();
     }
-    else if (size_t(m_index) < m_files.size() && !m_files[m_index].IsDirectory())
+    else
     {
-        name = GetSelectedFile();
+        name = GetSelectedFile(true/*only_files*/);
         if (name.Empty())
             return;
         files.emplace_back(std::move(name));

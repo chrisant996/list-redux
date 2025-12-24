@@ -2,6 +2,7 @@
 
 - Changed what shows up in the command row in hex mode.
 - Fixed whitespace and control code coloring in the viewer.
+- Fixed Edit, Run, and Sweep to not try to operate on directories.
 
 ## v0.26 -- 2025/12/21
 

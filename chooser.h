@@ -46,7 +46,7 @@ public:
     void            Navigate(const WCHAR* dir, std::vector<FileInfo>&& files);
     void            Navigate(const WCHAR* dir, Error& e, const WCHAR* up_from=nullptr);
     ChooserOutcome  Go(Error& e, bool do_search=false);
-    StrW            GetSelectedFile() const;
+    StrW            GetSelectedFile(bool only_files=false) const;
     std::vector<StrW> GetTaggedFiles(intptr_t* num_before_index=nullptr) const;
     std::vector<intptr_t> GetTaggedIndices(intptr_t* num_before_index=nullptr) const;
 
