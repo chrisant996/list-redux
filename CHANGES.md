@@ -1,5 +1,6 @@
 ## v0.27 -- 2025/12/24
 
+- Changed what shows up in the command row in hex mode.
 - Fixed whitespace and control code coloring in the viewer.
 
 ## v0.26 -- 2025/12/21
