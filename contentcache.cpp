@@ -46,6 +46,19 @@ void SetPipedInput()
     SetStdHandle(STD_INPUT_HANDLE, CreateFile(L"CONIN$", GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, 0));
 }
 
+const WCHAR* MakeOverlayColor(const WCHAR* color, const WCHAR* overlay)
+{
+    static StrW s_tmp;
+    s_tmp = color;
+    if (overlay && *overlay)
+    {
+        if (!s_tmp.Empty())
+            s_tmp.Append(';');
+        s_tmp.Append(overlay);
+    }
+    return s_tmp.Text();
+}
+
 static const WCHAR* const c_oem437[] =
 {
     L" ",       // NUL
@@ -1790,21 +1803,25 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         s.AppendColor(norm);
 
     // Format the text characters.
+    StrW old_color;
     s.Printf(L"  ", 2);
-    s.AppendColorOverlay(nullptr, GetColor(ColorElement::Divider));
+    s.AppendColorOverlay(norm, GetColor(ColorElement::Divider));
     // s.Append(L"\u2502", 1);
     s.Append(L"*", 1);
-    s.AppendColor(marked_color ? marked_color : norm);
+    old_color = (marked_color ? marked_color : norm);
+    s.AppendColor(old_color.Text());
     highlighting_found_text = false;
     for (unsigned ii = 0; ii < len; ++ii)
     {
         BYTE c = ptr[ii];
         bool edited = false;
         ColorElement byte_color;
+        const WCHAR* new_color = norm;
+
         if (IsByteDirty(offset + ii, c, byte_color))
         {
             edited = true;
-            s.AppendColorOverlay(norm, GetColor(byte_color));
+            new_color = MakeOverlayColor(norm, GetColor(byte_color));
             tmp2.SetFromCodepage(m_map.GetCodePage(true), reinterpret_cast<const char*>(&c), 1);
             tmp.SetAt(tmp.Text() + ii, *tmp2.Text());
         }
@@ -1813,15 +1830,16 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             if (found_line->len && offset + ii == found_line->offset)
             {
                 highlighting_found_text = true;
-                s.AppendColor(GetColor(ColorElement::SearchFound));
+                new_color = GetColor(ColorElement::SearchFound);
             }
             else if (highlighting_found_text && offset + ii == found_line->offset + found_line->len)
             {
                 assert(marked_color);
                 highlighting_found_text = false;
-                s.AppendColor(marked_color);
+                new_color = marked_color;
             }
         }
+
         if (c > 0 && c < ' ')
         {
             if (m_options.ascii_filter)
@@ -1830,33 +1848,32 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             }
             else
             {
-                const bool hilite_newline = (!highlighting_found_text && c == '\n' && !edited && !marked_color);
-                if (hilite_newline)
-                    s.AppendColorOverlay(norm, GetColor(ColorElement::CtrlCode));
+                if (!highlighting_found_text && c == '\n' && !edited && !marked_color)
+                    new_color = MakeOverlayColor(norm, GetColor(ColorElement::CtrlCode));
+                if (!old_color.Equal(new_color))
+                    s.AppendColor(new_color);
                 s.Append(c_oem437[c], 1);
-                if (hilite_newline)
-                    s.AppendColor(norm);
             }
         }
         else if (!c || wcwidth(tmp.Text()[ii]) != 1 || (m_options.ascii_filter && c > 0x7f))
         {
 filter_byte:
             if (!edited && !marked_color)
-                s.AppendColorOverlay(norm, GetColor(ColorElement::FilteredByte));
+                new_color = MakeOverlayColor(norm, GetColor(ColorElement::FilteredByte));
+            if (!old_color.Equal(new_color))
+                s.AppendColor(new_color);
             s.Append(m_options.filter_byte_char);
-            if (!edited && !marked_color)
-                s.AppendColor(norm);
         }
         else
         {
+            if (!old_color.Equal(new_color))
+                s.AppendColor(new_color);
             s.Append(tmp.Text() + ii, 1);
         }
-        if (edited)
-            s.AppendColor(marked_color);
+
+        old_color = new_color;
     }
-    if (marked_color)
-        s.AppendColor(norm);
-    s.AppendColorOverlay(nullptr, GetColor(ColorElement::Divider));
+    s.AppendColorOverlay(norm, GetColor(ColorElement::Divider));
     // s.Append(L"\u2502", 1);
     s.Append(L"*", 1);
     s.AppendColor(norm);
