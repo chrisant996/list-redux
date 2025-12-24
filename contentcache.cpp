@@ -1370,7 +1370,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
         const unsigned begin_index = s.Length();
         const unsigned margin_width = CalcMarginWidth(false/*hex_mode*/);
 #endif
-        s.AppendColor(GetColor(ColorElement::LineNumber));
+        s.AppendColorOverlay(norm, GetColor(ColorElement::LineNumber));
         if (m_options.show_line_numbers)
         {
             const size_t prev_num = (line > 0) ? GetLineNunber(line - 1) : 0;
@@ -1446,9 +1446,7 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
             }
             else if (highlighting_found_text && !need_found_highlight)
             {
-                s.AppendColor(GetColor(ColorElement::Content));
-                if (color)
-                    s.AppendColor(color);
+                s.AppendColor(color ? color : norm);
                 highlighting_found_text = false;
             }
             s.Append(text, text_len);
@@ -1657,6 +1655,19 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     if (!EnsureHexData(offset, hex_bytes, e))
         return false;
 
+    StrW _norm;
+    StrW _hilite;
+    _norm.Set(GetColor(ColorElement::Content));
+    _hilite.Set(_norm);
+    if (offset % 0x400 == 0)
+    {
+        if (!_hilite.Empty())
+            _hilite.Append(L";");
+        _hilite.Append(L"1");
+    }
+    const WCHAR* const norm = _norm.Text();
+    const WCHAR* const hilite = _hilite.Text();
+
     assert(offset < GetFileSize());
     assert(offset >= m_data_offset);
     const BYTE* ptr = m_data + (offset - m_data_offset);
@@ -1681,7 +1692,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
                 tmp.Append(ptr[ii]);
             else
             {
-                tmp.AppendColor(GetColor(ColorElement::FilteredByte));
+                tmp.AppendColorOverlay(norm, GetColor(ColorElement::FilteredByte));
                 tmp.Append(m_options.filter_byte_char);
             }
         }
@@ -1697,22 +1708,11 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     const unsigned begin_index = s.Length();
 #endif
 
-    StrW norm;
-    StrW hilite;
-    norm.Set(GetColor(ColorElement::Content));
-    hilite.Set(norm);
-    if (offset % 0x400 == 0)
-    {
-        if (!hilite.Empty())
-            hilite.Append(L";");
-        hilite.Append(L"1");
-    }
-
     // Format the offset.
-    s.AppendColor((offset % 0x400 == 0) ? hilite.Text() : norm.Text());
+    s.AppendColor((offset % 0x400 == 0) ? hilite : norm);
     s.Printf(L"%0*.*x", m_hex_size_width, m_hex_size_width, offset);
     if (offset % 0x400 == 0)
-        s.AppendColor(norm.Text());
+        s.AppendColor(norm);
     s.Append(L"  ", 2);
 
     // Format line number.
@@ -1723,9 +1723,9 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         tmp2.Clear();
         if (prev_line < this_line)
             tmp2.Printf(L"%zu%s", this_line, c_div_char);
-        s.AppendColor(GetColor(ColorElement::LineNumber));
+        s.AppendColorOverlay(norm, GetColor(ColorElement::LineNumber));
         s.Printf(L"%*s", m_line_count_width + 1, tmp2.Text());
-        s.AppendColor(norm.Text());
+        s.AppendColor(norm);
         s.Append(L"  ", 2);
     }
 
@@ -1740,8 +1740,9 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     {
         if (highlighting_found_text && offset + ii == found_line->offset + found_line->len)
         {
+            assert(marked_color);
             highlighting_found_text = false;
-            s.AppendColor(norm.Text()), s.AppendColor(marked_color);
+            s.AppendColor(marked_color);
         }
         if (ii)
         {
@@ -1761,22 +1762,23 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             if (IsByteDirty(offset + ii, value, byte_color))
             {
                 colored = true;
-                s.AppendColor(GetColor(byte_color));
+                s.AppendColorOverlay(norm, GetColor(byte_color));
             }
             else
             {
                 colored = (!highlighting_found_text && ptr[ii] == '\n' && !marked_color);
                 if (colored)
-                    s.AppendColorOverlay(nullptr, GetColor(ColorElement::CtrlCode));
+                    s.AppendColorOverlay(norm, GetColor(ColorElement::CtrlCode));
             }
             s.Printf(L"%02X", value);
             if (colored)
             {
-                s.AppendColor(norm.Text());
                 if (highlighting_found_text)
                     s.AppendColor(GetColor(ColorElement::SearchFound));
                 else if (marked_color)
                     s.AppendColor(marked_color);
+                else
+                    s.AppendColor(norm);
             }
         }
         else
@@ -1785,14 +1787,14 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         }
     }
     if (marked_color)
-        s.AppendColor(norm.Text());
+        s.AppendColor(norm);
 
     // Format the text characters.
     s.Printf(L"  ", 2);
     s.AppendColorOverlay(nullptr, GetColor(ColorElement::Divider));
     // s.Append(L"\u2502", 1);
     s.Append(L"*", 1);
-    s.AppendColor(marked_color ? marked_color : norm.Text());
+    s.AppendColor(marked_color ? marked_color : norm);
     highlighting_found_text = false;
     for (unsigned ii = 0; ii < len; ++ii)
     {
@@ -1802,7 +1804,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         if (IsByteDirty(offset + ii, c, byte_color))
         {
             edited = true;
-            s.AppendColor(GetColor(byte_color));
+            s.AppendColorOverlay(norm, GetColor(byte_color));
             tmp2.SetFromCodepage(m_map.GetCodePage(true), reinterpret_cast<const char*>(&c), 1);
             tmp.SetAt(tmp.Text() + ii, *tmp2.Text());
         }
@@ -1815,8 +1817,8 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             }
             else if (highlighting_found_text && offset + ii == found_line->offset + found_line->len)
             {
+                assert(marked_color);
                 highlighting_found_text = false;
-                s.AppendColor(norm.Text());
                 s.AppendColor(marked_color);
             }
         }
@@ -1830,37 +1832,34 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             {
                 const bool hilite_newline = (!highlighting_found_text && c == '\n' && !edited && !marked_color);
                 if (hilite_newline)
-                    s.AppendColorOverlay(nullptr, GetColor(ColorElement::CtrlCode));
+                    s.AppendColorOverlay(norm, GetColor(ColorElement::CtrlCode));
                 s.Append(c_oem437[c], 1);
                 if (hilite_newline)
-                    s.AppendColor(norm.Text());
+                    s.AppendColor(norm);
             }
         }
         else if (!c || wcwidth(tmp.Text()[ii]) != 1 || (m_options.ascii_filter && c > 0x7f))
         {
 filter_byte:
             if (!edited && !marked_color)
-                s.AppendColor(GetColor(ColorElement::FilteredByte));
+                s.AppendColorOverlay(norm, GetColor(ColorElement::FilteredByte));
             s.Append(m_options.filter_byte_char);
             if (!edited && !marked_color)
-                s.AppendColor(norm.Text());
+                s.AppendColor(norm);
         }
         else
         {
             s.Append(tmp.Text() + ii, 1);
         }
         if (edited)
-        {
-            s.AppendColor(norm.Text());
             s.AppendColor(marked_color);
-        }
     }
     if (marked_color)
-        s.AppendColor(norm.Text());
+        s.AppendColor(norm);
     s.AppendColorOverlay(nullptr, GetColor(ColorElement::Divider));
     // s.Append(L"\u2502", 1);
     s.Append(L"*", 1);
-    s.AppendColor(norm.Text());
+    s.AppendColor(norm);
 
     return true;
 }
