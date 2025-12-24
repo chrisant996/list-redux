@@ -46,6 +46,8 @@ enum
     ID_FILENAME,
     ID_GOTO,
     ID_ENCODING,
+    ID_ASCIIFILTER,
+    ID_HEXGROUPING,
     ID_HEXEDIT,
     ID_OPTION_LINEENDINGS,
     ID_OPTION_LINENUMBERS,
@@ -278,6 +280,8 @@ private:
     void            OpenNewFile(Error& e);
     ViewerOutcome   CloseCurrentFile();
     bool            ToggleHexEditMode(Error& e);
+    void            ToggleAsciiFilter();
+    void            ToggleHexGrouping();
     void            ToggleLineEndings();
     void            ToggleLineNumbers();
     void            ToggleFileOffsets();
@@ -1141,26 +1145,39 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg)
 #endif
     };
 
-    StrW tmp;
     uint32 msg_width = cell_count(msg);
 
     m_clickable_footer.Init(m_terminal_height - 1, m_terminal_width);
 
+    // Message (left aligned).
     m_clickable_footer.Add(msg, -1, 100, false);
 
+    // MultiFile indicator.
     if (m_multifile_search)
         m_clickable_footer.Add(L"    MultiFile", -1, 10, true);
 
-    m_clickable_footer.Add(nullptr, 4, 15, true);
-    m_clickable_footer.Add(m_context.GetEncodingName(m_hex_mode), m_hex_mode ? -1 : ID_ENCODING, 15, true);
-
     if (m_hex_mode)
     {
-        m_clickable_footer.Add(nullptr, 4, 10, true);
+        // Hex toggle keys.
+        m_clickable_footer.Add(nullptr, 2, 20, true);   // Padding for the whole group; use the highest toggle key priority.
+        m_clickable_footer.Add(nullptr, 2, 19, true);
+        m_clickable_footer.AddKeyName(L"Alt-A", ColorElement::Command, L"ASCII", ID_ASCIIFILTER, 19, true);
+        m_clickable_footer.Add(nullptr, 2, 20, true);
+        m_clickable_footer.AddKeyName(L"Alt-H", ColorElement::Command, L"Grouping", ID_HEXGROUPING, 20, true);
+        m_clickable_footer.Add(nullptr, 2, 18, true);
+        m_clickable_footer.AddKeyName(L"Alt-N", ColorElement::Command, L"LineNums", ID_OPTION_LINENUMBERS, 18, true);
+
+        // Hex edit key.
+        m_clickable_footer.Add(nullptr, 6, 25, true);
         m_clickable_footer.AddKeyName(L"Alt-E", ColorElement::Command, m_hex_edit ? L"EDITING " : L"EditMode", ID_HEXEDIT, 25, true);
     }
     else
     {
+        // Encoding.
+        m_clickable_footer.Add(nullptr, 4, 15, true);
+        m_clickable_footer.Add(m_context.GetEncodingName(m_hex_mode), m_hex_mode ? -1 : ID_ENCODING, 15, true);
+
+        // Options.
         m_clickable_footer.Add(L"    Options: ", -1, 25, true);
         if (!m_text /*&& !m_context.IsBinaryFile()*/)
             m_clickable_footer.Add(g_options.show_line_endings ? L"E" : L"e", ID_OPTION_LINEENDINGS, 25, true);
@@ -1725,11 +1742,7 @@ hex_edit_right:
         case 'a':
             if (input.modifier == Modifier::ALT)
             {
-                if (m_hex_mode)
-                {
-                    g_options.ascii_filter = !g_options.ascii_filter;
-                    m_force_update = true;
-                }
+                ToggleAsciiFilter();
             }
             break;
         case 'c':
@@ -1794,13 +1807,7 @@ hex_edit_right:
             }
             else if (input.modifier == Modifier::ALT)
             {
-                if (!m_text && m_hex_mode)
-                {
-                    ++g_options.hex_grouping;
-                    if (unsigned(1) << g_options.hex_grouping >= m_hex_width)
-                        g_options.hex_grouping = 0;
-                    m_force_update = true;
-                }
+                ToggleHexGrouping();
             }
             break;
         case 'j':
@@ -2040,6 +2047,12 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
         {
         case ID_ENCODING:
             ChooseEncoding();
+            break;
+        case ID_ASCIIFILTER:
+            ToggleAsciiFilter();
+            break;
+        case ID_HEXGROUPING:
+            ToggleHexGrouping();
             break;
         case ID_HEXEDIT:
             ToggleHexEditMode(e);
@@ -2628,6 +2641,26 @@ bool Viewer::ToggleHexEditMode(Error& e)
     m_force_update_header = true;
     m_force_update_footer = true;
     return true;
+}
+
+void Viewer::ToggleAsciiFilter()
+{
+    if (m_hex_mode)
+    {
+        g_options.ascii_filter = !g_options.ascii_filter;
+        m_force_update = true;
+    }
+}
+
+void Viewer::ToggleHexGrouping()
+{
+    if (!m_text && m_hex_mode)
+    {
+        ++g_options.hex_grouping;
+        if (unsigned(1) << g_options.hex_grouping >= m_hex_width)
+            g_options.hex_grouping = 0;
+        m_force_update = true;
+    }
 }
 
 void Viewer::ToggleLineEndings()
