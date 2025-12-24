@@ -40,6 +40,9 @@
   - [x] hex view
   - [x] hex edit (same limitation as goto line)
   - [x] searching (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)
+- [ ] menu row
+  - [ ] clickable
+  - [ ] enable/disable entries appropriately
 - [ ] optionally build with RE2 regex library (and do it for official releases)
 - [ ] documentation for the `.listredux` file
 - [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)

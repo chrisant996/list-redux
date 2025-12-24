@@ -169,6 +169,9 @@ ChooserOutcome Chooser::Go(Error& e, bool do_search)
 
     while (true)
     {
+#ifdef INCLUDE_MENU_ROW
+        m_command_mode = true;
+#endif
         UpdateDisplay();
 
         if (do_search)
@@ -202,6 +205,9 @@ ChooserOutcome Chooser::Go(Error& e, bool do_search)
         case InputType::Mouse:
             {
                 e.Clear();
+#ifdef INCLUDE_MENU_ROW
+                m_command_mode = false;
+#endif
                 const ChooserOutcome outcome = HandleInput(input, e);
                 if (e.Test())
                 {
@@ -262,7 +268,7 @@ void Chooser::UpdateDisplay()
         m_dirty_footer = true;
 
 #ifdef INCLUDE_MENU_ROW
-    const bool update_menu = (m_dirty_menu && g_options.show_menu);
+    const bool update_menu = (g_options.show_menu && (m_dirty_menu || m_command_mode != m_last_command_mode));
     m_dirty_menu = false;
 #else
     const bool update_menu = false;
@@ -404,34 +410,37 @@ void Chooser::UpdateDisplay()
         unsigned width = 0;
         bool stop = false;
 
-        auto add = [&](const WCHAR* key, const WCHAR* desc, bool delimit=true) {
-            if (!stop)
-            {
-                const unsigned old_len = menu.Length();
-                if (!menu.Empty())
-                    menu.AppendSpaces(2);
-                AppendKeyName(menu, key, ColorElement::MenuRow, delimit ? desc : nullptr);
-                if (!delimit && desc)
-                    menu.Append(desc);
-                if (width + cell_count(menu.Text() + old_len) > m_terminal_width)
+        if (m_command_mode)
+        {
+            auto add = [&](const WCHAR* key, const WCHAR* desc, bool delimit=true) {
+                if (!stop)
                 {
-                    stop = true;
-                    menu.SetLength(old_len);
+                    const unsigned old_len = menu.Length();
+                    if (!menu.Empty())
+                        menu.AppendSpaces(2);
+                    AppendKeyName(menu, key, ColorElement::MenuRow, delimit ? desc : nullptr);
+                    if (!delimit && desc)
+                        menu.Append(desc);
+                    if (width + cell_count(menu.Text() + old_len) > m_terminal_width)
+                    {
+                        stop = true;
+                        menu.SetLength(old_len);
+                    }
                 }
-            }
-        };
+            };
 
-        add(L"F1", L"Help");
-        add(L"Enter", L"View");
-        add(L"1-4", L"Details");
-        add(L"A", L"ChangeAttr");
-        add(L"E", L"Edit");
-        add(L"R", L"Rename");
-        add(L"S", L"Search");
-        add(L"T", L"Tag");
-        add(L"U", L"Untag");
-        add(L"V", L"ViewTagged");
-        add(L"Alt-R", L"Run");
+            add(L"F1", L"Help");
+            add(L"Enter", L"View");
+            add(L"1-4", L"Details");
+            add(L"A", L"ChangeAttr");
+            add(L"E", L"Edit");
+            add(L"R", L"Rename");
+            add(L"S", L"Search");
+            add(L"T", L"Tag");
+            add(L"U", L"Untag");
+            add(L"V", L"ViewTagged");
+            add(L"Alt-R", L"Run");
+        }
 
         s.Printf(L"\x1b[%uH", m_terminal_height - 1);
         s.AppendColor(GetColor(ColorElement::MenuRow));
@@ -500,6 +509,9 @@ void Chooser::UpdateDisplay()
 
     m_prev_visible_rows = m_visible_rows;
     m_last_feedback = std::move(m_feedback);
+#ifdef INCLUDE_MENU_ROW
+    m_last_command_mode = m_command_mode;
+#endif
 }
 
 void Chooser::Relayout()
@@ -1375,6 +1387,10 @@ bool Chooser::OnLeftClick(const InputRecord& input, Error& e)
 
 void Chooser::NewFileMask(Error& e)
 {
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
+
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
@@ -1411,6 +1427,10 @@ void Chooser::NewFileMask(Error& e)
 
 void Chooser::ChangeAttributes(Error& e, bool only_current)
 {
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
+
     std::vector<intptr_t> indices;
     const WCHAR* scope = nullptr;
     if (!only_current && m_tagged.AnyMarked())
@@ -1504,6 +1524,10 @@ LError:
 
 void Chooser::NewDirectory(Error& e)
 {
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
+
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));
@@ -1540,6 +1564,10 @@ void Chooser::RenameEntry(Error& e)
     StrW old_name = GetSelectedFile();
     if (old_name.Empty())
         return;
+
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
 
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
@@ -1733,6 +1761,10 @@ void Chooser::SweepFiles(Error& e)
     if (files.empty())
         return;
 
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
+
     StrW s;
     StrW program;
     StrW args_before;
@@ -1875,6 +1907,10 @@ void Chooser::ShowFileList()
 
 void Chooser::SearchAndTag(Error& e, bool caseless)
 {
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
+
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
     s.AppendColor(GetColor(ColorElement::Command));

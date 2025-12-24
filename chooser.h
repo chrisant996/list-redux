@@ -107,6 +107,9 @@ private:
     bool            m_can_drag = false;
     bool            m_can_scrollbar = false;
 
+#ifdef INCLUDE_MENU_ROW
+    bool            m_command_mode = false;
+#endif
     MarkedList      m_dirty;
     bool            m_dirty_header = false;
 #ifdef INCLUDE_MENU_ROW
@@ -114,6 +117,10 @@ private:
 #endif
     bool            m_dirty_footer = false;
     intptr_t        m_prev_visible_rows = 0;
+
     StrW            m_last_feedback;
+#ifdef INCLUDE_MENU_ROW
+    bool            m_last_command_mode = false;
+#endif
 };
 
