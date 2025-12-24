@@ -2563,9 +2563,17 @@ void ContentCache::UndoSave(Error& e)
     if (!IsOpen() || IsDirty() || m_patch_blocks_saved.empty())
         return;
 
+    SHFile h = CreateFileW(m_name.Text(), GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, 0);
+    if (h == INVALID_HANDLE_VALUE)
+    {
+        e.Sys();
+        e.Set(L"Unable to open file for writing.");
+        return;
+    }
+
     for (auto& p : m_patch_blocks_saved)
     {
-        if (!p.second.Save(m_file, true/*original*/, e))
+        if (!p.second.Save(h, true/*original*/, e))
             return;
     }
 
