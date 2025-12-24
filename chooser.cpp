@@ -1716,10 +1716,7 @@ void Chooser::RunFile(bool edit, Error& e)
     }
 
     if (s.Empty())
-        return
-
-    // Clear the current (alternate) screen in case programs switch to it.
-    OutputConsole(L"\x1b[J");
+        return;
 
     // Swap back to original screen and console modes.
     std::unique_ptr<Interactive> inverted = m_interactive->MakeReverseInteractive();
