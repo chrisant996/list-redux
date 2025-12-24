@@ -33,6 +33,18 @@ enum
     ID_PATH,
     ID_FILELIST,
     ID_ONE_ATTR,
+
+    ID_HELP,
+    ID_VIEW,
+    ID_DETAILS,
+    ID_ATTR,
+    ID_EDIT,
+    ID_RENAME,
+    ID_SEARCH,
+    ID_TAG,
+    ID_UNTAG,
+    ID_VIEWTAGGED,
+    ID_RUN,
 };
 
 static void ApplyAttr(DWORD& mask, DWORD& attr, bool& minus, DWORD flag)
@@ -268,16 +280,15 @@ void Chooser::UpdateDisplay()
         m_dirty_footer = true;
 
 #ifdef INCLUDE_MENU_ROW
-    const bool update_menu = (g_options.show_menu && (m_dirty_menu || m_command_mode != m_last_command_mode));
-    m_dirty_menu = false;
+    const bool update_menu_row = (g_options.show_menu && (m_dirty_menu || m_command_mode != m_last_command_mode));
 #else
-    const bool update_menu = false;
+    const bool update_menu_row = false;
 #endif
 
     if (!m_dirty_header &&
         !m_dirty_footer &&
         !m_dirty.AnyMarked() &&
-        !update_menu &&
+        !update_menu_row &&
         m_visible_rows >= m_prev_visible_rows)
     {
         return;
@@ -404,49 +415,37 @@ void Chooser::UpdateDisplay()
 
     // Menu row.
 #ifdef INCLUDE_MENU_ROW
-    if (update_menu)
+    if (update_menu_row)
     {
         StrW menu;
         unsigned width = 0;
         bool stop = false;
 
+        m_clickable_menu.Init(m_terminal_height - 2, m_terminal_width);
+
         if (m_command_mode)
         {
-            auto add = [&](const WCHAR* key, const WCHAR* desc, bool delimit=true) {
-                if (!stop)
-                {
-                    const unsigned old_len = menu.Length();
-                    if (!menu.Empty())
-                        menu.AppendSpaces(2);
-                    AppendKeyName(menu, key, ColorElement::MenuRow, delimit ? desc : nullptr);
-                    if (!delimit && desc)
-                        menu.Append(desc);
-                    if (width + cell_count(menu.Text() + old_len) > m_terminal_width)
-                    {
-                        stop = true;
-                        menu.SetLength(old_len);
-                    }
-                }
+            auto add = [&](int16 priority, const WCHAR* key, const WCHAR* desc, int16 id) {
+                m_clickable_menu.AddKeyName(key, ColorElement::MenuRow, desc, id, priority, false/*right_align*/);
+                m_clickable_menu.Add(nullptr, 2, priority, false/*right_align*/);
             };
 
-            add(L"F1", L"Help");
-            add(L"Enter", L"View");
-            add(L"1-4", L"Details");
-            add(L"A", L"ChangeAttr");
-            add(L"E", L"Edit");
-            add(L"R", L"Rename");
-            add(L"S", L"Search");
-            add(L"T", L"Tag");
-            add(L"U", L"Untag");
-            add(L"V", L"ViewTagged");
-            add(L"Alt-R", L"Run");
+            add(99, L"F1", L"Help", ID_HELP);
+            add(98, L"Enter", L"View", ID_VIEW);
+            add(97, L"1-4", L"Details", ID_DETAILS);
+            add(79, L"A", L"ChangeAttr", ID_ATTR);
+            add(78, L"E", L"Edit", ID_EDIT);
+            add(77, L"R", L"Rename", ID_RENAME);
+            add(89, L"S", L"Search", ID_SEARCH);
+            add(88, L"T", L"Tag", ID_TAG);
+            add(87, L"U", L"Untag", ID_UNTAG);
+            add(86, L"V", L"ViewTagged", ID_VIEWTAGGED);
+            add(69, L"Alt-R", L"Run", ID_RUN);
         }
 
         s.Printf(L"\x1b[%uH", m_terminal_height - 1);
-        s.AppendColor(GetColor(ColorElement::MenuRow));
-        s.Append(c_clreol);
-        s.Append(menu);
-        s.Append(c_norm);
+        m_clickable_menu.BuildOutput(s, GetColor(ColorElement::MenuRow));
+        m_dirty_menu = false;
     }
 #endif
 
@@ -635,9 +634,7 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
         case Key::F1:
             if (input.modifier == Modifier::None)
             {
-                if (ViewHelp(Help::CHOOSER, e) == ViewerOutcome::EXITAPP)
-                    return ChooserOutcome::EXITAPP;
-                ForceUpdateAll();
+                DoHelp();
             }
             break;
         case Key::F2:
@@ -666,37 +663,7 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
             return ChooserOutcome::EXITAPP;
 
         case Key::ENTER:
-viewone:
-            if (m_index >= 0 && m_index < m_count)
-            {
-                const auto& info = m_files[m_index];
-                if (info.IsDirectory())
-                {
-                    PathW dir;
-                    StrW up_from;
-                    info.GetPathName(dir);
-                    if (info.IsPseudoDirectory())
-                    {
-                        const WCHAR* mask = FindName(m_dir.Text());
-                        dir.ToParent(); // Strip "..".
-                        up_from = FindName(dir.Text());
-                        dir.ToParent(); // Go up to parent.
-                        dir.JoinComponent(mask);
-                    }
-
-                    Navigate(dir.Text(), e, up_from.Text());
-                    if (e.Test())
-                    {
-                        ReportError(e);
-                        ForceUpdateAll();
-                    }
-                }
-                else
-                {
-                    return ChooserOutcome::VIEWONE;
-                }
-            }
-            break;
+            return ViewOneFile();
 
         case Key::HOME:
             SetIndex(0);
@@ -874,7 +841,6 @@ LNext:
         case 'S':
             if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
             {
-                // TODO:  What should it do in hex mode?
                 SearchAndTag(e, input.modifier == Modifier::None/*caseless*/);
             }
             break;
@@ -920,10 +886,7 @@ LNext:
         case 'v':
             if (input.modifier == Modifier::None)
             {
-                if (m_tagged.AnyMarked())
-                    return ChooserOutcome::VIEWTAGGED;
-                else
-                    m_feedback.Set(c_no_files_tagged);
+                return ViewTaggedFiles();
             }
             break;
 
@@ -977,23 +940,13 @@ LNext:
         case 't':
             if (input.modifier == Modifier::None)
             {
-                if (m_index < m_count && !m_files[m_index].IsDirectory())
-                {
-                    m_tagged.Mark(m_index, 1);      // Mark.
-                    m_dirty.Mark(m_index % m_num_rows, 1);
-                }
-                goto LNext;
+                TagFile(true/*tag*/);
             }
             break;
         case 'u':
             if (input.modifier == Modifier::None)
             {
-                if (m_index < m_count && !m_files[m_index].IsDirectory())
-                {
-                    m_tagged.Mark(m_index, -1);     // Unmark.
-                    m_dirty.Mark(m_index % m_num_rows, 1);
-                }
-                goto LNext;
+                TagFile(false/*tag*/);
             }
             break;
         case '\x01':    // CTRL-A
@@ -1034,9 +987,7 @@ LNext:
             __fallthrough;
         case Key::MouseDrag:
         case Key::MouseLeftDblClick:
-            if (OnLeftClick(input, e))
-                goto viewone;
-            break;
+            return OnLeftClick(input, e);
         default:
             m_can_drag = false;
             m_can_scrollbar = false;
@@ -1294,7 +1245,7 @@ LDone:
     }
 }
 
-bool Chooser::OnLeftClick(const InputRecord& input, Error& e)
+ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
 {
     // Check for clicks in scrollbar.
     if (m_can_scrollbar)
@@ -1306,10 +1257,10 @@ bool Chooser::OnLeftClick(const InputRecord& input, Error& e)
             {
                 SetIndex(scroll_pos);
                 SetTop(clamp<intptr_t>(scroll_pos - (m_content_height / 2), 0, m_num_rows));
-                return false;
+                return ChooserOutcome::CONTINUE;
             }
         }
-        return false;
+        return ChooserOutcome::CONTINUE;
     }
 
     // Check for clicks in file list area.
@@ -1332,9 +1283,9 @@ bool Chooser::OnLeftClick(const InputRecord& input, Error& e)
                         if (input.key == Key::MouseLeftDblClick)
                         {
                             m_can_drag = false;
-                            return true;
+                            return ViewOneFile();
                         }
-                        return false;
+                        return ChooserOutcome::CONTINUE;
                     }
                     break;
                 }
@@ -1342,7 +1293,7 @@ bool Chooser::OnLeftClick(const InputRecord& input, Error& e)
             }
             m_can_drag = false;
         }
-        return false;
+        return ChooserOutcome::CONTINUE;
     }
 
     // Check for autoscroll
@@ -1352,41 +1303,132 @@ bool Chooser::OnLeftClick(const InputRecord& input, Error& e)
         {
             // TODO:  autoscroll
         }
-        return false;
+        return ChooserOutcome::CONTINUE;
     }
 
     m_can_drag = false;
 
     // TODO:  Could hover effects be feasible/useful?  (To show clickable spots and tooltips?)
 
-    // Click in header.
+    int16 id = -1;
     if (input.mouse_pos.Y == 0)
+        id = m_clickable_header.InterpretInput(input);
+#ifdef INCLUDE_MENU_ROW
+    else if (input.mouse_pos.Y == m_terminal_height - 2)
+        id = m_clickable_menu.InterpretInput(input);
+#endif
+    else if (input.mouse_pos.Y == m_terminal_height - 1)
+        id = m_clickable_footer.InterpretInput(input);
+    switch (id)
     {
-        switch (m_clickable_header.InterpretInput(input))
-        {
-        case ID_PATH:
-            NewFileMask(e);
-            break;
-        }
-        return false;
+    case ID_PATH:
+        NewFileMask(e);
+        break;
+    case ID_FILELIST:
+        ShowFileList();
+        break;
+    case ID_ONE_ATTR:
+        ChangeAttributes(e, true/*only_current*/);
+        break;
+    case ID_HELP:
+        DoHelp();
+        break;
+    case ID_VIEW:
+        return ViewOneFile();
+    case ID_DETAILS:
+        ++g_options.details;
+        g_options.details %= 4;
+        Relayout();
+        break;
+    case ID_ATTR:
+        ChangeAttributes(e, false/*only_current*/);
+        break;
+    case ID_EDIT:
+        RunFile(true/*edit*/, e);
+        break;
+    case ID_RENAME:
+        RenameEntry(e);
+        break;
+    case ID_SEARCH:
+        SearchAndTag(e, input.modifier == Modifier::None/*caseless*/);
+        break;
+    case ID_TAG:
+    case ID_UNTAG:
+        TagFile(id == ID_TAG);
+        break;
+    case ID_VIEWTAGGED:
+        return ViewTaggedFiles();
+    case ID_RUN:
+        RunFile(false/*edit*/, e);
+        break;
     }
 
-    // Click in footer.
-    if (input.mouse_pos.Y == m_terminal_height - 1)
+    return ChooserOutcome::CONTINUE;
+}
+
+void Chooser::DoHelp()
+{
+    Error e;
+    ViewHelp(Help::CHOOSER, e);
+    ForceUpdateAll();
+}
+
+ChooserOutcome Chooser::ViewOneFile()
+{
+    if (m_index < 0 || m_index >= m_count)
+        return ChooserOutcome::CONTINUE;
+
+    const auto& info = m_files[m_index];
+    if (info.IsDirectory())
     {
-        switch (m_clickable_footer.InterpretInput(input))
+        PathW dir;
+        StrW up_from;
+        info.GetPathName(dir);
+        if (info.IsPseudoDirectory())
         {
-        case ID_FILELIST:
-            ShowFileList();
-            break;
-        case ID_ONE_ATTR:
-            ChangeAttributes(e, true/*only_current*/);
-            break;
+            const WCHAR* mask = FindName(m_dir.Text());
+            dir.ToParent(); // Strip "..".
+            up_from = FindName(dir.Text());
+            dir.ToParent(); // Go up to parent.
+            dir.JoinComponent(mask);
         }
-        return false;
+
+        Error e;
+        Navigate(dir.Text(), e, up_from.Text());
+        if (e.Test())
+        {
+            ReportError(e);
+            ForceUpdateAll();
+        }
+        return ChooserOutcome::CONTINUE;
     }
 
-    return false;
+    return ChooserOutcome::VIEWONE;
+}
+
+ChooserOutcome Chooser::ViewTaggedFiles()
+{
+    if (m_tagged.AnyMarked())
+    {
+        return ChooserOutcome::VIEWTAGGED;
+    }
+    else
+    {
+        m_feedback.Set(c_no_files_tagged);
+        return ChooserOutcome::CONTINUE;
+    }
+}
+
+void Chooser::TagFile(bool tag)
+{
+    if (m_index < m_count && !m_files[m_index].IsDirectory())
+    {
+        m_tagged.Mark(m_index, tag ? 1 : -1);
+        m_dirty.Mark(m_index % m_num_rows, 1);
+    }
+    if (m_count && m_index < m_count - 1)
+        SetIndex(m_index + 1);
+    EnsureTop();
 }
 
 void Chooser::NewFileMask(Error& e)

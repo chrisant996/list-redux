@@ -65,7 +65,11 @@ private:
     bool            AskForConfirmation(const WCHAR* msg);
     void            WaitToContinue(bool erase_after=false, bool new_line=false);
 
-    bool            OnLeftClick(const InputRecord& input, Error& e);
+    ChooserOutcome  OnLeftClick(const InputRecord& input, Error& e);
+    void            DoHelp();
+    ChooserOutcome  ViewOneFile();
+    ChooserOutcome  ViewTaggedFiles();
+    void            TagFile(bool tag);
     void            NewFileMask(Error& e);
     void            ChangeAttributes(Error& e, bool only_current=false);
     void            NewDirectory(Error& e);
@@ -95,6 +99,9 @@ private:
     int32           m_vert_scroll_column = 0;
     scroll_car      m_vert_scroll_car;
     ClickableRow    m_clickable_header;
+#ifdef INCLUDE_MENU_ROW
+    ClickableRow    m_clickable_menu;
+#endif
     ClickableRow    m_clickable_footer;
     MouseHelper     m_mouse;
     StrW            m_feedback;

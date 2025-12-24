@@ -43,12 +43,19 @@ constexpr unsigned c_horiz_scroll_amount = 10;
 
 enum
 {
+    ID_HELP,
     ID_FILENAME,
     ID_GOTO,
+    ID_SEARCH,
+    ID_FINDNEXT,
     ID_ENCODING,
     ID_ASCIIFILTER,
     ID_HEXGROUPING,
     ID_HEXEDIT,
+    ID_HEXEDIT_PREV,
+    ID_HEXEDIT_NEXT,
+    ID_HEXEDIT_SAVE,
+    ID_HEXEDIT_UNDO,
     ID_OPTION_LINEENDINGS,
     ID_OPTION_LINENUMBERS,
     ID_OPTION_FILEOFFSETS,
@@ -270,6 +277,7 @@ private:
     size_t          CountForDisplay() const;
     void            DoSearch(bool next, bool caseless);
     void            FindNext(bool next=true);
+    void            JumpNextEdit(bool next=true);
     void            Center(const FoundOffset& found_line);
     void            GoTo(Error& e);
     size_t          GetFoundLineIndex(const FoundOffset& found_line);
@@ -279,6 +287,9 @@ private:
     void            ChooseTabWidth();
     void            OpenNewFile(Error& e);
     ViewerOutcome   CloseCurrentFile();
+    void            DoHelp();
+    void            DoSave(Error& e);
+    void            DoUndo(Error& e);
     bool            ToggleHexEditMode(Error& e);
     void            ToggleAsciiFilter();
     void            ToggleHexGrouping();
@@ -326,9 +337,15 @@ private:
     bool            m_hex_high_nybble = true;
     bool            m_hex_characters = false;
 
+#ifdef INCLUDE_MENU_ROW
+    bool            m_command_mode = false;
+#endif
     bool            m_can_drag = false;
     bool            m_can_scrollbar = false;
     ClickableRow    m_clickable_header;
+#ifdef INCLUDE_MENU_ROW
+    ClickableRow    m_clickable_menu;
+#endif
     ClickableRow    m_clickable_footer;
 
     intptr_t        m_last_index = -1;
@@ -342,9 +359,16 @@ private:
     bool            m_last_hex_characters = false;
     FileOffset      m_last_processed = FileOffset(-1);
     bool            m_last_completed = false;
+#ifdef INCLUDE_MENU_ROW
+    bool            m_last_edited = false;
+    bool            m_last_command_mode = false;
+#endif
     bool            m_force_update = false;
     FileOffset      m_force_update_hex_edit_offset = FileOffset(-1);
     bool            m_force_update_header = false;
+#ifdef INCLUDE_MENU_ROW
+    bool            m_force_update_menu = false;
+#endif
     bool            m_force_update_footer = false;
     bool            m_searching = false;
     StrW            m_searching_file;
@@ -399,6 +423,9 @@ ViewerOutcome Viewer::Go(Error& e, bool do_search)
     {
         e.Clear();
 
+#ifdef INCLUDE_MENU_ROW
+        m_command_mode = true;
+#endif
         UpdateDisplay();
 
         if (do_search)
@@ -427,6 +454,9 @@ ViewerOutcome Viewer::Go(Error& e, bool do_search)
         case InputType::Char:
         case InputType::Mouse:
             {
+#ifdef INCLUDE_MENU_ROW
+                m_command_mode = false;
+#endif
                 const ViewerOutcome outcome = HandleInput(input, e);
                 if (e.Test())
                 {
@@ -592,19 +622,24 @@ LAutoFitContentWidth:
     const bool processed_changed = (m_last_processed != m_context.Processed() || m_last_completed != m_context.Completed());
     const bool feedback_changed = (!m_last_feedback.Equal(m_feedback));
     const bool hex_meta_pos_changed = (m_last_hex_characters != m_hex_characters || m_last_hex_high_nybble != m_hex_high_nybble);
+#ifdef INCLUDE_MENU_ROW
+    const bool edited = (m_context.IsDirty() || m_context.IsSaved());
+#endif
 
     // Decide what needs to be updated.
     const bool update_header = (m_force_update || m_force_update_header || file_changed || top_changed || pos_changed || processed_changed);
+#ifdef INCLUDE_MENU_ROW
+    const bool update_menu_row = (menu_row && (m_force_update || m_force_update_menu || m_last_command_mode != m_command_mode || m_last_edited != edited));
+#else
+    const bool update_menu_row = false;
+#endif
     const bool update_content = (m_force_update || top_changed);
     const bool update_hex_edit = (m_force_update_hex_edit_offset != FileOffset(-1));
     const FileOffset update_hex_edit_offset = m_force_update_hex_edit_offset;
     update_command_line |= (m_force_update || m_force_update_footer || feedback_changed);
-    if (!update_header && !update_content && !update_command_line && !hex_meta_pos_changed)
+    if (!update_header && !update_menu_row && !update_content && !update_command_line && !hex_meta_pos_changed)
         return;
     const bool update_debug_row = debug_row;
-#ifdef INCLUDE_MENU_ROW
-    const bool update_menu_row = (menu_row && m_force_update);
-#endif
 
     StrW s;
 
@@ -620,6 +655,10 @@ LAutoFitContentWidth:
     m_last_feedback.Set(m_feedback);
     m_last_processed = m_context.Processed();
     m_last_completed = m_context.Completed();
+#ifdef INCLUDE_MENU_ROW
+    m_last_edited = edited;
+    m_last_command_mode = m_command_mode;
+#endif
     m_force_update = false;
     m_force_update_hex_edit_offset = FileOffset(-1);
     m_force_update_header = false;
@@ -1018,36 +1057,32 @@ LAutoFitContentWidth:
         unsigned width = 0;
         bool stop = false;
 
-        auto add = [&](const WCHAR* key, const WCHAR* desc) {
-            if (!stop)
-            {
-                const unsigned old_len = menu.Length();
-                if (!menu.Empty())
-                    menu.AppendSpaces(2);
-                AppendKeyName(menu, key, ColorElement::MenuRow, desc);
-                if (width + cell_count(menu.Text() + old_len) > m_terminal_width)
-                {
-                    stop = true;
-                    menu.SetLength(old_len);
-                }
-            }
-        };
+        m_clickable_menu.Init(m_terminal_height - 2, m_terminal_width);
 
-        add(L"F1", L"Help");
-        add(L"F3", L"FindNext");
-        add(L"Alt-G", L"GoTo");
-        if (m_hex_edit)
+        if (m_command_mode)
         {
-            add(L"F7/F8", L"Prev/Next");
-            add(L"^S", L"Save");
-            add(L"^Z", L"Undo");
+            auto add = [&](int16 priority, const WCHAR* key, const WCHAR* desc, int16 id) {
+                m_clickable_menu.AddKeyName(key, ColorElement::MenuRow, desc, id, priority, false/*right_align*/);
+                m_clickable_menu.Add(nullptr, 2, priority, false/*right_align*/);
+            };
+
+            add(99, L"F1", L"Help", ID_HELP);
+            add(98, m_hex_mode ? L"Alt-G" : L"G", L"GoTo", ID_GOTO);
+            add(97, m_hex_mode ? L"Alt-S" : L"S", L"Search", ID_SEARCH);
+            add(96, L"F3", L"FindNext", ID_FINDNEXT);
+            if (m_hex_mode && (m_context.IsDirty() || m_context.IsSaved()))
+            {
+                add(79, L"F7", L"PrevEdit", ID_HEXEDIT_PREV);
+                add(79, L"F8", L"NextEdit", ID_HEXEDIT_NEXT);
+            }
+            if (m_hex_edit)
+                add(89, L"^S", L"Save", ID_HEXEDIT_SAVE);
+            if (m_hex_edit || m_context.IsSaved())
+                add(88, L"^Z", L"Undo", ID_HEXEDIT_UNDO);
         }
 
         s.Printf(L"\x1b[%uH", m_terminal_height - menu_row);
-        s.AppendColor(GetColor(ColorElement::MenuRow));
-        s.Append(c_clreol);
-        s.Append(menu);
-        s.Append(c_norm);
+        m_clickable_menu.BuildOutput(s, GetColor(ColorElement::MenuRow));
     }
 #endif
 
@@ -1221,6 +1256,9 @@ void Viewer::InitHexWidth()
             m_hex_mode = false;
 // TODO:  This can lead to losing unsaved edits!
             m_hex_edit = false;
+#ifdef INCLUDE_MENU_ROW
+            m_force_update_menu = true;
+#endif
         }
     }
 }
@@ -1253,9 +1291,7 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
         case Key::F1:
             if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
             {
-                if (!m_text && ViewHelp(Help::VIEWER, e) == ViewerOutcome::EXITAPP)
-                    return ViewerOutcome::EXITAPP;
-                m_force_update = true;
+                DoHelp();
             }
             break;
 #ifdef INCLUDE_MENU_ROW
@@ -1519,19 +1555,7 @@ hex_edit_right:
             {
                 // F3 = forward, Shift-F3 = backward.
                 const bool next = (input.modifier & Modifier::SHIFT) == Modifier::None;
-                if (!g_options.searcher)
-                {
-                    if (!next && m_found_line.Empty())
-                    {
-                        // Mark where to start searching.
-                        m_found_line.MarkOffset(m_context.GetFileSize());
-                    }
-                    DoSearch(next, true/*caseless*/);
-                }
-                else
-                {
-                    FindNext(next);
-                }
+                FindNext(next);
             }
             break;
         case Key::F4:
@@ -1557,15 +1581,9 @@ hex_edit_right:
             break;
         case Key::F7:
         case Key::F8:
-            if (m_hex_mode && input.modifier == Modifier::None)
+            if (input.modifier == Modifier::None)
             {
-                FileOffset offset;
-                const bool next = (input.key == Key::F8);
-                if (m_context.NextEditedByteRow(m_hex_pos, offset, m_hex_width, next))
-                {
-                    m_hex_pos = offset;
-                    m_hex_high_nybble = next;
-                }
+                JumpNextEdit(input.key == Key::F8);
             }
             break;
         case Key::F12:
@@ -1685,11 +1703,7 @@ hex_edit_right:
         case 'S'-'@':   // CTRL-S
             if (input.modifier == Modifier::CTRL)
             {
-                if (m_hex_edit && m_context.IsDirty())
-                {
-                    m_context.SaveBytes(e);
-                    m_force_update = true;
-                }
+                DoSave(e);
             }
             break;
         case 'T'-'@':   // CTRL-T
@@ -1713,21 +1727,7 @@ hex_edit_right:
         case 'Z'-'@':   // CTRL-Z
             if (input.modifier == Modifier::CTRL)
             {
-                if (m_hex_edit)
-                {
-                    if (m_context.IsDirty())
-                    {
-                        m_force_update = true;
-                        if (ConfirmDiscardBytes())
-                            m_context.DiscardBytes();
-                    }
-                    else if (m_context.IsSaved())
-                    {
-                        m_force_update = true;
-                        if (ConfirmUndoSave())
-                            m_context.UndoSave(e);
-                    }
-                }
+                DoUndo(e);
             }
             break;
 
@@ -1885,7 +1885,6 @@ hex_edit_right:
         case 'S':
             if ((input.modifier & ~(Modifier::SHIFT|Modifier::ALT)) == Modifier::None)
             {
-                // TODO:  What should it do in hex mode?
                 DoSearch(true, (input.modifier & Modifier::SHIFT) == Modifier::None/*caseless*/);
             }
             break;
@@ -1893,7 +1892,6 @@ hex_edit_right:
         case '\\':
             if ((input.modifier & ~(Modifier::SHIFT|Modifier::ALT)) == Modifier::None)
             {
-                // TODO:  What should it do in hex mode?
                 DoSearch(true, input.key_char == '\\'/*caseless*/);
             }
             break;
@@ -2025,67 +2023,81 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
         }
     }
 
-    // Click in header.
+    int16 id = -1;
     if (input.mouse_pos.Y == 0)
+        id = m_clickable_header.InterpretInput(input);
+#ifdef INCLUDE_MENU_ROW
+    else if (input.mouse_pos.Y == m_terminal_height - 2)
+        id = m_clickable_menu.InterpretInput(input);
+#endif
+    else if (input.mouse_pos.Y == m_terminal_height - 1)
+        id = m_clickable_footer.InterpretInput(input);
+    switch (id)
     {
-        switch (m_clickable_header.InterpretInput(input))
-        {
-        case ID_FILENAME:
-            ShowFileList();
-            break;
-        case ID_GOTO:
-            GoTo(e);
-            break;
-        }
-        return;
-    }
-
-    // Click in footer.
-    if (input.mouse_pos.Y == m_terminal_height - 1)
-    {
-        switch (m_clickable_footer.InterpretInput(input))
-        {
-        case ID_ENCODING:
-            ChooseEncoding();
-            break;
-        case ID_ASCIIFILTER:
-            ToggleAsciiFilter();
-            break;
-        case ID_HEXGROUPING:
-            ToggleHexGrouping();
-            break;
-        case ID_HEXEDIT:
-            ToggleHexEditMode(e);
-            break;
-        case ID_OPTION_LINEENDINGS:
-            ToggleLineEndings();
-            break;
-        case ID_OPTION_LINENUMBERS:
-            ToggleLineNumbers();
-            break;
-        case ID_OPTION_FILEOFFSETS:
-            ToggleFileOffsets();
-            break;
-        case ID_OPTION_SHOWWHITESPACE:
-            ToggleShowWhitespace();
-            break;
-        case ID_OPTION_WRAP:
-            ToggleWrap();
-            break;
-        case ID_OPTION_EXPANDTABS:
-            ToggleExpandTabs();
-            break;
-        case ID_OPTION_CTRLMODE:
-            ToggleCtrlMode();
-            break;
-        case ID_OPTION_SHOWRULER:
-            ToggleShowRuler();
-            break;
-        case ID_OPTION_SHOWDEBUGINFO:
-            ToggleShowDebugInfo();
-            break;
-        }
-        return;
+    case ID_HELP:
+        DoHelp();
+        break;
+    case ID_FILENAME:
+        ShowFileList();
+        break;
+    case ID_GOTO:
+        GoTo(e);
+        break;
+    case ID_SEARCH:
+        DoSearch(true/*next*/, true/*caseless*/);
+        break;
+    case ID_FINDNEXT:
+        FindNext();
+        break;
+    case ID_ENCODING:
+        ChooseEncoding();
+        break;
+    case ID_ASCIIFILTER:
+        ToggleAsciiFilter();
+        break;
+    case ID_HEXGROUPING:
+        ToggleHexGrouping();
+        break;
+    case ID_HEXEDIT:
+        ToggleHexEditMode(e);
+        break;
+    case ID_HEXEDIT_PREV:
+    case ID_HEXEDIT_NEXT:
+        JumpNextEdit();
+        break;
+    case ID_HEXEDIT_SAVE:
+        DoSave(e);
+        break;
+    case ID_HEXEDIT_UNDO:
+        DoUndo(e);
+        break;
+    case ID_OPTION_LINEENDINGS:
+        ToggleLineEndings();
+        break;
+    case ID_OPTION_LINENUMBERS:
+        ToggleLineNumbers();
+        break;
+    case ID_OPTION_FILEOFFSETS:
+        ToggleFileOffsets();
+        break;
+    case ID_OPTION_SHOWWHITESPACE:
+        ToggleShowWhitespace();
+        break;
+    case ID_OPTION_WRAP:
+        ToggleWrap();
+        break;
+    case ID_OPTION_EXPANDTABS:
+        ToggleExpandTabs();
+        break;
+    case ID_OPTION_CTRLMODE:
+        ToggleCtrlMode();
+        break;
+    case ID_OPTION_SHOWRULER:
+        ToggleShowRuler();
+        break;
+    case ID_OPTION_SHOWDEBUGINFO:
+        ToggleShowDebugInfo();
+        break;
     }
 }
 
@@ -2236,6 +2248,12 @@ size_t Viewer::CountForDisplay() const
 
 void Viewer::DoSearch(bool next, bool caseless)
 {
+    // TODO:  What should it do in hex mode?
+
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
+
     StrW s;
     s.Printf(L"\x1b[%uH\r", m_terminal_height);
     OutputConsole(s.Text(), s.Length());
@@ -2262,9 +2280,18 @@ void Viewer::DoSearch(bool next, bool caseless)
 
 void Viewer::FindNext(bool next)
 {
-    assert(g_options.searcher);
-
     // TODO:  When should a search start over at the top of the file?
+
+    if (!g_options.searcher)
+    {
+        if (!next && m_found_line.Empty())
+        {
+            // Mark where to start searching.
+            m_found_line.MarkOffset(m_context.GetFileSize());
+        }
+        DoSearch(next, true/*caseless*/);
+        return;
+    }
 
     ClearSignaled();
 
@@ -2353,6 +2380,19 @@ void Viewer::FindNext(bool next)
     }
 }
 
+void Viewer::JumpNextEdit(bool next)
+{
+    if (m_hex_mode)
+    {
+        FileOffset offset;
+        if (m_context.NextEditedByteRow(m_hex_pos, offset, m_hex_width, next))
+        {
+            m_hex_pos = offset;
+            m_hex_high_nybble = next;
+        }
+    }
+}
+
 void Viewer::Center(const FoundOffset& found_line)
 {
     assert(!found_line.Empty());
@@ -2413,6 +2453,10 @@ void Viewer::GoTo(Error& e)
 
         return 1; // Eat other characters.
     };
+
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
 
     StrW right;
     while (!done)
@@ -2549,6 +2593,10 @@ void Viewer::ChooseEncoding()
 
 void Viewer::ChooseTabWidth()
 {
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
+
     StrW s;
     StrW right;
     right = L"(from 2 to 16)";
@@ -2571,6 +2619,10 @@ void Viewer::ChooseTabWidth()
 
 void Viewer::OpenNewFile(Error& e)
 {
+#ifdef INCLUDE_MENU_ROW
+    UpdateDisplay();
+#endif
+
     StrW s;
     StrW tmp;
     tmp.Printf(L"Enter file to open%s ", c_prompt_char);
@@ -2620,6 +2672,41 @@ ViewerOutcome Viewer::CloseCurrentFile()
     return ViewerOutcome::CONTINUE;
 }
 
+void Viewer::DoHelp()
+{
+    Error e;
+    ViewHelp(Help::VIEWER, e);
+    m_force_update = true;
+}
+
+void Viewer::DoSave(Error& e)
+{
+    if (m_hex_edit && m_context.IsDirty())
+    {
+        m_context.SaveBytes(e);
+        m_force_update = true;
+    }
+}
+
+void Viewer::DoUndo(Error& e)
+{
+    if (m_hex_edit)
+    {
+        if (m_context.IsDirty())
+        {
+            m_force_update = true;
+            if (ConfirmDiscardBytes())
+                m_context.DiscardBytes();
+        }
+        else if (m_context.IsSaved())
+        {
+            m_force_update = true;
+            if (ConfirmUndoSave())
+                m_context.UndoSave(e);
+        }
+    }
+}
+
 bool Viewer::ToggleHexEditMode(Error& e)
 {
     if (!m_hex_mode || m_text || m_context.IsPipe())
@@ -2639,6 +2726,9 @@ bool Viewer::ToggleHexEditMode(Error& e)
 
     m_hex_edit = !m_hex_edit;
     m_force_update_header = true;
+#ifdef INCLUDE_MENU_ROW
+    m_force_update_menu = true;
+#endif
     m_force_update_footer = true;
     return true;
 }
