@@ -2,7 +2,11 @@
 
 - Changed what shows up in the command row in hex mode.
 - Fixed whitespace and control code coloring in the viewer.
+- Fixed "Access denied" error when using `Ctrl-Z` to undo saved hex edits.
+- Fixed `Ctrl-Z` so it also works when in hex view mode (versus edit mode).
+- Fixed `F7` and `F8` to also work in hex view mode (versus edit mode).
 - Fixed Edit, Run, and Sweep to not try to operate on directories.
+- Other minor cosmetic changes.
 
 ## v0.26 -- 2025/12/21
 
