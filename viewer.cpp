@@ -1071,15 +1071,18 @@ LAutoFitContentWidth:
             add(98, m_hex_mode ? L"Alt-G" : L"G", L"GoTo", ID_GOTO);
             add(97, m_hex_mode ? L"Alt-S" : L"S", L"Search", ID_SEARCH);
             add(96, L"F3", L"FindNext", ID_FINDNEXT);
-            if (m_hex_mode && (m_context.IsDirty() || m_context.IsSaved()))
+            if (m_hex_mode)
             {
-                add(79, L"F7", L"PrevEdit", ID_HEXEDIT_PREV);
-                add(79, L"F8", L"NextEdit", ID_HEXEDIT_NEXT);
+                if (m_context.IsDirty() || m_context.IsSaved())
+                {
+                    add(79, L"F7", L"PrevEdit", ID_HEXEDIT_PREV);
+                    add(79, L"F8", L"NextEdit", ID_HEXEDIT_NEXT);
+                }
+                if (m_hex_edit)
+                    add(89, L"^S", L"Save", ID_HEXEDIT_SAVE);
+                if (m_hex_edit || m_context.IsSaved())
+                    add(88, L"^Z", L"Undo", ID_HEXEDIT_UNDO);
             }
-            if (m_hex_edit)
-                add(89, L"^S", L"Save", ID_HEXEDIT_SAVE);
-            if (m_hex_edit || m_context.IsSaved())
-                add(88, L"^Z", L"Undo", ID_HEXEDIT_UNDO);
         }
 
         s.Printf(L"\x1b[%uH", m_terminal_height - menu_row);
@@ -2390,6 +2393,10 @@ void Viewer::JumpNextEdit(bool next)
         {
             m_hex_pos = offset;
             m_hex_high_nybble = next;
+
+            FoundOffset found;
+            found.MarkOffset(offset);
+            Center(found);
         }
     }
 }
@@ -2691,20 +2698,17 @@ void Viewer::DoSave(Error& e)
 
 void Viewer::DoUndo(Error& e)
 {
-    if (m_hex_edit)
+    if (m_context.IsDirty())
     {
-        if (m_context.IsDirty())
-        {
-            m_force_update = true;
-            if (ConfirmDiscardBytes())
-                m_context.DiscardBytes();
-        }
-        else if (m_context.IsSaved())
-        {
-            m_force_update = true;
-            if (ConfirmUndoSave())
-                m_context.UndoSave(e);
-        }
+        m_force_update = true;
+        if (ConfirmDiscardBytes())
+            m_context.DiscardBytes();
+    }
+    else if (m_context.IsSaved())
+    {
+        m_force_update = true;
+        if (ConfirmUndoSave())
+            m_context.UndoSave(e);
     }
 }
 
