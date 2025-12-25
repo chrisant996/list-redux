@@ -456,6 +456,7 @@ void Chooser::UpdateDisplay()
 
         tmp.Clear();
         tmp.Printf(L"Files: %lu of %lu", m_index + 1, m_count);
+        // TODO:  Append count of tagged files.
         m_clickable_footer.Add(tmp.Text(), ID_FILELIST, 25, false);
         const int padding = (20 - tmp.Length());
         if (padding > 0)

@@ -66,6 +66,7 @@
 - [x] `F2` incrementally search the list of file names
 - [x] `F` `S` `/` `\` search for text in files in file chooser (tag matching files)
 - [x] `Ctrl-N` invert tagged files
+- [ ] show count of tagged files at the bottom
 
 ### File Viewer (list file content)
 
