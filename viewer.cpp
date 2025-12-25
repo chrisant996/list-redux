@@ -48,6 +48,8 @@ enum
     ID_FILENAME,
     ID_PREVFILE,
     ID_NEXTFILE,
+    ID_OPENFILE,
+    ID_CLOSEFILE,
     ID_GOTO,
     ID_SEARCH,
     ID_FINDNEXT,
@@ -274,7 +276,7 @@ private:
     void            InitHexWidth();
     unsigned        LinePercent(size_t line) const;
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
-    void            OnLeftClick(const InputRecord& input, Error &e);
+    ViewerOutcome   OnLeftClick(const InputRecord& input, Error &e);
     void            EnsureAltFiles();
     void            SetFile(intptr_t index, ContentCache* context=nullptr, bool force=false);
     size_t          CountForDisplay() const;
@@ -289,7 +291,7 @@ private:
     void            ChooseEncoding();
     void            ChooseTabWidth();
     void            OpenNewFile(Error& e);
-    ViewerOutcome   CloseCurrentFile();
+    ViewerOutcome   CloseCurrentFile(Error& e);
     void            DoHelp();
     void            ShowOriginalScreen();
     void            DoSave(Error& e);
@@ -752,7 +754,7 @@ LAutoFitContentWidth:
                 tmp.Clear();
                 tmp.Printf(L"Pos: %06lx (%lu)", m_hex_pos, m_hex_pos);
                 PadToWidth(tmp, 20);
-                m_clickable_header.Add(tmp.Text(), -1, 10, true);
+                m_clickable_header.Add(tmp.Text(), ID_GOTO, 10, true);
                 m_clickable_header.Add(nullptr, 2, 10, true);
             }
             tmp.Clear();
@@ -1090,6 +1092,8 @@ LAutoFitContentWidth:
             }
             add(59, L"^N", L"NextFile", ID_NEXTFILE);
             add(59, L"^P", L"PrevFile", ID_PREVFILE);
+            add(39, L"Alt-O", L"Open", ID_OPENFILE);
+            add(39, L"Alt-C", L"Close", ID_CLOSEFILE);
             add(49, L"F12", L"OrigScreen", ID_ORIGSCREEN);
         }
 
@@ -1756,8 +1760,7 @@ hex_edit_right:
         case 'c':
             if (input.modifier == Modifier::ALT)
             {
-                if (!m_hex_edit || ToggleHexEditMode(e))
-                    return CloseCurrentFile();
+                return CloseCurrentFile(e);
             }
             else if (input.modifier != Modifier::None)
             {
@@ -1850,8 +1853,7 @@ hex_edit_right:
             }
             else if (input.modifier == Modifier::ALT)
             {
-                if (!m_text) // Can't open files in ViewText() mode.
-                    OpenNewFile(e);
+                OpenNewFile(e);
             }
             break;
         case 'r':
@@ -1927,8 +1929,7 @@ hex_edit_right:
             m_can_scrollbar = (m_vert_scroll_column && input.mouse_pos.X == m_vert_scroll_column && input.mouse_pos.Y >= 1 + !!m_hex_mode && unsigned(input.mouse_pos.Y) < 1 + !!m_hex_mode + m_content_height);
             __fallthrough;
         case Key::MouseDrag:
-            OnLeftClick(input, e);
-            break;
+            return OnLeftClick(input, e);
         case Key::MouseRightClick:
             m_can_drag = false;
             m_can_scrollbar = false;
@@ -1939,7 +1940,7 @@ hex_edit_right:
     return ViewerOutcome::CONTINUE;
 }
 
-void Viewer::OnLeftClick(const InputRecord& input, Error& e)
+ViewerOutcome Viewer::OnLeftClick(const InputRecord& input, Error& e)
 {
     const uint32 content_top = 1 + !!m_hex_mode;
 
@@ -1962,14 +1963,14 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
                 else
                 {
                     if (!m_context.ProcessThrough(scroll_pos, e))
-                        return;
+                        return ViewerOutcome::CONTINUE;
                     if (m_context.Count() > 0)
                         found.MarkOffset(m_context.GetOffset(min<size_t>(scroll_pos, m_context.Count() - 1)));
                 }
                 Center(found);
             }
         }
-        return;
+        return ViewerOutcome::CONTINUE;
     }
 
     m_can_scrollbar = false;
@@ -2023,7 +2024,7 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
                 }
             }
         }
-        return;
+        return ViewerOutcome::CONTINUE;
     }
     else if (input.key == Key::MouseDrag)
     {
@@ -2056,6 +2057,15 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
     case ID_FILENAME:
         ShowFileList();
         break;
+    case ID_NEXTFILE:
+    case ID_PREVFILE:
+        NextFile(id == ID_NEXTFILE, e);
+        break;
+    case ID_OPENFILE:
+        OpenNewFile(e);
+        break;
+    case ID_CLOSEFILE:
+        return CloseCurrentFile(e);
     case ID_GOTO:
         GoTo(e);
         break;
@@ -2115,6 +2125,8 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
         ToggleShowDebugInfo();
         break;
     }
+
+    return ViewerOutcome::CONTINUE;
 }
 
 void Viewer::EnsureAltFiles()
@@ -2639,6 +2651,9 @@ void Viewer::ChooseTabWidth()
 
 void Viewer::OpenNewFile(Error& e)
 {
+    if (m_text)
+        return;         // Can't open files in ViewText() mode.
+
 #ifdef INCLUDE_MENU_ROW
     UpdateDisplay();
 #endif
@@ -2676,8 +2691,11 @@ void Viewer::OpenNewFile(Error& e)
     SetFile(m_index + 1);
 }
 
-ViewerOutcome Viewer::CloseCurrentFile()
+ViewerOutcome Viewer::CloseCurrentFile(Error& e)
 {
+    if (m_hex_edit && !ToggleHexEditMode(e))
+        return ViewerOutcome::CONTINUE;
+
     if (m_text || m_files->size() <= 1)
         return ViewerOutcome::RETURN;
 
