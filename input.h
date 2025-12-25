@@ -109,10 +109,10 @@ public:
     void            DisableMouseInput();
     void            DisableMouseInputIfShift();
 private:
-    void            UpdateMode(DWORD new_mode);
+    void            UpdateMode(DWORD new_mode, bool force=false);
 private:
     static HANDLE   s_hin;
-    static DWORD    s_prev_mode;    // To differentiate between press vs release.
+    static DWORD    s_prev_mode;
     DWORD           m_restore_mode = 0;
     bool            m_can_restore = false;
 };
@@ -190,5 +190,6 @@ private:
 
 InputRecord SelectInput(DWORD timeout=INFINITE, AutoMouseConsoleMode* mouse=nullptr);
 bool ReadInput(StrW& out, History history=History::MAX, DWORD max_length=30, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&, void*)>> input_callback=std::nullopt);
+bool IsMouseLeftButtonDown();
 
 bool ParseULongLong(const WCHAR* s, ULONGLONG& out, int radix=10);

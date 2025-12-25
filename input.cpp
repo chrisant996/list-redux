@@ -324,10 +324,14 @@ static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
     const DWORD key_state = record.dwControlKeyState;
     const DWORD event_flags = record.dwEventFlags;
 
+    // Remember the previous button state, to differentiate between press vs
+    // release.
+    const auto btn = GetButtonState();
+    const auto prv = s_prev_button_state;
+    s_prev_button_state = btn;
+
     // In a race condition, both left and right click may happen simultaneously.
     // Only respond to one; left has priority over right.
-    const auto prv = s_prev_button_state;
-    const auto btn = GetButtonState();
     const bool left_click = (!(prv & FROM_LEFT_1ST_BUTTON_PRESSED) && (btn & FROM_LEFT_1ST_BUTTON_PRESSED));
     const bool right_click = !left_click && (!(prv & RIGHTMOST_BUTTON_PRESSED) && (btn & RIGHTMOST_BUTTON_PRESSED));
     const bool double_click = left_click && (record.dwEventFlags & DOUBLE_CLICK);
@@ -495,6 +499,11 @@ severed:
     }
 
     return input;
+}
+
+bool IsMouseLeftButtonDown()
+{
+    return !!(GetButtonState() & FROM_LEFT_1ST_BUTTON_PRESSED);
 }
 
 struct GraphemeInfo
@@ -2147,9 +2156,9 @@ AutoMouseConsoleMode::~AutoMouseConsoleMode()
         UpdateMode(m_restore_mode);
 }
 
-void AutoMouseConsoleMode::UpdateMode(DWORD new_mode)
+void AutoMouseConsoleMode::UpdateMode(DWORD new_mode, bool force)
 {
-    if (new_mode != s_prev_mode && SetConsoleMode(s_hin, new_mode))
+    if ((force || new_mode != s_prev_mode) && SetConsoleMode(s_hin, new_mode))
     {
         s_prev_mode = new_mode;
         s_prev_button_state = GetButtonState();

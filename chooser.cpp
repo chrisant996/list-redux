@@ -658,8 +658,12 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
             break;
 
         case Key::ESC:
-            if (m_can_drag || m_can_scrollbar)
+            if (IsMouseLeftButtonDown() && (m_can_drag || m_can_scrollbar))
+            {
+                m_can_drag = false;
+                m_can_scrollbar = false;
                 break;
+            }
             return ChooserOutcome::EXITAPP;
 
         case Key::ENTER:
@@ -1263,6 +1267,8 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
         return ChooserOutcome::CONTINUE;
     }
 
+    m_can_scrollbar = false;
+
     // Check for clicks in file list area.
     if (m_visible_rows > 0 && unsigned(input.mouse_pos.Y - 1) < unsigned(m_visible_rows))
     {
@@ -1283,6 +1289,7 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
                         if (input.key == Key::MouseLeftDblClick)
                         {
                             m_can_drag = false;
+                            assert(!m_can_scrollbar);
                             return ViewOneFile();
                         }
                         return ChooserOutcome::CONTINUE;
@@ -1293,6 +1300,7 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
             }
             m_can_drag = false;
         }
+        assert(!m_can_scrollbar);
         return ChooserOutcome::CONTINUE;
     }
 
@@ -1307,6 +1315,7 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
     }
 
     m_can_drag = false;
+    assert(!m_can_scrollbar);
 
     // TODO:  Could hover effects be feasible/useful?  (To show clickable spots and tooltips?)
 

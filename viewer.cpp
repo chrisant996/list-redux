@@ -1317,8 +1317,12 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
 #endif
 
         case Key::ESC:
-            if (m_can_drag || m_can_scrollbar)
+            if (IsMouseLeftButtonDown() && (m_can_drag || m_can_scrollbar))
+            {
+                m_can_drag = false;
+                m_can_scrollbar = false;
                 break;
+            }
             if (m_hex_edit)
             {
                 ToggleHexEditMode(e);
@@ -1968,6 +1972,8 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
         return;
     }
 
+    m_can_scrollbar = false;
+
     // Click in content area.
     if (unsigned(input.mouse_pos.Y) >= content_top && unsigned(input.mouse_pos.Y) < content_top + m_content_height)
     {
@@ -2026,6 +2032,9 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
             // TODO:  autoscroll
         }
     }
+
+    m_can_drag = false;
+    assert(!m_can_scrollbar);
 
     int16 id = -1;
     if (input.mouse_pos.Y == 0)
