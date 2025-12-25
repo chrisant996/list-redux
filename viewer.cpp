@@ -422,7 +422,7 @@ ViewerOutcome Viewer::Go(Error& e, bool do_search)
 {
     SetFile(0);
 
-    AutoMouseConsoleMode mouse(0, g_options.allow_mouse);
+    AutoMouseConsoleMode mouse(g_options.allow_mouse);
 
     while (true)
     {

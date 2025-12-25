@@ -2,7 +2,6 @@
 
 - What if codepage 437 isn't installed?  It's our fallback, but if it's not installed then choose another?
 - Sometimes detects `clink.log` file as Binary when `debug.log_terminal` is enabled, but it's really UTF8.
-- [ ] The OS is getting stuck reporting the LEFT mouse button is down if ENABLE_MOUSE_INPUT is removed while the mouse is down.  Adding back ENABLE_MOUSE_INPUT seems to not reset the cached mouse button state, so the mouse button is reported as being down until it's pressed and released again.
 
 # FEATURES
 

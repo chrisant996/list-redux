@@ -14,12 +14,39 @@
 #include <set>
 
 static HANDLE s_interrupt = NULL;
+static DWORD s_prev_button_state = 0;
 static bool s_sending_terminal_request = false;
 
 static const int32 CTRL_PRESSED = LEFT_CTRL_PRESSED|RIGHT_CTRL_PRESSED;
 static const int32 ALT_PRESSED = LEFT_ALT_PRESSED|RIGHT_ALT_PRESSED;
 
 const WCHAR c_prompt_char[] = L":";
+
+// Don't use dwButtonState directly, due to an OS bug.  If SetConsoleMode
+// removes ENABLE_MOUSE_INPUT while a mouse button is down, then
+// ReadConsoleInputW keeps reporting the button is down.  The state doesn't
+// resync with reality until after ENABLE_MOUSE_INPUT is added again and the
+// button is pressed and released again.
+#pragma region dwButtonState workaround
+
+static short GetWheelDirection(const MOUSE_EVENT_RECORD& record)
+{
+    return short(HIWORD(record.dwButtonState));
+}
+
+#define dwButtonState __OS_bug_makes_dwButtonState_unreliable__
+
+static DWORD GetButtonState()
+{
+    DWORD dw = 0;
+    if (GetKeyState(VK_LBUTTON) & 0x8000)
+        dw |= FROM_LEFT_1ST_BUTTON_PRESSED;
+    if (GetKeyState(VK_RBUTTON) & 0x8000)
+        dw |= RIGHTMOST_BUTTON_PRESSED;
+    return dw;
+}
+
+#pragma endregion //dwButtonState workaround
 
 InputRecord::InputRecord()
 {
@@ -297,14 +324,10 @@ static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
     const DWORD key_state = record.dwControlKeyState;
     const DWORD event_flags = record.dwEventFlags;
 
-    // Remember the button state, to differentiate press vs release.
-    static DWORD s_prev_button_state;
-    const auto prv = s_prev_button_state;
-    s_prev_button_state = record.dwButtonState;
-
     // In a race condition, both left and right click may happen simultaneously.
     // Only respond to one; left has priority over right.
-    const auto btn = record.dwButtonState;
+    const auto prv = s_prev_button_state;
+    const auto btn = GetButtonState();
     const bool left_click = (!(prv & FROM_LEFT_1ST_BUTTON_PRESSED) && (btn & FROM_LEFT_1ST_BUTTON_PRESSED));
     const bool right_click = !left_click && (!(prv & RIGHTMOST_BUTTON_PRESSED) && (btn & RIGHTMOST_BUTTON_PRESSED));
     const bool double_click = left_click && (record.dwEventFlags & DOUBLE_CLICK);
@@ -340,7 +363,7 @@ static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
     // Mouse wheel.
     if (wheel)
     {
-        int32 direction = (0 - short(HIWORD(record.dwButtonState))) / 120;
+        int32 direction = (0 - GetWheelDirection(record)) / 120;
         UINT wheel_scroll_lines = 3;
         SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &wheel_scroll_lines, false);
 
@@ -353,7 +376,7 @@ static InputRecord ProcessInput(MOUSE_EVENT_RECORD const& record)
     // Mouse horizontal wheel.
     if (hwheel)
     {
-        int32 direction = (short(HIWORD(record.dwButtonState))) / 32;
+        int32 direction = (GetWheelDirection(record)) / 32;
         UINT hwheel_distance = 1;
 
         input.type = InputType::Mouse;
@@ -881,7 +904,7 @@ int32 ReadInputState::Go(void* cookie)
     if (m_origin.X < 0 || m_origin.Y < 0)
         SetOrigin(csbi.dwCursorPosition);
 
-    AutoMouseConsoleMode mouse(0, g_options.allow_mouse);
+    AutoMouseConsoleMode mouse(g_options.allow_mouse);
     m_mouse_helper.ClearClicks();
     m_can_drag = false;
 
@@ -2102,11 +2125,16 @@ int32 MouseHelper::AccelerationHelper::MaybeAccelerate(int32 lines)
     return lines;
 }
 
-AutoMouseConsoleMode::AutoMouseConsoleMode(HANDLE hin, bool enable)
+HANDLE AutoMouseConsoleMode::s_hin = GetStdHandle(STD_INPUT_HANDLE);
+DWORD AutoMouseConsoleMode::s_prev_mode = ([]() {
+    DWORD dw = 0;
+    GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &dw);
+    return dw;
+})();
+
+AutoMouseConsoleMode::AutoMouseConsoleMode(bool enable)
 {
-    m_hin = hin ? hin : GetStdHandle(STD_INPUT_HANDLE);
-    if (m_hin && !GetConsoleMode(m_hin, &m_orig_mode))
-        m_hin = 0;
+    m_can_restore = (s_hin && GetConsoleMode(s_hin, &m_restore_mode));
     if (enable)
         DisableMouseInputIfShift();
     else
@@ -2115,31 +2143,38 @@ AutoMouseConsoleMode::AutoMouseConsoleMode(HANDLE hin, bool enable)
 
 AutoMouseConsoleMode::~AutoMouseConsoleMode()
 {
-    if (m_hin)
-        SetConsoleMode(m_hin, m_orig_mode);
+    if (m_can_restore)
+        UpdateMode(m_restore_mode);
+}
+
+void AutoMouseConsoleMode::UpdateMode(DWORD new_mode)
+{
+    if (new_mode != s_prev_mode && SetConsoleMode(s_hin, new_mode))
+    {
+        s_prev_mode = new_mode;
+        s_prev_button_state = GetButtonState();
+    }
 }
 
 void AutoMouseConsoleMode::DisableMouseInput()
 {
-    if (m_hin)
+    if (m_can_restore)
     {
-        const DWORD new_mode = (m_orig_mode & ~ENABLE_MOUSE_INPUT)|ENABLE_QUICK_EDIT_MODE;
-        if (new_mode != m_prev_mode && SetConsoleMode(m_hin, new_mode))
-            m_prev_mode = new_mode;
+        const DWORD new_mode = (m_restore_mode & ~ENABLE_MOUSE_INPUT)|ENABLE_QUICK_EDIT_MODE;
+        UpdateMode(new_mode);
     }
 }
 
 void AutoMouseConsoleMode::DisableMouseInputIfShift()
 {
-    if (m_hin)
+    if (m_can_restore)
     {
-        DWORD new_mode = (m_orig_mode & ~(ENABLE_MOUSE_INPUT|ENABLE_QUICK_EDIT_MODE));
+        DWORD new_mode = (m_restore_mode & ~(ENABLE_MOUSE_INPUT|ENABLE_QUICK_EDIT_MODE));
         if (GetKeyState(VK_SHIFT) & 0x8000)
             new_mode |= ENABLE_QUICK_EDIT_MODE;
         else
             new_mode |= ENABLE_MOUSE_INPUT;
-        if (new_mode != m_prev_mode && SetConsoleMode(m_hin, new_mode))
-            m_prev_mode = new_mode;
+        UpdateMode(new_mode);
     }
 }
 

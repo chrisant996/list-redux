@@ -750,7 +750,7 @@ void ShowOriginalScreen()
     static const WCHAR c_swap_to_primary[] = L"\x1b[?1049l";
     static const WCHAR c_swap_to_alternate[] = L"\x1b[?1049h";
 
-    AutoMouseConsoleMode mouse(0, false);
+    AutoMouseConsoleMode mouse(false);
 
     OutputConsole(c_swap_to_primary);
     SelectInput();

@@ -116,7 +116,7 @@ PopupResult PopupList::Go(const WCHAR* title, const std::vector<StrW>& items, in
     m_terminal_width = LOWORD(colsrows);
     m_terminal_height = HIWORD(colsrows);
 
-    AutoMouseConsoleMode mouse(0, g_options.allow_mouse);
+    AutoMouseConsoleMode mouse(g_options.allow_mouse);
 
     if (items.empty())
     {

@@ -104,14 +104,17 @@ extern const WCHAR c_prompt_char[];
 class AutoMouseConsoleMode
 {
 public:
-                    AutoMouseConsoleMode(HANDLE hin=0, bool enable=true);
+                    AutoMouseConsoleMode(bool enable=true);
                     ~AutoMouseConsoleMode();
     void            DisableMouseInput();
     void            DisableMouseInputIfShift();
 private:
-    HANDLE          m_hin = 0;
-    DWORD           m_orig_mode = 0;
-    DWORD           m_prev_mode = 0;
+    void            UpdateMode(DWORD new_mode);
+private:
+    static HANDLE   s_hin;
+    static DWORD    s_prev_mode;    // To differentiate between press vs release.
+    DWORD           m_restore_mode = 0;
+    bool            m_can_restore = false;
 };
 
 class MouseHelper
