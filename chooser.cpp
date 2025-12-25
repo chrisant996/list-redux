@@ -541,6 +541,8 @@ void Chooser::EnsureColumnWidths()
             --m_content_height;
 #endif
 
+        const bool can_show_content = (terminal_height > m_content_height);
+
         m_max_size_width = 0;
         if (g_options.details >= 3 && m_files.size())
         {
@@ -585,7 +587,7 @@ void Chooser::EnsureColumnWidths()
             {
                 m_num_per_row = int32(std::max<intptr_t>(1, m_col_widths.size()));
                 m_num_rows = std::min<intptr_t>(m_content_height, m_files.size());
-                m_visible_rows = int32((terminal_height > 2) ? m_num_rows : 0);
+                m_visible_rows = int32(can_show_content ? m_num_rows : 0);
             }
         }
 
@@ -600,7 +602,7 @@ void Chooser::EnsureColumnWidths()
 
             m_num_per_row = int32(std::max<intptr_t>(1, m_col_widths.size()));
             m_num_rows = (m_count + m_num_per_row - 1) / m_num_per_row;
-            m_visible_rows = int32(std::min<intptr_t>(m_num_rows, (terminal_height > 2) ? terminal_height - 2 : 0));
+            m_visible_rows = int32(std::min<intptr_t>(m_num_rows, can_show_content ? m_content_height : 0));
         }
 
         if (m_col_widths.size() == 1 && m_col_widths[0] > target_width)
