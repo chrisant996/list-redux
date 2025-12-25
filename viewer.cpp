@@ -44,7 +44,10 @@ constexpr unsigned c_horiz_scroll_amount = 10;
 enum
 {
     ID_HELP,
+    ID_ORIGSCREEN,
     ID_FILENAME,
+    ID_PREVFILE,
+    ID_NEXTFILE,
     ID_GOTO,
     ID_SEARCH,
     ID_FINDNEXT,
@@ -288,8 +291,10 @@ private:
     void            OpenNewFile(Error& e);
     ViewerOutcome   CloseCurrentFile();
     void            DoHelp();
+    void            ShowOriginalScreen();
     void            DoSave(Error& e);
     void            DoUndo(Error& e);
+    void            NextFile(bool next, Error& e);
     bool            ToggleHexEditMode(Error& e);
     void            ToggleAsciiFilter();
     void            ToggleHexGrouping();
@@ -1083,6 +1088,9 @@ LAutoFitContentWidth:
                 if (m_hex_edit || m_context.IsSaved())
                     add(88, L"^Z", L"Undo", ID_HEXEDIT_UNDO);
             }
+            add(59, L"^N", L"NextFile", ID_NEXTFILE);
+            add(59, L"^P", L"PrevFile", ID_PREVFILE);
+            add(49, L"F12", L"OrigScreen", ID_ORIGSCREEN);
         }
 
         s.Printf(L"\x1b[%uH", m_terminal_height - menu_row);
@@ -1592,7 +1600,6 @@ hex_edit_right:
             break;
         case Key::F12:
             ShowOriginalScreen();
-            m_force_update = true;
             break;
 
         case Key::TAB:
@@ -1691,17 +1698,10 @@ hex_edit_right:
             }
             break;
         case 'N'-'@':   // CTRL-N
-            if (input.modifier == Modifier::CTRL)
-            {
-                if (!m_hex_edit || ToggleHexEditMode(e))
-                    SetFile(m_index + 1);
-            }
-            break;
         case 'P'-'@':   // CTRL-P
             if (input.modifier == Modifier::CTRL)
             {
-                if (!m_hex_edit || ToggleHexEditMode(e))
-                    SetFile(m_index - 1);
+                NextFile(input.key_char == 'N'-'@', e);
             }
             break;
         case 'S'-'@':   // CTRL-S
@@ -2040,6 +2040,9 @@ void Viewer::OnLeftClick(const InputRecord& input, Error& e)
     {
     case ID_HELP:
         DoHelp();
+        break;
+    case ID_ORIGSCREEN:
+        ShowOriginalScreen();
         break;
     case ID_FILENAME:
         ShowFileList();
@@ -2687,6 +2690,12 @@ void Viewer::DoHelp()
     m_force_update = true;
 }
 
+void Viewer::ShowOriginalScreen()
+{
+    ::ShowOriginalScreen();
+    m_force_update = true;
+}
+
 void Viewer::DoSave(Error& e)
 {
     if (m_hex_edit && m_context.IsDirty())
@@ -2710,6 +2719,12 @@ void Viewer::DoUndo(Error& e)
         if (ConfirmUndoSave())
             m_context.UndoSave(e);
     }
+}
+
+void Viewer::NextFile(bool next, Error& e)
+{
+    if (!m_hex_edit || ToggleHexEditMode(e))
+        SetFile(m_index + (next ? 1 : -1));
 }
 
 bool Viewer::ToggleHexEditMode(Error& e)
