@@ -2032,6 +2032,7 @@ ViewerOutcome Viewer::OnLeftClick(const InputRecord& input, Error& e)
         {
             // TODO:  autoscroll
         }
+        return ViewerOutcome::CONTINUE;
     }
 
     m_can_drag = false;

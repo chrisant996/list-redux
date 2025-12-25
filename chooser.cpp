@@ -1292,7 +1292,6 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
                         if (input.key == Key::MouseLeftDblClick)
                         {
                             m_can_drag = false;
-                            assert(!m_can_scrollbar);
                             return ViewOneFile();
                         }
                         return ChooserOutcome::CONTINUE;
@@ -1301,9 +1300,7 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
                 }
                 left += m_col_widths[i] + m_padding;
             }
-            m_can_drag = false;
         }
-        assert(!m_can_scrollbar);
         return ChooserOutcome::CONTINUE;
     }
 
@@ -1318,7 +1315,6 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
     }
 
     m_can_drag = false;
-    assert(!m_can_scrollbar);
 
     // TODO:  Could hover effects be feasible/useful?  (To show clickable spots and tooltips?)
 
