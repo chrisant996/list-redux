@@ -29,6 +29,7 @@ public:
     bool            IsMarked(intptr_t index) const;
     bool            AnyMarked() const;
     bool            AllMarked() const;
+    size_t          CountMarked(size_t total) const;
 
 private:
     std::unordered_set<intptr_t> m_set;
@@ -61,6 +62,7 @@ private:
     void            SetTop(intptr_t top);
     void            EnsureTop();
     void            RefreshDirectoryListing(Error& e);
+    intptr_t        NumTaggedFiles();
 
     bool            AskForConfirmation(const WCHAR* msg);
     void            WaitToContinue(bool erase_after=false, bool new_line=false);

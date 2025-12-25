@@ -1,12 +1,13 @@
 ## v0.27 -- 2025/12/24
 
+- Show count of tagged files in the chooser.
 - Changed what shows up in the command row in hex mode.
 - Fixed whitespace and control code coloring in the viewer.
+- Fixed left mouse button sometimes not responding.
 - Fixed "Access denied" error when using `Ctrl-Z` to undo saved hex edits.
 - Fixed `Ctrl-Z` so it also works when in hex view mode (versus edit mode).
 - Fixed `F7` and `F8` to also work in hex view mode (versus edit mode).
 - Fixed Edit, Run, and Sweep to not try to operate on directories.
-- Fixed left mouse button sometimes not responding.
 - Other minor cosmetic changes.
 
 ## v0.26 -- 2025/12/21

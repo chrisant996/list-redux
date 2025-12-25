@@ -66,7 +66,7 @@
 - [x] `F2` incrementally search the list of file names
 - [x] `F` `S` `/` `\` search for text in files in file chooser (tag matching files)
 - [x] `Ctrl-N` invert tagged files
-- [ ] show count of tagged files at the bottom
+- [x] show count of tagged files at the bottom
 
 ### File Viewer (list file content)
 
@@ -157,7 +157,7 @@
   - [ ] allow showing CSI SGR codes inline?  (but wrapping and max line length are problematic)
 - [ ] let user override hanging indent per file
 - [ ] option or toggle showing scrollbar in viewer?
-- [ ] `S` configure sort order
+- [ ] `S` configure sort order (NOTE: `Chooser::NumTaggedFiles` expects directories sorted first)
 - [ ] option to sort horizontally instead of vertically
 
 ### Maybe

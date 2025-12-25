@@ -132,6 +132,14 @@ bool MarkedList::AllMarked() const
     return (!m_set.size() && m_reverse);
 }
 
+size_t MarkedList::CountMarked(size_t total) const
+{
+    size_t n = min(m_set.size(), total);
+    if (m_reverse)
+        n = total - n;
+    return n;
+}
+
 Chooser::Chooser(const Interactive* interactive)
 : m_interactive(interactive)
 {
@@ -456,7 +464,12 @@ void Chooser::UpdateDisplay()
 
         tmp.Clear();
         tmp.Printf(L"Files: %lu of %lu", m_index + 1, m_count);
-        // TODO:  Append count of tagged files.
+        if (m_tagged.AnyMarked())
+        {
+            const size_t n = NumTaggedFiles();
+            if (n > 0)
+                tmp.Printf(L"  (%lu tagged)", n);
+        }
         m_clickable_footer.Add(tmp.Text(), ID_FILELIST, 25, false);
         const int padding = (20 - tmp.Length());
         if (padding > 0)
@@ -956,23 +969,26 @@ LNext:
                 TagFile(false/*tag*/);
             }
             break;
-        case '\x01':    // CTRL-A
-        case '\x14':    // CTRL-T
+        case 'A'-'@':   // CTRL-A
+        case 'T'-'@':   // CTRL-T
             if (!m_tagged.AllMarked())
             {
                 m_tagged.MarkAll();
                 m_dirty.MarkAll();
+                m_dirty_footer = true;
             }
             break;
-        case '\x0e':    // CTRL-N
+        case 'N'-'@':   // CTRL-N
             m_tagged.Reverse();
             m_dirty.MarkAll();
+            m_dirty_footer = true;
             break;
-        case '\x15':    // CTRL-U
+        case 'U'-'@':   // CTRL-U
             if (m_tagged.AnyMarked())
             {
                 m_tagged.Clear();
                 m_dirty.MarkAll();
+                m_dirty_footer = true;
             }
             break;
         }
@@ -1064,6 +1080,20 @@ std::vector<intptr_t> Chooser::GetTaggedIndices(intptr_t* num_before_index) cons
         }
     }
     return indices;
+}
+
+intptr_t Chooser::NumTaggedFiles()
+{
+    size_t dirs = 0;
+    for (size_t i = 0; i < m_files.size(); ++i)
+    {
+        const auto& file = m_files[i];
+        if (!file.IsDirectory())
+            break;
+        ++dirs;
+    }
+
+    return m_tagged.CountMarked(m_files.size() - dirs);
 }
 
 void Chooser::SetIndex(intptr_t index)
