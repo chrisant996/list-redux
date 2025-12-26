@@ -43,6 +43,7 @@
 - menu row
   - [x] clickable
   - [ ] enable/disable entries appropriately (always compute it, but only draw it if its content changed)
+- [x] `Alt-Shift-C` to save current settings into `.listredux` file as defaults
 - [ ] optionally build with RE2 regex library (and do it for official releases)
 - [ ] documentation for the `.listredux` file
 - [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
@@ -144,19 +145,16 @@
 
 ### Future
 
-- [ ] option to enable/disable mouse input
 - [ ] improve message box routine (make it not full terminal width, have clickable buttons, etc)
   - [ ] mouse input in message box routine
 - [ ] some way to configure colors inside the app (could benefit from ability to navigate between different input boxes)
 - [ ] some way to revert to default colors inside the app
-- [ ] save current settings into `.listredux` file as defaults
 - detect certain file types and render with formatting/color
   - [ ] detect git patches and render some lines with color
   - [ ] detect markdown and render some simple markdown formatting
   - [ ] detect C++, Lua, etc and render syntax coloring
   - [ ] allow showing CSI SGR codes inline?  (but wrapping and max line length are problematic)
 - [ ] let user override hanging indent per file
-- [ ] option or toggle showing scrollbar in viewer?
 - [ ] `S` configure sort order (NOTE: `Chooser::NumTaggedFiles` expects directories sorted first)
 - [ ] option to sort horizontally instead of vertically
 
@@ -186,6 +184,7 @@
 
 # KNOWN ISSUES
 
+- Mouse input is always enabled.  Hold the `SHIFT` key to let mouse clicks through to the terminal (e.g. for Quick Edit selection).
 - Some exotic characters are calculated as the wrong width in Windows Terminal (e.g. from dirx\icons.cpp when choosing inaccurate encodings).
   - [x] Mitigate width miscalculations by making the scroll bar characters always use explicit positioning escape codes.
 - Very large files consisting mostly of very short lines may take an excessive amount of memory to open.  This could lead to crashing the program.  For example, a 2GB file containing only 0x0A bytes would be interpreted as 2 billion lines, and take many times that much space to maintain tracking data for all 2 billion lines.

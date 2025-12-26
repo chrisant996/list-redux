@@ -54,3 +54,9 @@ MISCELLANEOUS:
 
    Alt-Shift-C  Write current settings to config file (%USERPROFILE%\.listredux).
 
+MOUSE INPUT:
+
+Many things respond to mouse input (e.g. scrollbars, the file chooser, the menu
+row, etc).  Hold the SHIFT key to let mouse input be handled by the terminal
+instead.
+
