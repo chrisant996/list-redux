@@ -1,7 +1,10 @@
-## v0.27 -- 2025/12/24
+## v0.27 -- 2025/12/26
 
+- Added `F10` to toggle showing a clickable "menu row" showing some commonly used key bindings.
+- Added `Alt-Shift-C` to save the current configuration state to the config file (`%USERPROFILE%\.listredux`).
 - Show count of tagged files in the chooser.
 - Changed what shows up in the command row in hex mode.
+- Changed the `Command` color config name to `Footer` for symmetry with the `Header` color config name.
 - Fixed whitespace and control code coloring in the viewer.
 - Fixed left mouse button sometimes not responding.
 - Fixed "Access denied" error when using `Ctrl-Z` to undo saved hex edits.
