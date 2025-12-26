@@ -6,6 +6,7 @@
 #include "pch.h"
 #include "input.h"
 #include "output.h"
+#include "config.h"
 #include "colors.h"
 #include "ecma48.h"
 #include "terminal.h"
@@ -19,6 +20,7 @@ const WCHAR c_show_cursor[] = L"\x1b[?25h";
 
 static HANDLE s_hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
+static int s_emulation = -1;
 static Terminal* s_terminal = new Terminal;
 
 bool IsConsole(HANDLE h)
@@ -27,9 +29,21 @@ bool IsConsole(HANDLE h)
     return !!GetConsoleMode(h, &dummy);
 }
 
-void SetEmulation(int emulate)
+void SetEmulation(const WCHAR* value)
 {
+    int emulate = -1;
+    if (ParseBoolean(value, true))
+        emulate = true;
+    else if (ParseBoolean(value, false))
+        emulate = false;
+
+    s_emulation = emulate;
     s_terminal->SetEmulation(emulate);
+}
+
+const WCHAR* GetEmulationConfigValue()
+{
+    return (s_emulation > 1) ? L"On" : (s_emulation == 0) ? L"Off" : L"Auto";
 }
 
 int ValidateColor(const WCHAR* p)

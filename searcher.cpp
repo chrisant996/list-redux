@@ -194,12 +194,12 @@ std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
     {
         cr.Init(row, terminal_width);
 
-        cr.AddKeyName(L"^I", ColorElement::Command, caseless ? L"IgnoreCase" : L"ExactCase ", ID_IGNORECASE, 0, true);
+        cr.AddKeyName(L"^I", ColorElement::Footer, caseless ? L"IgnoreCase" : L"ExactCase ", ID_IGNORECASE, 0, true);
         cr.Add(nullptr, 3, 0, true);
-        cr.AddKeyName(L"^X", ColorElement::Command, regex ? L"RegExp " : L"Literal", ID_REGEXP, 0, true);
+        cr.AddKeyName(L"^X", ColorElement::Footer, regex ? L"RegExp " : L"Literal", ID_REGEXP, 0, true);
 
         tmp.Set(L"\r");
-        cr.BuildOutput(tmp, GetColor(ColorElement::Command));
+        cr.BuildOutput(tmp, GetColor(ColorElement::Footer));
         tmp.Printf(L"\rSearch%s ", c_prompt_char);
         OutputConsole(tmp.Text(), tmp.Length());
     };

@@ -30,17 +30,47 @@ static bool s_light_theme = false;
 
 static const WCHAR* c_default_colors[] =
 {
+    // General
     L"91",              // Error
+    L"93",              // Header
+    L"93",              // Footer
+#ifdef INCLUDE_MENU_ROW
+    L"44;96",           // MenuRow
+#endif
+    L"47;30",           // KeyName
+
+    // Scrollbar
+    L"90",              // FloatingScrollBar
+    L"90",              // ScrollBar
+    L"37",              // ScrollBarCar
+
+    // Input
+    L"93",              // Input
+    L"43;30",           // InputSelection
+    L"46;30",           // InputHorizScroll
+
+    // Popup
+    L"47;90",           // PopupBorder
+    L"47;30",           // PopupScrollCar
+    L"47;30",           // PopupHeader
+    L"47;30",           // PopupFooter
+    L"47;30",           // PopupContent
+    L"47;90",           // PopupContentDim
+    L"40;37",           // PopupSelect
+
+    // Miscellaneous
+    L"7",               // SweepDivider
+    L"96",              // SweepFile
+    L"7;36",            // DebugRow
+
+    // Chooser
     L"97",              // File
     L"97;48;5;23",      // Selected
     L"36",              // Tagged
     L"30;48;5;23",      // SelectedTagged
-    L"93",              // Header
-    L"93",              // Command
-    L"93",              // Input
-    L"43;30",           // InputSelection
-    L"46;30",           // InputHorizScroll
     L"90",              // Divider
+
+    // Viewer
     L"90",              // LineNumber
     L"",                // Content
     L"90",              // Whitespace
@@ -49,25 +79,8 @@ static const WCHAR* c_default_colors[] =
     L"7",               // EndOfFileLine
     L"7",               // MarkedLine
     L"7;36",            // SearchFound
-    L"7;36",            // DebugRow
-#ifdef INCLUDE_MENU_ROW
-    L"44;96",           // MenuRow
-#endif
-    L"7",               // SweepDivider
-    L"96",              // SweepFile
-    L"90",              // FloatingScrollBar
-    L"90",              // ScrollBar
-    L"37",              // ScrollBarCar
-    L"47;90",           // PopupBorder
-    L"47;30",           // PopupScrollCar
-    L"47;30",           // PopupHeader
-    L"47;30",           // PopupFooter
-    L"47;30",           // PopupContent
-    L"47;90",           // PopupContentDim
-    L"40;37",           // PopupSelect
     L"97;45",           // EditedByte
     L"97;42",           // SavedByte
-    L"47;30",           // KeyName
 };
 static_assert(_countof(c_default_colors) == size_t(ColorElement::MAX));
 
@@ -803,17 +816,47 @@ void ReportColorlessError(Error& e)
 
 static const WCHAR* const c_reg_color_name[] =
 {
+    // General
     L"Error",
+    L"Header",
+    L"Footer",
+#ifdef INCLUDE_MENU_ROW
+    L"MenuRow",
+#endif
+    L"KeyName",
+
+    // Scrollbar
+    L"FloatingScrollBar",
+    L"ScrollBar",
+    L"ScrollBarCar",
+
+    // Input
+    L"Input",
+    L"InputSelection",
+    L"InputHorizScroll",
+
+    // Popup
+    L"PopupBorder",
+    L"PopupScrollCar",
+    L"PopupHeader",
+    L"PopupFooter",
+    L"PopupContent",
+    L"PopupContentDim",
+    L"PopupSelect",
+
+    // Miscellaneous
+    L"SweepDivider",
+    L"SweepFile",
+    L"DebugRow",
+
+    // Chooser
     L"File",
     L"Selected",
     L"Tagged",
     L"SelectedTagged",
-    L"Header",
-    L"Command",
-    L"Input",
-    L"InputSelection",
-    L"InputHorizScroll",
     L"Divider",
+
+    // Viewer
     L"LineNumber",
     L"Content",
     L"Whitespace",
@@ -822,25 +865,8 @@ static const WCHAR* const c_reg_color_name[] =
     L"EndOfFileLine",
     L"MarkedLine",
     L"SearchFound",
-    L"DebugRow",
-#ifdef INCLUDE_MENU_ROW
-    L"MenuRow",
-#endif
-    L"SweepDivider",
-    L"SweepFile",
-    L"FloatingScrollBar",
-    L"ScrollBar",
-    L"ScrollBarCar",
-    L"PopupBorder",
-    L"PopupScrollCar",
-    L"PopupHeader",
-    L"PopupFooter",
-    L"PopupContent",
-    L"PopupContentDim",
-    L"PopupSelect",
     L"EditedByte",
     L"SavedByte",
-    L"KeyName",
 };
 static_assert(_countof(c_reg_color_name) == _countof(s_colors));
 static_assert(_countof(c_reg_color_name) == size_t(ColorElement::MAX));
@@ -873,5 +899,13 @@ void ReadColors(const WCHAR* ini_filename)
 
     for (uint32 i = 0; i < _countof(c_reg_color_name); ++i)
         ReadConfigString(ini_filename, L"Colors", c_reg_color_name[i], s_colors[i], _countof(s_colors[i]), c_default_colors[i]);
+}
+
+bool WriteColors(const WCHAR* ini_filename)
+{
+    bool ok = true;
+    for (uint32 i = 0; i < _countof(c_reg_color_name); ++i)
+        ok &= WriteConfigString(ini_filename, L"Colors", c_reg_color_name[i], s_colors[i]);
+    return ok;
 }
 #endif

@@ -337,7 +337,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
 
     LoadConfig();
     if (emulate >= -1)
-        SetEmulation(emulate);
+        SetEmulation((emulate > 0) ? L"true" : (emulate == 0) ? L"false" : L"auto");
     if (wrapping >= 0)
         SetWrapping(wrapping > 0);
     if (hex_view >= 0)

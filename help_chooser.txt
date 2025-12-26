@@ -50,3 +50,7 @@ TAGGING KEYS:
         Ctrl-T  Tag all files.
         Ctrl-U  Untag all files.
 
+MISCELLANEOUS:
+
+   Alt-Shift-C  Write current settings to config file (%USERPROFILE%\.listredux).
+

@@ -11,6 +11,7 @@
 #include "signaled.h"
 #include "popuplist.h"
 #include "list_format.h"
+#include "config.h"
 #include "colors.h"
 #include "ellipsify.h"
 #include "ecma48.h"
@@ -27,6 +28,7 @@ constexpr scroll_bar_style c_sbstyle = scroll_bar_style::eighths_block_chars;
 static const WCHAR c_no_file_open[] = L"*** No File Open ***";
 static const WCHAR c_endoffile_marker[] = L"*** End Of File ***";
 static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
+static const WCHAR c_config_saved[] = L"*** Configuration Saved ***";
 static const WCHAR c_canceled[] = L"*** Canceled ***";
 
 const DWORD c_max_needle = 32;
@@ -132,8 +134,8 @@ static int ConfirmSaveChanges()
 {
     const WCHAR* const msg = L"Do you want to save your changes to this file?";
     const WCHAR* const directive = L"Press S to save, D to discard, or any other key to cancel...";
-    // TODO:  ColorElement::Command might not be the most appropriate color.
-    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
+    // TODO:  ColorElement::Footer might not be the most appropriate color.
+    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Footer);
     OutputConsole(s.Text(), s.Length());
 
     while (true)
@@ -170,8 +172,8 @@ static bool ConfirmDiscardBytes()
 {
     const WCHAR* const msg = L"Do you want to discard all unsaved changes to this file?";
     const WCHAR* const directive = L"Press D to discard, or any other key to cancel...";
-    // TODO:  ColorElement::Command might not be the most appropriate color.
-    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
+    // TODO:  ColorElement::Footer might not be the most appropriate color.
+    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Footer);
     OutputConsole(s.Text(), s.Length());
 
     while (true)
@@ -205,8 +207,8 @@ static bool ConfirmUndoSave()
 {
     const WCHAR* const msg = L"Do you want to undo all saved changes to this file?";
     const WCHAR* const directive = L"Press U to undo, or any other key to cancel...";
-    // TODO:  ColorElement::Command might not be the most appropriate color.
-    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
+    // TODO:  ColorElement::Footer might not be the most appropriate color.
+    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Footer);
     OutputConsole(s.Text(), s.Length());
 
     while (true)
@@ -272,7 +274,7 @@ public:
 private:
     unsigned        CalcMarginWidth();
     void            UpdateDisplay();
-    void            MakeCommandLine(StrW& s, const WCHAR* msg=nullptr);
+    void            MakeFooter(StrW& s, const WCHAR* msg=nullptr);
     void            InitHexWidth();
     unsigned        LinePercent(size_t line) const;
     ViewerOutcome   HandleInput(const InputRecord& input, Error &e);
@@ -392,7 +394,7 @@ void ScopedWorkingIndicator::ShowFeedback(bool completed, unsigned __int64 proce
         StrW msg;
         const DWORD colsrows = GetConsoleColsRows();
         msg.Printf(L"\x1b[%uH", HIWORD(colsrows));
-        viewer->MakeCommandLine(msg, L"Working...");
+        viewer->MakeFooter(msg, L"Working...");
         OutputConsole(msg.Text(), msg.Length());
         m_needs_cleanup = true;
     }
@@ -1102,7 +1104,7 @@ LAutoFitContentWidth:
     }
 #endif
 
-    // Command line.
+    // Footer.
     StrW left;
     if (m_searching)
         left.Append(L"Searching... (Ctrl-Break to cancel)");
@@ -1114,7 +1116,7 @@ LAutoFitContentWidth:
         {
             StrW tmp;
             left.AppendSpaces(4);
-            // -1 because of how MakeCommandLine works inside.
+            // -1 because of how MakeFooter works inside.
             const WCHAR* name = FindName(m_searching_file.Text());
             int32 limit = m_terminal_width - 21 - left.Length();
             if (cell_count(name) <= 20 && limit >= 20)
@@ -1131,7 +1133,7 @@ LAutoFitContentWidth:
             }
             left.Append(tmp.Text());
         }
-        MakeCommandLine(s, left.Text());
+        MakeFooter(s, left.Text());
     }
 
     if (s.Length() || hex_meta_pos_changed)
@@ -1179,7 +1181,7 @@ LAutoFitContentWidth:
     m_feedback.Clear();
 }
 
-void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg)
+void Viewer::MakeFooter(StrW& s, const WCHAR* msg)
 {
     static const WCHAR* const c_ctrl_indicator[] =
     {
@@ -1212,15 +1214,15 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg)
         // Hex toggle keys.
         m_clickable_footer.Add(nullptr, 2, 20, true);   // Padding for the whole group; use the highest toggle key priority.
         m_clickable_footer.Add(nullptr, 2, 19, true);
-        m_clickable_footer.AddKeyName(L"Alt-A", ColorElement::Command, L"ASCII", ID_ASCIIFILTER, 19, true);
+        m_clickable_footer.AddKeyName(L"Alt-A", ColorElement::Footer, L"ASCII", ID_ASCIIFILTER, 19, true);
         m_clickable_footer.Add(nullptr, 2, 20, true);
-        m_clickable_footer.AddKeyName(L"Alt-H", ColorElement::Command, L"Grouping", ID_HEXGROUPING, 20, true);
+        m_clickable_footer.AddKeyName(L"Alt-H", ColorElement::Footer, L"Grouping", ID_HEXGROUPING, 20, true);
         m_clickable_footer.Add(nullptr, 2, 18, true);
-        m_clickable_footer.AddKeyName(L"Alt-N", ColorElement::Command, L"LineNums", ID_OPTION_LINENUMBERS, 18, true);
+        m_clickable_footer.AddKeyName(L"Alt-N", ColorElement::Footer, L"LineNums", ID_OPTION_LINENUMBERS, 18, true);
 
         // Hex edit key.
         m_clickable_footer.Add(nullptr, 6, 25, true);
-        m_clickable_footer.AddKeyName(L"Alt-E", ColorElement::Command, m_hex_edit ? L"EDITING " : L"EditMode", ID_HEXEDIT, 25, true);
+        m_clickable_footer.AddKeyName(L"Alt-E", ColorElement::Footer, m_hex_edit ? L"EDITING " : L"EditMode", ID_HEXEDIT, 25, true);
     }
     else
     {
@@ -1251,7 +1253,7 @@ void Viewer::MakeCommandLine(StrW& s, const WCHAR* msg)
     }
 
     s.Printf(L"\x1b[%uH\r", m_terminal_height);
-    m_clickable_footer.BuildOutput(s, GetColor(ColorElement::Command));
+    m_clickable_footer.BuildOutput(s, GetColor(ColorElement::Footer));
     s.Printf(L"\x1b[%uG", msg_width + 1);
 }
 
@@ -1758,9 +1760,16 @@ hex_edit_right:
             }
             break;
         case 'c':
+        case 'C':
             if (input.modifier == Modifier::ALT)
             {
                 return CloseCurrentFile(e);
+            }
+            else if (input.modifier == (Modifier::ALT|Modifier::SHIFT))
+            {
+                if (SaveConfig(e))
+                    m_feedback = c_config_saved;
+                break;
             }
             else if (input.modifier != Modifier::None)
             {
@@ -2500,7 +2509,7 @@ void Viewer::GoTo(Error& e)
             right = L"Base 16 (use # prefix for base 10)";
 
         s.Clear();
-        s.AppendColor(GetColor(ColorElement::Command));
+        s.AppendColor(GetColor(ColorElement::Footer));
         s.Printf(L"\r%s\x1b[%uG%s\r%s%s ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), !lineno ? L"Offset" : L"Line #", c_prompt_char);
         OutputConsole(s.Text(), s.Length());
 
@@ -2633,7 +2642,7 @@ void Viewer::ChooseTabWidth()
     StrW s;
     StrW right;
     right = L"(from 2 to 16)";
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\r%s\x1b[%uG%s\rEnter tab width%s ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 
@@ -2662,7 +2671,7 @@ void Viewer::OpenNewFile(Error& e)
     StrW s;
     StrW tmp;
     tmp.Printf(L"Enter file to open%s ", c_prompt_char);
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\r%s", tmp.Text());
     OutputConsole(s.Text(), s.Length());
 

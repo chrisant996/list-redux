@@ -12,6 +12,7 @@
 #include "input.h"
 #include "output.h"
 #include "popuplist.h"
+#include "config.h"
 #include "colors.h"
 #include "ellipsify.h"
 #include "ecma48.h"
@@ -26,6 +27,7 @@ constexpr scroll_bar_style c_sbstyle = scroll_bar_style::half_line_chars;
 
 static const WCHAR c_no_files_tagged[] = L"*** No Files Tagged ***";
 static const WCHAR c_text_not_found[] = L"*** Text Not Found ***";
+static const WCHAR c_config_saved[] = L"*** Configuration Saved ***";
 static const WCHAR c_canceled[] = L"*** Canceled ***";
 
 enum
@@ -457,7 +459,7 @@ void Chooser::UpdateDisplay()
     }
 #endif
 
-    // Command line.
+    // Footer.
     if (m_dirty_footer)
     {
         m_clickable_footer.Init(m_terminal_height - 1, m_terminal_width);
@@ -499,7 +501,7 @@ void Chooser::UpdateDisplay()
         }
 
         s.Printf(L"\x1b[%uH", m_terminal_height);
-        m_clickable_footer.BuildOutput(s, GetColor(ColorElement::Command));
+        m_clickable_footer.BuildOutput(s, GetColor(ColorElement::Footer));
         m_dirty_footer = false;
     }
 
@@ -857,6 +859,15 @@ LNext:
             }
             break;
 
+        case 'c':
+        case 'C':
+            if (input.modifier == (Modifier::ALT|Modifier::SHIFT))
+            {
+                if (SaveConfig(e))
+                    m_feedback = c_config_saved;
+            }
+            break;
+
         case 's':
         case 'S':
             if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
@@ -1175,8 +1186,8 @@ void Chooser::RefreshDirectoryListing(Error& e)
 bool Chooser::AskForConfirmation(const WCHAR* msg)
 {
     const WCHAR* const directive = L"Press Y to confirm, or any other key to cancel...";
-    // TODO:  ColorElement::Command might not be the most appropriate color.
-    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Command);
+    // TODO:  ColorElement::Footer might not be the most appropriate color.
+    const StrW s = MakeMsgBoxText(msg, directive, ColorElement::Footer);
     OutputConsole(s.Text(), s.Length());
 
     bool confirmed = false;
@@ -1477,7 +1488,7 @@ void Chooser::NewFileMask(Error& e)
 
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\r\x1b[KEnter new file mask or path%s ", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 
@@ -1536,7 +1547,7 @@ void Chooser::ChangeAttributes(Error& e, bool only_current)
 
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\r%s\x1b[%uG%s\r%s (%s)%s ", c_clreol, m_terminal_width + 1 - right.Length(), right.Text(), L"Change attributes", scope, c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 
@@ -1614,7 +1625,7 @@ void Chooser::NewDirectory(Error& e)
 
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\rEnter new directory name%s ", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 
@@ -1655,7 +1666,7 @@ void Chooser::RenameEntry(Error& e)
 
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\rEnter new name%s ", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 
@@ -1854,7 +1865,7 @@ void Chooser::SweepFiles(Error& e)
 
     s.Clear();
     s.Printf(L"\x1b[%uH", m_terminal_height);
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\rEnter program to run%s ", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
     ReadInput(program, History::SweepProgram);
@@ -1869,7 +1880,7 @@ void Chooser::SweepFiles(Error& e)
 
     s.Clear();
     s.Printf(L"\x1b[%uH", m_terminal_height);
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\rArguments before file name%s ", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
     ok = ReadInput(args_before, History::SweepArgsBefore);
@@ -1882,7 +1893,7 @@ void Chooser::SweepFiles(Error& e)
 
     s.Clear();
     s.Printf(L"\x1b[%uH", m_terminal_height);
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\rArguments after file name%s ", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
     ok = ReadInput(args_after, History::SweepArgsAfter);
@@ -1994,7 +2005,7 @@ void Chooser::SearchAndTag(Error& e, bool caseless)
 
     StrW s;
     s.Printf(L"\x1b[%uH", m_terminal_height);
-    s.AppendColor(GetColor(ColorElement::Command));
+    s.AppendColor(GetColor(ColorElement::Footer));
     s.Printf(L"\r\x1b[KSearch%s ", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 

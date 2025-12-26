@@ -70,5 +70,6 @@ HEX EDIT MODE KEYS:
 
 MISCELLANEOUS:
 
+   Alt-Shift-C  Write current settings to config file (%USERPROFILE%\.listredux).
          Alt-D  Toggle showing debug info.
 

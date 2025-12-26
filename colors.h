@@ -15,6 +15,7 @@ int HasBackgroundColor(const WCHAR* p);
 void ReportColorlessError(Error& e);
 
 void ReadColors(const WCHAR* ini_filename);
+bool WriteColors(const WCHAR* ini_filename);
 
 const WCHAR* ApplyGradient(const WCHAR* color, ULONGLONG value, ULONGLONG min, ULONGLONG max);
 const WCHAR* StripLineStyles(const WCHAR* color);
@@ -22,17 +23,47 @@ const WCHAR* BlendColors(const WCHAR* a, const WCHAR* b, BYTE alpha, bool back=f
 
 enum class ColorElement
 {
+    // General
     Error,
+    Header,
+    Footer,
+#ifdef INCLUDE_MENU_ROW
+    MenuRow,
+#endif
+    KeyName,
+
+    // Scrollbar
+    FloatingScrollBar,
+    ScrollBar,
+    ScrollBarCar,
+
+    // Input
+    Input,
+    InputSelection,
+    InputHorizScroll,
+
+    // Popup
+    PopupBorder,
+    PopupScrollCar,
+    PopupHeader,
+    PopupFooter,
+    PopupContent,
+    PopupContentDim,
+    PopupSelect,
+
+    // Miscellaneous
+    SweepDivider,
+    SweepFile,
+    DebugRow,
+
+    // Chooser
     File,
     Selected,
     Tagged,
     SelectedTagged,
-    Header,
-    Command,
-    Input,
-    InputSelection,
-    InputHorizScroll,
     Divider,
+
+    // Viewer
     LineNumber,
     Content,
     Whitespace,
@@ -41,25 +72,9 @@ enum class ColorElement
     EndOfFileLine,
     MarkedLine,
     SearchFound,
-    DebugRow,
-#ifdef INCLUDE_MENU_ROW
-    MenuRow,
-#endif
-    SweepDivider,
-    SweepFile,
-    FloatingScrollBar,
-    ScrollBar,
-    ScrollBarCar,
-    PopupBorder,
-    PopupScrollCar,
-    PopupHeader,
-    PopupFooter,
-    PopupContent,
-    PopupContentDim,
-    PopupSelect,
     EditedByte,
     SavedByte,
-    KeyName,
+
     MAX
 };
 
