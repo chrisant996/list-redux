@@ -309,7 +309,7 @@ static COLORREF RgbFromColorTable(BYTE value)
     return s_infoex.ColorTable[value];
 }
 
-static bool ParseNum(const WCHAR*& p, DWORD& num)
+static bool ParseNum(const WCHAR*& p, int16& num)
 {
     num = 0;
     while (*p && *p != ';')
@@ -439,30 +439,65 @@ int HasBackgroundColor(const WCHAR* p)
     }
 }
 
-enum class RgbFromColorMode { Foreground, PreferBackground, Background, BackgroundNotDefault };
+enum class RgbFromColorMode { Foreground, Background, BackgroundNotDefault };
 
 static COLORREF RgbFromColor(const WCHAR* color, RgbFromColorMode mode=RgbFromColorMode::Foreground)
 {
     static const BYTE c_cube_series[] = { 0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff };
 
     unsigned format = 0;    // 5=8-bit, 2=24-bit, 0=30..37,39
-    DWORD value = -1;
+    DWORD value = 0xffffffff;
     bool bold = false;
     bool bg = false;
 
     assert(implies(color, 0x1b != color[0]));
 
-    bool start = true;
-    int num = 0;
-    for (const WCHAR* p = color; true; ++p)
+    const WCHAR* p = color;
+    while (true)
     {
-        if (!*p || *p == ';')
+        if ((wcsncmp(p, L"38;2;", 5) == 0) || (wcsncmp(p, L"48;2;", 5) == 0))
         {
+            const bool is_fore = (*p == '3');
+            p += 5;
+            int16 r, g, b;
+            if (!ParseNum(p, r) || !*(p++))
+                return 0xffffffff;
+            if (!ParseNum(p, g) || !*(p++))
+                return 0xffffffff;
+            if (!ParseNum(p, b))
+                return 0xffffffff;
+            if (is_fore == (mode == RgbFromColorMode::Foreground))
+            {
+                bg = !is_fore;
+                format = 2;
+                value = RGB(BYTE(r), BYTE(g), BYTE(b));
+            }
+        }
+        else if ((wcsncmp(p, L"38;5;", 5) == 0) || (wcsncmp(p, L"48;5;", 5) == 0))
+        {
+            const bool is_fore = (*p == '3');
+            p += 5;
+            int16 num;
+            if (!ParseNum(p, num))
+                return 0xffffffff;
+            if (is_fore == (mode == RgbFromColorMode::Foreground))
+            {
+                bg = !is_fore;
+                format = 5;
+                value = num;
+            }
+        }
+        else
+        {
+            int16 num = 0;
+            if (!ParseNum(p, num))
+                return 0xffffffff;
+
             switch (num)
             {
             case 0:
                 format = 0;
-                value = -1;
+                value = 0xffffffff;
                 bold = false;
                 break;
             case 1:
@@ -491,52 +526,16 @@ static COLORREF RgbFromColor(const WCHAR* color, RgbFromColorMode mode=RgbFromCo
                 }
                 break;
             }
-
-            if (!*p)
-                break;
-
-            start = true;
-            num = 0;
-            continue;
         }
 
-        if (start && ((wcsncmp(p, L"38;2;", 5) == 0) ||
-                      (mode != RgbFromColorMode::Foreground && wcsncmp(p, L"48;2;", 5) == 0)))
-        {
-            bg = (*p == '4');
-            p += 5;
-            DWORD r, g, b;
-            if (!ParseNum(p, r) || !*(p++))
-                return 0xffffffff;
-            if (!ParseNum(p, g) || !*(p++))
-                return 0xffffffff;
-            if (!ParseNum(p, b))
-                return 0xffffffff;
-            format = 2;
-            value = RGB(BYTE(r), BYTE(g), BYTE(b));
-            num = -1;
-            --p; // Counteract the loop.
-        }
-        else if (start && ((wcsncmp(p, L"38;5;", 5) == 0) ||
-                           (mode != RgbFromColorMode::Foreground && wcsncmp(p, L"48;2;", 5) == 0)))
-        {
-            bg = (*p == '4');
-            p += 5;
-            if (!ParseNum(p, value))
-                return 0xffffffff;
-            format = 5;
-            num = -1;
-            --p; // Counteract the loop.
-        }
-        else if (iswdigit(*p))
-        {
-            num *= 10;
-            num += *p - '0';
-        }
-        else
+        if (!*p)
+            break;
+
+        assert(*p == ';');
+        if (*p != ';')
             return 0xffffffff;
 
-        start = false;
+        ++p; // Advance past the ';'.
     }
 
     switch (format)
@@ -576,16 +575,15 @@ static COLORREF RgbFromColor(const WCHAR* color, RgbFromColorMode mode=RgbFromCo
             return bg ? 0xffffffff : RgbFromColorTable(BYTE(value) - 30 + (bold && !bg ? 8 : 0));
         else if (value >= 90 && value <= 97)
             return bg ? 0xffffffff : RgbFromColorTable(BYTE(value) - 90 + 8);
-        else if (value == 39 || value == 49 || value == -1)
+        else if (value == 39 || value == 49 || value == 0xffffffff)
         {
-            if (value == -1)
+            if (value == 0xffffffff)
             {
                 switch (mode)
                 {
                 case RgbFromColorMode::Foreground:
                     value = 39;
                     break;
-                case RgbFromColorMode::PreferBackground:
                 case RgbFromColorMode::Background:
                 case RgbFromColorMode::BackgroundNotDefault:
                     value = 49;
