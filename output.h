@@ -12,7 +12,7 @@ class Error;
 
 bool IsConsole(HANDLE h);
 void SetEmulation(const WCHAR* value=L"auto"); // auto, on, off.
-const WCHAR* GetEmulationConfigValue();
+void GetEmulation(StrW& out);
 void ShowOriginalScreen();
 
 DWORD GetConsoleColsRows();

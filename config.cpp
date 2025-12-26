@@ -37,63 +37,175 @@ const WCHAR* BooleanValue(bool value, BooleanStyle style)
     }
 }
 
-static void ReadOptions(const WCHAR* ini_filename)
+static void GetDetails(StrW& out)
 {
-    WCHAR value[256];
-
-    if (ReadConfigString(ini_filename, L"Options", L"Details", value, _countof(value)))
+    out.Append('1' + g_options.details);
+}
+static void SetDetails(const WCHAR* value)
+{
+    if (wcsicmp(value, L"1") ||
+        wcsicmp(value, L"2") ||
+        wcsicmp(value, L"3") ||
+        wcsicmp(value, L"4"))
     {
-        if (wcsicmp(value, L"1") ||
-            wcsicmp(value, L"2") ||
-            wcsicmp(value, L"3") ||
-            wcsicmp(value, L"4"))
-        {
-            g_options.details = value[0] - '1';
-        }
+        g_options.details = value[0] - '1';
     }
+}
 
+static void GetMaxLineLength(StrW& out)
+{
+    out.Printf(L"%u", g_options.max_line_length);
+}
+
+static void GetWrapping(StrW& out)
+{
+    out = BooleanValue(g_options.wrapping);
+}
+void SetWrapping(const WCHAR* wrapping)
+{
+    g_options.wrapping = wrapping;
+}
+
+#ifdef INCLUDE_MENU_ROW
+static void GetMenuRow(StrW& out)
+{
+    out = BooleanValue(g_options.show_menu);
+}
+static void SetMenuRow(const WCHAR* value)
+{
+    g_options.show_menu = ParseBoolean(value);
+}
+#endif
+
+static void GetScrollbar(StrW& out)
+{
+    out = BooleanValue(g_options.show_scrollbar);
+}
+static void SetScrollbar(const WCHAR* value)
+{
+    g_options.show_scrollbar = ParseBoolean(value);
+}
+
+static void GetAsciiFilter(StrW& out)
+{
+    out = BooleanValue(g_options.ascii_filter);
+}
+static void SetAsciiFilter(const WCHAR* value)
+{
+    g_options.ascii_filter = ParseBoolean(value);
+}
+
+static void GetShowLineEndings(StrW& out)
+{
+    out = BooleanValue(g_options.show_line_endings);
+}
+static void SetShowLineEndings(const WCHAR* value)
+{
+    g_options.show_line_endings = ParseBoolean(value);
+}
+
+static void GetShowLineNumbers(StrW& out)
+{
+    out = BooleanValue(g_options.show_line_numbers);
+}
+static void SetShowLineNumbers(const WCHAR* value)
+{
+    g_options.show_line_numbers = ParseBoolean(value);
+}
+
+static void GetShowFileOffsets(StrW& out)
+{
+    out = BooleanValue(g_options.show_file_offsets);
+}
+static void SetShowFileOffsets(const WCHAR* value)
+{
+    g_options.show_file_offsets = ParseBoolean(value);
+}
+
+static void GetHexGrouping(StrW& out)
+{
+    out.Printf(L"%u", g_options.hex_grouping);
+}
+static void SetHexGrouping(const WCHAR* value)
+{
+    ULONGLONG n;
+    if (ParseULongLong(value, n) && n < 4)
+        g_options.hex_grouping = uint8(n);
+}
+
+static void GetShowEndOfFileLine(StrW& out)
+{
+    out = BooleanValue(g_options.show_endoffile_line);
+}
+static void SetShowEndOfFileLine(const WCHAR* value)
+{
+    g_options.show_endoffile_line = ParseBoolean(value);
+}
+
+static void GetTabWidth(StrW& out)
+{
+    out.Printf(L"%u", g_options.tab_width);
+}
+static void SetTabWidth(const WCHAR* value)
+{
+    ULONGLONG n;
+    if (ParseULongLong(value, n) && n >= 2 && n <= 8)
+        g_options.tab_width = uint16(n);
+}
+
+typedef void (*get_func_t)(StrW&);
+typedef void (*set_func_t)(const WCHAR*);
+
+struct OptionDefinition
+{
+    const WCHAR*    name;
+    get_func_t      get_fn;
+    set_func_t      set_fn;
+};
+
+static const OptionDefinition c_option_defs[] =
+{
+    { L"Details",           GetDetails, SetDetails },
 #ifndef DEBUG
     // MaxLineLength is overridden in DEBUG builds, so avoid writing out the
     // value when running a DEBUG build.
-    if (ReadConfigString(ini_filename, L"Options", L"MaxLineLength", value, _countof(value)))
-        SetMaxLineLength(value);
+    { L"MaxLineLength",     GetMaxLineLength, SetMaxLineLength },
 #endif
-
-    if (ReadConfigString(ini_filename, L"Options", L"Wrap", value, _countof(value)))
-        SetWrapping(ParseBoolean(value));
-
+    { L"Wrap",              GetWrapping, SetWrapping },
+    { L"AsciiFilter",       GetAsciiFilter, SetAsciiFilter },
+    { L"ShowLineEndings",   GetShowLineEndings, SetShowLineEndings },
+    { L"ShowLineNumbers",   GetShowLineNumbers, SetShowLineNumbers },
+    { L"ShowFileOffsets",   GetShowFileOffsets, SetShowFileOffsets },
+    { L"HexGrouping",       GetHexGrouping, SetHexGrouping },
+    { L"ShowEndOfFileLine", GetShowEndOfFileLine, SetShowEndOfFileLine },
+    { L"TabWidth",          GetTabWidth, SetTabWidth },
 #ifdef INCLUDE_MENU_ROW
-    if (ReadConfigString(ini_filename, L"Options", L"MenuRow", value, _countof(value)))
-        g_options.show_menu = ParseBoolean(value);
+    { L"MenuRow",           GetMenuRow, SetMenuRow },
 #endif
+    { L"Scrollbar",         GetScrollbar, SetScrollbar },
+    { L"Emulate",           GetEmulation, SetEmulation },
+};
 
-    if (ReadConfigString(ini_filename, L"Options", L"Scrollbar", value, _countof(value)))
-        SetViewerScrollbar(ParseBoolean(value));
-
-    if (ReadConfigString(ini_filename, L"Options", L"Emulate", value, _countof(value)))
-        SetEmulation(value);
+static void ReadOptions(const WCHAR* ini_filename)
+{
+    WCHAR value[256];
+    for (const auto& opt : c_option_defs)
+    {
+        if (ReadConfigString(ini_filename, L"Options", opt.name, value, _countof(value)))
+            opt.set_fn(value);
+    }
 }
 
 static bool WriteOptions(const WCHAR* ini_filename)
 {
     bool ok = true;
-    WCHAR sz[128];
     StrW value;
-
-    sz[0] = '1' + g_options.details;
-    sz[1] = 0;
-    ok &= WriteConfigString(ini_filename, L"Options", L"Details", sz);
-
-    value.Clear();
-    value.Printf(L"%u", g_options.max_line_length);
-    ok &= WriteConfigString(ini_filename, L"Options", L"MaxLineLength", value.Text());
-    ok &= WriteConfigString(ini_filename, L"Options", L"Wrap", BooleanValue(g_options.wrapping, BooleanStyle::YesNo));
-#ifdef INCLUDE_MENU_ROW
-    ok &= WriteConfigString(ini_filename, L"Options", L"MenuRow", BooleanValue(g_options.show_menu, BooleanStyle::YesNo));
-#endif
-    ok &= WriteConfigString(ini_filename, L"Options", L"Scrollbar", BooleanValue(g_options.show_scrollbar, BooleanStyle::YesNo));
-    ok &= WriteConfigString(ini_filename, L"Options", L"Emulate", GetEmulationConfigValue());
-
+    for (const auto& opt : c_option_defs)
+    {
+        value.Clear();
+        opt.get_fn(value);
+        ok &= WriteConfigString(ini_filename, L"Options", opt.name, value.Text());
+    }
     return ok;
 }
 #endif

@@ -90,16 +90,6 @@ void SetMaxLineLength(const WCHAR* arg)
     g_options.max_line_length = uint32(n);
 }
 
-void SetWrapping(bool wrapping)
-{
-    g_options.wrapping = wrapping;
-}
-
-void SetViewerScrollbar(bool scrollbar)
-{
-    g_options.show_scrollbar = scrollbar;
-}
-
 void SetViewerGotoLine(size_t line)
 {
     s_goto_line = line;

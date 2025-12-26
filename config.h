@@ -12,7 +12,7 @@ bool SaveConfig(Error& e);
 
 enum class BooleanStyle { TrueFalse, Digit, OnOff, YesNo };
 bool ParseBoolean(const WCHAR* value, bool target=true);
-const WCHAR* BooleanValue(bool value, BooleanStyle style);
+const WCHAR* BooleanValue(bool value, BooleanStyle style=BooleanStyle::YesNo);
 
 #ifdef USE_REGISTRY_FOR_CONFIG
 bool ReadConfigString(HKEY hkeyApp, const WCHAR* name, WCHAR* out, uint32 max_len, const WCHAR* default_value);
@@ -20,3 +20,5 @@ bool ReadConfigString(HKEY hkeyApp, const WCHAR* name, WCHAR* out, uint32 max_le
 bool ReadConfigString(const WCHAR* ini_filename, const WCHAR* section, const WCHAR* name, WCHAR* out, uint32 max_len, const WCHAR* default_value=nullptr);
 bool WriteConfigString(const WCHAR* ini_filename, const WCHAR* section, const WCHAR* name, const WCHAR* value);
 #endif
+
+void SetWrapping(const WCHAR* wrapping);

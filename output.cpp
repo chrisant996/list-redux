@@ -41,9 +41,9 @@ void SetEmulation(const WCHAR* value)
     s_terminal->SetEmulation(emulate);
 }
 
-const WCHAR* GetEmulationConfigValue()
+void GetEmulation(StrW& out)
 {
-    return (s_emulation > 1) ? L"On" : (s_emulation == 0) ? L"Off" : L"Auto";
+    out = (s_emulation > 1) ? L"On" : (s_emulation == 0) ? L"Off" : L"Auto";
 }
 
 int ValidateColor(const WCHAR* p)

@@ -339,7 +339,7 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     if (emulate >= -1)
         SetEmulation((emulate > 0) ? L"true" : (emulate == 0) ? L"false" : L"auto");
     if (wrapping >= 0)
-        SetWrapping(wrapping > 0);
+        SetWrapping(BooleanValue(wrapping > 0));
     if (hex_view >= 0)
         SetViewerHexViewMode(hex_view > 0);
 
