@@ -22,7 +22,9 @@
 // running on Windows versions before 10 build 15063.
 #define INCLUDE_TERMINAL_EMULATOR
 
-//#define INCLUDE_MENU_ROW
+// Define this to include an optional clickable menu row that lists some
+// commonly used commands.
+#define INCLUDE_MENU_ROW
 
 //#define INCLUDE_CTRLMODE_PERIOD
 //#define INCLUDE_CTRLMODE_SPACE
