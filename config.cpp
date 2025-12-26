@@ -17,6 +17,14 @@
 #ifdef USE_REGISTRY_FOR_CONFIG
 // TODO:  ...
 #else
+static bool ParseBoolean(const WCHAR* value, bool target=true)
+{
+    if (target)
+        return (!wcsicmp(value, L"true") || !wcsicmp(value, L"1") || !wcsicmp(value, L"on") || !wcsicmp(value, L"yes"));
+    else
+        return (!wcsicmp(value, L"false") || !wcsicmp(value, L"0") || !wcsicmp(value, L"off") || !wcsicmp(value, L"no"));
+}
+
 static void ReadOptions(const WCHAR* ini_filename)
 {
     WCHAR value[256];
@@ -33,19 +41,24 @@ static void ReadOptions(const WCHAR* ini_filename)
     }
 
     if (ReadConfigString(ini_filename, L"Options", L"Scrollbar", value, _countof(value)))
-        SetViewerScrollbar(!wcsicmp(value, L"true") || !wcsicmp(value, L"1") || !wcsicmp(value, L"on") || !wcsicmp(value, L"yes"));
+        SetViewerScrollbar(ParseBoolean(value));
 
     if (ReadConfigString(ini_filename, L"Options", L"Wrap", value, _countof(value)))
-        SetWrapping(!wcsicmp(value, L"true") || !wcsicmp(value, L"1") || !wcsicmp(value, L"on") || !wcsicmp(value, L"yes"));
+        SetWrapping(ParseBoolean(value));
+
+#ifdef INCLUDE_MENU_ROW
+    if (ReadConfigString(ini_filename, L"Options", L"MenuRow", value, _countof(value)))
+        g_options.show_menu = ParseBoolean(value);
+#endif
 
     if (ReadConfigString(ini_filename, L"Options", L"MaxLineLength", value, _countof(value)))
         SetMaxLineLength(value);
 
     if (ReadConfigString(ini_filename, L"Options", L"Emulate", value, _countof(value)))
     {
-        if (!wcsicmp(value, L"on") || !wcsicmp(value, L"1") || !wcsicmp(value, L"yes"))
+        if (ParseBoolean(value, true))
             SetEmulation(true);
-        else if (!wcsicmp(value, L"off") || !wcsicmp(value, L"0") || !wcsicmp(value, L"no"))
+        else if (ParseBoolean(value, false))
             SetEmulation(false);
         else
             SetEmulation(-1);
