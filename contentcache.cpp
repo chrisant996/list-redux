@@ -614,6 +614,11 @@ calc_width:
                     break;
                 default:
                     m_any_nonspace = true;
+                    // If text is not indented at all, then disable the help
+                    // mode special hanging indent (which is intended for
+                    // indenting descriptions of keys).
+                    if (!m_pending_length)
+                        m_consecutive_spaces = -1;
                     break;
                 }
             }

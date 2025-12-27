@@ -402,6 +402,7 @@ Viewer::Viewer(const char* text, const WCHAR* title)
         e.Format(m_errmsg);
         m_errmsg.TrimRight();
     }
+    m_wrap = g_options.wrapping;
     m_force_update = true;
 }
 
@@ -409,6 +410,7 @@ Viewer::Viewer(const std::vector<StrW>& files)
 : m_files(&files)
 , m_context(g_options)
 {
+    m_wrap = g_options.wrapping;
     m_hex_mode = g_options.hex_mode;
 }
 
@@ -1230,7 +1232,8 @@ void Viewer::MakeFooter(StrW& s, const WCHAR* msg)
             m_clickable_footer.Add(g_options.show_file_offsets ? L"O" : L"o", ID_OPTION_FILEOFFSETS, 25, true);
             m_clickable_footer.Add(g_options.show_whitespace ? L"S" : L"s", ID_OPTION_SHOWWHITESPACE, 25, true);
         }
-        m_clickable_footer.Add(m_wrap ? L"W" : L"w", ID_OPTION_WRAP, 25, true);
+        if (!g_options.internal_help_mode)
+            m_clickable_footer.Add(m_wrap ? L"W" : L"w", ID_OPTION_WRAP, 25, true);
         if (!m_text)
         {
             m_clickable_footer.Add(g_options.expand_tabs ? L"T" : L"t", ID_OPTION_EXPANDTABS, 25, true);
@@ -1306,8 +1309,11 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
         case Key::F10:
             if (input.modifier == Modifier::None)
             {
-                g_options.show_menu = !g_options.show_menu;
-                m_force_update = true;
+                if (!g_options.internal_help_mode)
+                {
+                    g_options.show_menu = !g_options.show_menu;
+                    m_force_update = true;
+                }
             }
             break;
 #endif
@@ -2835,7 +2841,7 @@ void Viewer::ToggleShowWhitespace()
 
 void Viewer::ToggleWrap()
 {
-    if (!m_hex_mode)
+    if (!m_hex_mode && !g_options.internal_help_mode)
     {
         g_options.wrapping = !g_options.wrapping;
         m_wrap = g_options.wrapping;
@@ -2905,6 +2911,7 @@ ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title, bool help
 
     if (help)
     {
+        g_options.wrapping = true;
         g_options.internal_help_mode = true;
         g_options.hanging_extra = 0;
     }
