@@ -1821,10 +1821,11 @@ bool ParseULongLong(const WCHAR* s, ULONGLONG& out, int radix)
     return wcstonum(s, radix, out);
 }
 
-void ClickableRow::Init(uint16 row, uint16 terminal_width)
+void ClickableRow::Init(uint16 row, uint16 terminal_width, uint16 reserve_left)
 {
     m_row = row;
     m_terminal_width = terminal_width;
+    m_reserve_left = reserve_left;
     m_threshold = INT16_MAX;
     m_left_width = 0;
     m_right_width = 0;
@@ -1887,6 +1888,7 @@ void ClickableRow::BuildOutput(StrW& out, const WCHAR* color)
 
     uint16 width = 0;
     uint16 orig_length = out.Length();
+    const uint16 right_width = GetRightWidth();
 
     for (const auto& elm : m_left_elements)
         width += AppendOutput(out, elm, color);
@@ -1902,15 +1904,17 @@ void ClickableRow::BuildOutput(StrW& out, const WCHAR* color)
     }
     else
     {
-        const uint16 right_width = GetRightWidth();
         if (right_width)
             out.AppendSpaces(m_terminal_width - width - right_width);
         else if (width < m_terminal_width)
             out.Append(c_clreol);
     }
 
-    for (const auto& elm : m_right_elements)
-        AppendOutput(out, elm, color);
+    if (right_width)
+    {
+        for (const auto& elm : m_right_elements)
+            AppendOutput(out, elm, color);
+    }
 }
 
 void ClickableRow::EnsureLayout()
@@ -1934,6 +1938,7 @@ void ClickableRow::EnsureLayout()
             ++num_fit_elements;
         }
     }
+    total_width = max(total_width, m_reserve_left);
     for (auto& elm : m_right_elements)
     {
         total_width += elm.m_width;
@@ -2028,7 +2033,7 @@ void ClickableRow::EnsureLayout()
 
     // Special case when there's only one priority group and it's still too
     // large to fit.
-    if (m_left_width + m_right_width > m_terminal_width)
+    if (max(m_left_width, m_reserve_left) + m_right_width > m_terminal_width)
     {
         // TODO:  This should redo ellipsify_ex for left elements.
         m_right_width = 0;

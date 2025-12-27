@@ -165,7 +165,7 @@ public:
                     ClickableRow() = default;
                     ~ClickableRow() = default;
 
-    void            Init(uint16 row, uint16 terminal_width);
+    void            Init(uint16 row, uint16 terminal_width, uint16 reserve_left=0);
     void            Add(const WCHAR* text, int16 id, int16 priority, bool right_align, ellipsify_mode fit_mode=ellipsify_mode::INVALID, uint16 min_fit_width=20);
     void            AddKeyName(const WCHAR* key, ColorElement color_after, const WCHAR* desc, int16 id, int16 priority, bool right_align);
     uint16          GetLeftWidth();
@@ -180,6 +180,7 @@ private:
 private:
     uint16          m_row = 0;
     uint16          m_terminal_width = 0;
+    uint16          m_reserve_left = 0;
     int16           m_threshold = 0x7fff;
     uint16          m_left_width = 0;
     uint16          m_right_width = 0;

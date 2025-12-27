@@ -192,11 +192,11 @@ std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
 
     auto printcontext = [&]()
     {
-        cr.Init(row, terminal_width);
+        cr.Init(row, terminal_width, 20);
 
-        cr.AddKeyName(L"^I", ColorElement::Footer, caseless ? L"IgnoreCase" : L"ExactCase ", ID_IGNORECASE, 0, true);
-        cr.Add(nullptr, 3, 0, true);
-        cr.AddKeyName(L"^X", ColorElement::Footer, regex ? L"RegExp " : L"Literal", ID_REGEXP, 0, true);
+        cr.AddKeyName(L"^I", ColorElement::Footer, caseless ? L"IgnoreCase" : L"ExactCase ", ID_IGNORECASE, 99, true);
+        cr.Add(nullptr, 3, 89, true);
+        cr.AddKeyName(L"^X", ColorElement::Footer, regex ? L"RegExp " : L"Literal", ID_REGEXP, 89, true);
 
         tmp.Set(L"\r");
         cr.BuildOutput(tmp, GetColor(ColorElement::Footer));
@@ -247,7 +247,9 @@ toggle_caseless:
     printcontext();
 
     StrW s;
-    ReadInput(s, History::Search, 1024, terminal_width - 12 - cr.GetRightWidth(), callback);
+    const uint16 right_width = cr.GetRightWidth();
+    const DWORD max_width = terminal_width - 8 - right_width - (right_width ? 4 : 0);
+    ReadInput(s, History::Search, 1024, max_width, callback);
 
     OutputConsole(c_norm);
 
