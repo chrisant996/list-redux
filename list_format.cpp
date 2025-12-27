@@ -286,69 +286,6 @@ static void FormatAttributes(StrW& s, const DWORD dwAttr)
     s.AppendNormalIf(prev_color);
 }
 
-static void JustifyFilename(StrW& s, const StrW& name, unsigned max_name_width, unsigned max_ext_width)
-{
-    assert(*name.Text() != '.');
-    assert(max_name_width);
-    assert(max_ext_width);
-
-    const unsigned orig_len = s.Length();
-
-    unsigned name_len = name.Length();
-    unsigned name_width = __wcswidth(name.Text());
-    unsigned ext_width = 0;
-    const WCHAR* ext = FindExtension(name.Text());
-
-    if (ext)
-    {
-        ext_width = __wcswidth(ext);
-        name_width -= ext_width;
-        name_len = unsigned(ext - name.Text());
-        assert(*ext == '.');
-        ext++;
-        ext_width--;
-    }
-
-    if (!ext_width)
-    {
-        const unsigned combined_width = max_name_width + 1 + max_ext_width;
-        if (name_width <= combined_width)
-        {
-            s.Append(name);
-        }
-        else
-        {
-            StrW tmp;
-            tmp.Set(name);
-            TruncateWcwidth(tmp, combined_width, s_chTruncated);
-            s.Append(tmp);
-        }
-    }
-    else
-    {
-        StrW tmp;
-        tmp.Set(name.Text(), name_len);
-        TruncateWcwidth(tmp, max_name_width, 0);
-        tmp.AppendSpaces(max_name_width - name_width);
-        tmp.Append(name_width > max_name_width ? '.' : ' ');
-        s.Append(tmp);
-        if (ext_width > max_ext_width)
-        {
-            tmp.Clear();
-            tmp.Set(ext);
-            TruncateWcwidth(tmp, max_ext_width, s_chTruncated);
-            s.Append(tmp);
-        }
-        else
-        {
-            s.Append(ext);
-        }
-    }
-
-    assert(max_name_width + 1 + max_ext_width >= __wcswidth(s.Text() + orig_len));
-    s.AppendSpaces(max_name_width + 1 + max_ext_width - __wcswidth(s.Text() + orig_len));
-}
-
 void FormatFilename(StrW& s, const FileInfo* pfi, unsigned max_width, const WCHAR* color)
 {
     const StrW& name = pfi->GetName();
@@ -953,7 +890,12 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
     else
     {
         filename_width = min(max_width, c_min_filename_width);
-        details_width = max_width - filename_width;
+        details_width = (max_width > filename_width) ? max_width - filename_width : 0;
+        if (details_width < 1)
+        {
+            --filename_width;
+            details_width = 1; // Because the tag/divider is part of details.
+        }
     }
 
     if (filename_width <= 0)
@@ -962,7 +904,7 @@ unsigned FormatFileInfo(StrW& s, const FileInfo* pfi, unsigned max_width, int de
     FormatFilename(s, pfi, filename_width);
     assert(filename_width == cell_count(s.Text() + orig_len));
 
-    if (details)
+    if (details && details_width > 0)
     {
         StrW d;
         if (details >= 2)
