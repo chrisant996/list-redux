@@ -1229,8 +1229,11 @@ void Viewer::MakeFooter(StrW& s, const WCHAR* msg)
     else
     {
         // Encoding.
-        m_clickable_footer.Add(nullptr, 4, 15, true);
-        m_clickable_footer.Add(m_context.GetEncodingName(m_hex_mode), m_hex_mode ? -1 : ID_ENCODING, 15, true);
+        if (!g_options.internal_help_mode)
+        {
+            m_clickable_footer.Add(nullptr, 4, 15, true);
+            m_clickable_footer.Add(m_context.GetEncodingName(m_hex_mode), m_hex_mode ? -1 : ID_ENCODING, 15, true);
+        }
 
         // Options.
         m_clickable_footer.Add(L"    Options: ", -1, 25, true);
@@ -1589,8 +1592,11 @@ hex_edit_right:
         case Key::F4:
             if (input.modifier == Modifier::None)
             {
-                m_multifile_search = !m_multifile_search;
-                m_force_update_footer = true;
+                if (!g_options.internal_help_mode)
+                {
+                    m_multifile_search = !m_multifile_search;
+                    m_force_update_footer = true;
+                }
             }
             break;
         case Key::F5:
@@ -1709,8 +1715,7 @@ hex_edit_right:
         case 'E'-'@':
             if (input.modifier == Modifier::CTRL)
             {
-                if (!m_hex_mode && !m_text)
-                    ChooseEncoding();
+                ChooseEncoding();
             }
             break;
         case 'N'-'@':   // CTRL-N
@@ -2588,6 +2593,9 @@ FileOffset Viewer::GetFoundOffset(const FoundOffset& found_line, unsigned* offse
 
 void Viewer::ShowFileList()
 {
+    if (!m_files || g_options.internal_help_mode)
+        return;
+
     const PopupResult result = ShowPopupList(*m_files, L"Jump to Chosen File", m_index, PopupListFlags::DimPaths);
     m_force_update = true;
     if (!result.canceled)
@@ -2596,6 +2604,9 @@ void Viewer::ShowFileList()
 
 void Viewer::ChooseEncoding()
 {
+    if (m_hex_mode || g_options.internal_help_mode)
+        return;
+
     std::vector<EncodingDefinition> encodings = GetAvailableEncodings();
     std::vector<StrW> names;
 
