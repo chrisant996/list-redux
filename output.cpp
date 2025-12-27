@@ -491,22 +491,25 @@ void WrapText(const WCHAR* s, StrW& out, unsigned max_width)
     out.Swap(tmp);
 }
 
-void AppendKeyName(StrW& s, const WCHAR* key, ColorElement color_after, const WCHAR* desc)
+void AppendKeyName(StrW& s, const WCHAR* key, ColorElement color_after, const WCHAR* desc, bool enabled)
 {
     s.AppendColor(GetColor(ColorElement::KeyName));
     s.Append(key);
 
+    const WCHAR* dim = desc ? BlendColors(GetColor(color_after), GetColor(color_after), 0x70, false, false, true/*opposite_b*/) : nullptr;
     if (desc)
     {
-        const WCHAR* colon_color = BlendColors(GetColor(color_after), GetColor(color_after), 0x70, false, false, true/*opposite_b*/);
-        s.AppendColorOverlay(GetColor(color_after), colon_color);
+        s.AppendColorOverlay(GetColor(color_after), dim);
         s.Append(L":");
+
+        if (enabled)
+            s.AppendColor(GetColor(color_after));
+
+        s.Append(desc);
     }
 
-    s.AppendColor(GetColor(color_after));
-
-    if (desc)
-        s.Append(desc);
+    if (!desc || !enabled)
+        s.AppendColor(GetColor(color_after));
 }
 
 void PrintfV(const WCHAR* format, va_list args)

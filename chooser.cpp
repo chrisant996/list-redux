@@ -47,6 +47,7 @@ enum
     ID_UNTAG,
     ID_VIEWTAGGED,
     ID_RUN,
+    ID_ORIGSCREEN,
 };
 
 static void ApplyAttr(DWORD& mask, DWORD& attr, bool& minus, DWORD flag)
@@ -289,8 +290,41 @@ void Chooser::UpdateDisplay()
     if (!m_last_feedback.Equal(m_feedback))
         m_dirty_footer = true;
 
+    EnsureColumnWidths();
+
 #ifdef INCLUDE_MENU_ROW
-    const bool update_menu_row = (g_options.show_menu && (m_dirty_menu || m_command_mode != m_last_command_mode));
+    StrW menu;
+    {
+        unsigned width = 0;
+        bool stop = false;
+
+        m_clickable_menu.Init(m_terminal_height - 2, m_terminal_width);
+
+        if (m_command_mode)
+        {
+            auto add = [&](int16 priority, const WCHAR* key, const WCHAR* desc, int16 id, bool enabled=true) {
+                m_clickable_menu.AddKeyName(key, ColorElement::MenuRow, desc, id, priority, false/*right_align*/, enabled);
+                m_clickable_menu.Add(nullptr, 2, priority, false/*right_align*/);
+            };
+
+            add(99, L"F1", L"Help", ID_HELP);
+            add(98, L"Enter", L"View", ID_VIEW);
+            add(97, L"1-4", L"Details", ID_DETAILS);
+            add(79, L"A", L"ChangeAttr", ID_ATTR, m_tagged.AnyMarked() || (HasSelectedFile() && !m_files[m_index].IsPseudoDirectory()));
+            add(78, L"E", L"Edit", ID_EDIT, HasSelectedFile(true/*only_files*/));
+            add(77, L"R", L"Rename", ID_RENAME, HasSelectedFile() && !m_files[m_index].IsPseudoDirectory());
+            add(89, L"S", L"Search", ID_SEARCH);
+            add(88, L"T", L"Tag", ID_TAG);
+            add(87, L"U", L"Untag", ID_UNTAG);
+            add(86, L"V", L"ViewTagged", ID_VIEWTAGGED, NumTaggedFiles() > 0);
+            add(69, L"Alt-R", L"Run", ID_RUN, HasSelectedFile(true/*only_files*/));
+            add(49, L"F12", L"OrigScreen", ID_ORIGSCREEN);
+        }
+
+        m_clickable_menu.BuildOutput(menu, GetColor(ColorElement::MenuRow));
+        m_dirty_menu |= (!m_last_menu.Equal(menu));
+    }
+    const bool update_menu_row = (g_options.show_menu && m_dirty_menu);
 #else
     const bool update_menu_row = false;
 #endif
@@ -308,7 +342,6 @@ void Chooser::UpdateDisplay()
     StrW tmp;
     const WCHAR* const norm = GetColor(ColorElement::File);
 
-    EnsureColumnWidths();
     EnsureTop();
     if (m_top + m_visible_rows > m_num_rows)
         m_top = m_num_rows - m_visible_rows;
@@ -427,34 +460,8 @@ void Chooser::UpdateDisplay()
 #ifdef INCLUDE_MENU_ROW
     if (update_menu_row)
     {
-        StrW menu;
-        unsigned width = 0;
-        bool stop = false;
-
-        m_clickable_menu.Init(m_terminal_height - 2, m_terminal_width);
-
-        if (m_command_mode)
-        {
-            auto add = [&](int16 priority, const WCHAR* key, const WCHAR* desc, int16 id) {
-                m_clickable_menu.AddKeyName(key, ColorElement::MenuRow, desc, id, priority, false/*right_align*/);
-                m_clickable_menu.Add(nullptr, 2, priority, false/*right_align*/);
-            };
-
-            add(99, L"F1", L"Help", ID_HELP);
-            add(98, L"Enter", L"View", ID_VIEW);
-            add(97, L"1-4", L"Details", ID_DETAILS);
-            add(79, L"A", L"ChangeAttr", ID_ATTR);
-            add(78, L"E", L"Edit", ID_EDIT);
-            add(77, L"R", L"Rename", ID_RENAME);
-            add(89, L"S", L"Search", ID_SEARCH);
-            add(88, L"T", L"Tag", ID_TAG);
-            add(87, L"U", L"Untag", ID_UNTAG);
-            add(86, L"V", L"ViewTagged", ID_VIEWTAGGED);
-            add(69, L"Alt-R", L"Run", ID_RUN);
-        }
-
         s.Printf(L"\x1b[%uH", m_terminal_height - 1);
-        m_clickable_menu.BuildOutput(s, GetColor(ColorElement::MenuRow));
+        s.Append(menu);
         m_dirty_menu = false;
     }
 #endif
@@ -464,6 +471,10 @@ void Chooser::UpdateDisplay()
     {
         m_clickable_footer.Init(m_terminal_height - 1, m_terminal_width);
 
+        const int16 files_prio = m_feedback.Empty() ? 99 : 89;
+        const int16 padding_prio = m_feedback.Empty() ? 98 : 89;
+        const int16 feedback_prio = m_feedback.Empty() ? -1 : 99;
+
         tmp.Clear();
         tmp.Printf(L"Files: %lu of %lu", m_index + 1, m_count);
         if (m_tagged.AnyMarked())
@@ -472,15 +483,15 @@ void Chooser::UpdateDisplay()
             if (n > 0)
                 tmp.Printf(L"  (%lu tagged)", n);
         }
-        m_clickable_footer.Add(tmp.Text(), ID_FILELIST, 25, false);
+        m_clickable_footer.Add(tmp.Text(), ID_FILELIST, files_prio, false, RIGHT);
         const int padding = (20 - tmp.Length());
         if (padding > 0)
-            m_clickable_footer.Add(nullptr, padding, 25, false);
+            m_clickable_footer.Add(nullptr, padding, padding_prio, false);
 
         if (m_feedback.Length())
         {
-            m_clickable_footer.Add(nullptr, 4, 25, false);
-            m_clickable_footer.Add(m_feedback.Text(), -1, 100, false);
+            m_clickable_footer.Add(nullptr, 4, padding_prio, false);
+            m_clickable_footer.Add(m_feedback.Text(), -1, feedback_prio, false, RIGHT);
         }
 
         if (size_t(m_index) < m_files.size())
@@ -495,9 +506,9 @@ void Chooser::UpdateDisplay()
             }
             StrW attrs(after_last_space);
             tmp.SetLength(tmp.Length() - attrs.Length());
-            m_clickable_footer.Add(nullptr, 4, 50, true);
-            m_clickable_footer.Add(tmp.Text(), -1, 50, true);
-            m_clickable_footer.Add(attrs.Text(), ID_ONE_ATTR, 50, true);
+            m_clickable_footer.Add(nullptr, 4, 59, true);
+            m_clickable_footer.Add(tmp.Text(), -1, 59, true);
+            m_clickable_footer.Add(attrs.Text(), ID_ONE_ATTR, 59, true);
         }
 
         s.Printf(L"\x1b[%uH", m_terminal_height);
@@ -525,7 +536,7 @@ void Chooser::UpdateDisplay()
     m_prev_visible_rows = m_visible_rows;
     m_last_feedback = std::move(m_feedback);
 #ifdef INCLUDE_MENU_ROW
-    m_last_command_mode = m_command_mode;
+    m_last_menu = std::move(menu);
 #endif
 }
 
@@ -672,7 +683,6 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
 #endif
         case Key::F12:
             ShowOriginalScreen();
-            ForceUpdateAll();
             break;
 
         case Key::ESC:
@@ -1032,15 +1042,18 @@ LNext:
     return ChooserOutcome::CONTINUE;
 }
 
+bool Chooser::HasSelectedFile(bool only_files) const
+{
+    return (m_index >= 0 &&
+            size_t(m_index) < m_files.size() &&
+            !(only_files && m_files[m_index].IsDirectory()));
+}
+
 StrW Chooser::GetSelectedFile(bool only_files) const
 {
     StrW s;
-    if (m_index >= 0 &&
-        size_t(m_index) < m_files.size() &&
-        !(only_files && m_files[m_index].IsDirectory()))
-    {
+    if (HasSelectedFile(only_files))
         m_files[m_index].GetPathName(s);
-    }
     return s;
 }
 
@@ -1410,6 +1423,9 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
     case ID_RUN:
         RunFile(false/*edit*/, e);
         break;
+    case ID_ORIGSCREEN:
+        ShowOriginalScreen();
+        break;
     }
 
     return ChooserOutcome::CONTINUE;
@@ -1419,6 +1435,12 @@ void Chooser::DoHelp()
 {
     Error e;
     ViewHelp(Help::CHOOSER, e);
+    ForceUpdateAll();
+}
+
+void Chooser::ShowOriginalScreen()
+{
+    ::ShowOriginalScreen();
     ForceUpdateAll();
 }
 
@@ -1651,13 +1673,10 @@ void Chooser::NewDirectory(Error& e)
 
 void Chooser::RenameEntry(Error& e)
 {
-    if (size_t(m_index) >= m_files.size())
-        return;
-    if (m_files[m_index].IsPseudoDirectory())
-        return;
-
     StrW old_name = GetSelectedFile();
     if (old_name.Empty())
+        return;
+    if (m_files[m_index].IsPseudoDirectory())
         return;
 
 #ifdef INCLUDE_MENU_ROW

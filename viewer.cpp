@@ -359,8 +359,7 @@ private:
     FileOffset      m_last_processed = FileOffset(-1);
     bool            m_last_completed = false;
 #ifdef INCLUDE_MENU_ROW
-    bool            m_last_edited = false;
-    bool            m_last_command_mode = false;
+    StrW            m_last_menu;
 #endif
     bool            m_force_update = false;
     FileOffset      m_force_update_hex_edit_offset = FileOffset(-1);
@@ -616,6 +615,54 @@ LAutoFitContentWidth:
         }
     }
 
+#ifdef INCLUDE_MENU_ROW
+    StrW menu;
+    {
+        unsigned width = 0;
+        bool stop = false;
+
+        m_clickable_menu.Init(m_terminal_height - 2, m_terminal_width);
+
+        if (m_command_mode)
+        {
+            auto add = [&](int16 priority, const WCHAR* key, const WCHAR* desc, int16 id, bool enabled=true) {
+                m_clickable_menu.AddKeyName(key, ColorElement::MenuRow, desc, id, priority, false/*right_align*/, enabled);
+                m_clickable_menu.Add(nullptr, 2, priority, false/*right_align*/);
+            };
+
+            add(99, L"F1", L"Help", ID_HELP);
+            add(98, m_hex_mode ? L"Alt-G" : L"G", L"GoTo", ID_GOTO);
+            add(97, m_hex_mode ? L"Alt-S" : L"S", L"Search", ID_SEARCH);
+            add(96, L"F3", L"FindNext", ID_FINDNEXT);
+            if (m_hex_mode)
+            {
+                const bool any_edits = (m_context.IsDirty() || m_context.IsSaved());
+                if (any_edits)
+                {
+                    FileOffset offset;
+                    add(79, L"F7", L"PrevEdit", ID_HEXEDIT_PREV, m_context.NextEditedByteRow(m_hex_pos, offset, m_hex_width, false/*next*/));
+                    add(79, L"F8", L"NextEdit", ID_HEXEDIT_NEXT, m_context.NextEditedByteRow(m_hex_pos, offset, m_hex_width, true/*next*/));
+                }
+                if (m_hex_edit)
+                    add(89, L"^S", L"Save", ID_HEXEDIT_SAVE, m_context.IsDirty());
+                if (m_hex_edit || m_context.IsSaved())
+                    add(88, L"^Z", L"Undo", ID_HEXEDIT_UNDO, any_edits);
+            }
+            if (m_files && m_files->size() > 1)
+            {
+                add(59, L"^N", L"NextFile", ID_NEXTFILE, size_t(m_index + 1) < m_files->size());
+                add(59, L"^P", L"PrevFile", ID_PREVFILE, m_index > 0 && size_t(m_index) < m_files->size());
+            }
+            add(39, L"Alt-O", L"Open", ID_OPENFILE);
+            add(39, L"Alt-C", L"Close", ID_CLOSEFILE);
+            add(49, L"F12", L"OrigScreen", ID_ORIGSCREEN);
+        }
+
+        m_clickable_menu.BuildOutput(menu, GetColor(ColorElement::MenuRow));
+        m_force_update_menu |= (!m_last_menu.Equal(menu));
+    }
+#endif
+
     // Decide what changed.
     const bool file_changed = (m_last_index != m_index);
     const bool top_changed = (m_hex_mode ? (m_last_hex_top != m_hex_top) : (m_last_top != m_top || m_last_left != m_left));
@@ -630,7 +677,7 @@ LAutoFitContentWidth:
     // Decide what needs to be updated.
     const bool update_header = (m_force_update || m_force_update_header || file_changed || top_changed || pos_changed || processed_changed);
 #ifdef INCLUDE_MENU_ROW
-    const bool update_menu_row = (menu_row && (m_force_update || m_force_update_menu || m_last_command_mode != m_command_mode || m_last_edited != edited));
+    const bool update_menu_row = (menu_row && (m_force_update || m_force_update_menu));
 #else
     const bool update_menu_row = false;
 #endif
@@ -657,8 +704,7 @@ LAutoFitContentWidth:
     m_last_processed = m_context.Processed();
     m_last_completed = m_context.Completed();
 #ifdef INCLUDE_MENU_ROW
-    m_last_edited = edited;
-    m_last_command_mode = m_command_mode;
+    m_last_menu.Set(menu);
 #endif
     m_force_update = false;
     m_force_update_hex_edit_offset = FileOffset(-1);
@@ -1055,44 +1101,8 @@ LAutoFitContentWidth:
 #ifdef INCLUDE_MENU_ROW
     if (menu_row && update_menu_row)
     {
-        StrW menu;
-        unsigned width = 0;
-        bool stop = false;
-
-        m_clickable_menu.Init(m_terminal_height - 2, m_terminal_width);
-
-        if (m_command_mode)
-        {
-            auto add = [&](int16 priority, const WCHAR* key, const WCHAR* desc, int16 id) {
-                m_clickable_menu.AddKeyName(key, ColorElement::MenuRow, desc, id, priority, false/*right_align*/);
-                m_clickable_menu.Add(nullptr, 2, priority, false/*right_align*/);
-            };
-
-            add(99, L"F1", L"Help", ID_HELP);
-            add(98, m_hex_mode ? L"Alt-G" : L"G", L"GoTo", ID_GOTO);
-            add(97, m_hex_mode ? L"Alt-S" : L"S", L"Search", ID_SEARCH);
-            add(96, L"F3", L"FindNext", ID_FINDNEXT);
-            if (m_hex_mode)
-            {
-                if (m_context.IsDirty() || m_context.IsSaved())
-                {
-                    add(79, L"F7", L"PrevEdit", ID_HEXEDIT_PREV);
-                    add(79, L"F8", L"NextEdit", ID_HEXEDIT_NEXT);
-                }
-                if (m_hex_edit)
-                    add(89, L"^S", L"Save", ID_HEXEDIT_SAVE);
-                if (m_hex_edit || m_context.IsSaved())
-                    add(88, L"^Z", L"Undo", ID_HEXEDIT_UNDO);
-            }
-            add(59, L"^N", L"NextFile", ID_NEXTFILE);
-            add(59, L"^P", L"PrevFile", ID_PREVFILE);
-            add(39, L"Alt-O", L"Open", ID_OPENFILE);
-            add(39, L"Alt-C", L"Close", ID_CLOSEFILE);
-            add(49, L"F12", L"OrigScreen", ID_ORIGSCREEN);
-        }
-
         s.Printf(L"\x1b[%uH", m_terminal_height - menu_row);
-        m_clickable_menu.BuildOutput(s, GetColor(ColorElement::MenuRow));
+        s.Append(menu);
     }
 #endif
 

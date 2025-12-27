@@ -159,6 +159,7 @@ class ClickableRow
         int16       m_left;
         ellipsify_mode m_fit_mode;
         uint16      m_min_fit_width;
+        bool        m_enabled;
     };
 
 public:
@@ -166,8 +167,8 @@ public:
                     ~ClickableRow() = default;
 
     void            Init(uint16 row, uint16 terminal_width, uint16 reserve_left=0);
-    void            Add(const WCHAR* text, int16 id, int16 priority, bool right_align, ellipsify_mode fit_mode=ellipsify_mode::INVALID, uint16 min_fit_width=20);
-    void            AddKeyName(const WCHAR* key, ColorElement color_after, const WCHAR* desc, int16 id, int16 priority, bool right_align);
+    void            Add(const WCHAR* text, int16 id, int16 priority, bool right_align, ellipsify_mode fit_mode=ellipsify_mode::INVALID, uint16 min_fit_width=20, bool enabled=true);
+    void            AddKeyName(const WCHAR* key, ColorElement color_after, const WCHAR* desc, int16 id, int16 priority, bool right_align, bool enabled=true);
     uint16          GetLeftWidth();
     uint16          GetRightWidth();
     void            BuildOutput(StrW& out, const WCHAR* color=nullptr);

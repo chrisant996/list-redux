@@ -62,6 +62,7 @@ private:
     void            SetTop(intptr_t top);
     void            EnsureTop();
     void            RefreshDirectoryListing(Error& e);
+    bool            HasSelectedFile(bool only_files=false) const;
     intptr_t        NumTaggedFiles();
 
     bool            AskForConfirmation(const WCHAR* msg);
@@ -69,6 +70,7 @@ private:
 
     ChooserOutcome  OnLeftClick(const InputRecord& input, Error& e);
     void            DoHelp();
+    void            ShowOriginalScreen();
     ChooserOutcome  ViewOneFile();
     ChooserOutcome  ViewTaggedFiles();
     void            TagFile(bool tag);
@@ -129,7 +131,7 @@ private:
 
     StrW            m_last_feedback;
 #ifdef INCLUDE_MENU_ROW
-    bool            m_last_command_mode = false;
+    StrW            m_last_menu;
 #endif
 };
 

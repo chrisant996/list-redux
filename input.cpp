@@ -1834,7 +1834,7 @@ void ClickableRow::Init(uint16 row, uint16 terminal_width, uint16 reserve_left)
     m_need_layout = true;
 }
 
-void ClickableRow::Add(const WCHAR* text, int16 id, int16 priority, bool right_align, ellipsify_mode fit_mode, uint16 min_fit_width)
+void ClickableRow::Add(const WCHAR* text, int16 id, int16 priority, bool right_align, ellipsify_mode fit_mode, uint16 min_fit_width, bool enabled)
 {
     Element elm;
     std::vector<Element>& vec = right_align ? m_right_elements : m_left_elements;
@@ -1854,17 +1854,18 @@ void ClickableRow::Add(const WCHAR* text, int16 id, int16 priority, bool right_a
     elm.m_left = 0;
     elm.m_fit_mode = fit_mode;
     elm.m_min_fit_width = min_fit_width;
+    elm.m_enabled = enabled;
 
     vec.emplace_back(std::move(elm));
 
     m_need_layout = true;
 }
 
-void ClickableRow::AddKeyName(const WCHAR* key, ColorElement color_after, const WCHAR* desc, int16 id, int16 priority, bool right_align)
+void ClickableRow::AddKeyName(const WCHAR* key, ColorElement color_after, const WCHAR* desc, int16 id, int16 priority, bool right_align, bool enabled)
 {
     StrW tmp;
-    AppendKeyName(tmp, key, color_after, desc);
-    Add(tmp.Text(), id, priority, right_align);
+    AppendKeyName(tmp, key, color_after, desc, enabled);
+    Add(tmp.Text(), id, priority, right_align, INVALID, 20, enabled);
 }
 
 uint16 ClickableRow::GetLeftWidth()
@@ -2102,7 +2103,7 @@ int16 ClickableRow::InterpretInput(const InputRecord& input) const
                 input.mouse_pos.X >= elm.m_left &&
                 input.mouse_pos.X < elm.m_left + elm.m_width)
             {
-                return elm.m_id;
+                return elm.m_enabled ? elm.m_id : -1;
             }
         }
     }
