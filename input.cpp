@@ -2193,6 +2193,11 @@ void AutoMouseConsoleMode::DisableMouseInputIfShift()
     }
 }
 
+void AutoMouseConsoleMode::SetStdInputHandle(HANDLE hin)
+{
+    s_hin = hin;
+}
+
 void MouseHelper::ClearClicks()
 {
     m_tick = GetTickCount() - 0xffff;

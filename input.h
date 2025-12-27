@@ -108,6 +108,7 @@ public:
                     ~AutoMouseConsoleMode();
     void            DisableMouseInput();
     void            DisableMouseInputIfShift();
+    static void     SetStdInputHandle(HANDLE hin);
 private:
     void            UpdateMode(DWORD new_mode, bool force=false);
 private:

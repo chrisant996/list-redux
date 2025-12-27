@@ -4,6 +4,7 @@
 // vim: set et ts=4 sw=4 cino={0s:
 
 #include "pch.h"
+#include "input.h"
 #include "colors.h"
 #include "contentcache.h"
 #include "vieweroptions.h"
@@ -43,7 +44,9 @@ void SetPipedInput()
     if (s_piped_stdin == INVALID_HANDLE_VALUE)
         s_piped_stdin = 0;
 
-    SetStdHandle(STD_INPUT_HANDLE, CreateFile(L"CONIN$", GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, 0));
+    HANDLE hin = CreateFile(L"CONIN$", GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, 0);
+    SetStdHandle(STD_INPUT_HANDLE, hin);
+    AutoMouseConsoleMode::SetStdInputHandle(hin);
 }
 
 const WCHAR* MakeOverlayColor(const WCHAR* color, const WCHAR* overlay)
@@ -1278,12 +1281,12 @@ bool ContentCache::Open(const WCHAR* name, Error& e)
                 if (err && err != ERROR_HANDLE_EOF && err != ERROR_BROKEN_PIPE)
                     e.Sys(err);
                 m_eof = true;
+                SetSize(size);
                 return !e.Test();
             }
             chunk.Wrote(bytes_read);
             size += bytes_read;
         }
-        SetSize(size);
     }
 }
 
