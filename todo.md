@@ -42,7 +42,7 @@
   - [x] searching (chooser or viewer is inferred from file arg(s), multifile is inferred from number of files)
 - menu row
   - [x] clickable
-  - [ ] enable/disable entries appropriately (always compute it, but only draw it if its content changed)
+  - [x] enable/disable entries appropriately (always compute it, but only draw it if its content changed)
 - [x] `Alt-Shift-C` to save current settings into `.listredux` file as defaults
 - [ ] optionally build with RE2 regex library (and do it for official releases)
 - [ ] documentation for the `.listredux` file
@@ -142,6 +142,10 @@
   - [x] allow toggling between Binary and detected Text codepage
   - [x] allow manual override for Text encoding
   - [x] detect UTF8 more aggressively; MLang chooses Western European instead of UTF8 in a file that's ASCII except for one emoji.
+- [ ] option to end a row in hex mode at a newline
+  - [ ] requires computing and caching hex mode pagination/delineation offsets
+  - [ ] apply line-based parsing to hex mode for seek (i.e. Go To); must already be at least partially in place because of Show Line Numbers in hex mode
+  - [ ] end at 0x0A, but if the next byte is 0x00 then keep it on the same line (favors UTF16-LE)
 
 ### Future
 
@@ -193,7 +197,6 @@
 
 - Telephone dialer
 - Printing
-- hex mode: option to end a row at a newline (requires computing and caching hex mode pagination/delineation offsets) _[Too many drawbacks; including that it can't just seek without parsing anymore.]_
 
 
 
