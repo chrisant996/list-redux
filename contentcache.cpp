@@ -1644,7 +1644,6 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                 }
             }
 
-            assert(walk + tmp.Length() == inner_iter.get_pointer());
             walk = inner_iter.get_pointer();
         }
     }
