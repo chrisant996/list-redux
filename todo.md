@@ -188,6 +188,7 @@
 
 # KNOWN ISSUES
 
+- This might be defined VT behavior, but when Windows Terminal applies `CSI K` (clear to end of line) while `SGR 7` (reverse video) is active, it applies the `CSI K` as though `SGR 7` is **_not_** active, resulting in backwards coloring.  So, in order for the display to look right, avoid configuring the `MarkedColor` definition with `7`.
 - Mouse input is always enabled.  Hold the `SHIFT` key to let mouse clicks through to the terminal (e.g. for Quick Edit selection).
 - Some exotic characters are calculated as the wrong width in Windows Terminal (e.g. from dirx\icons.cpp when choosing inaccurate encodings).
   - [x] Mitigate width miscalculations by making the scroll bar characters always use explicit positioning escape codes.

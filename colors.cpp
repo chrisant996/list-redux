@@ -77,7 +77,7 @@ static const WCHAR* c_default_colors[] =
     L"33",              // CtrlCode
     L"90",              // FilteredByte
     L"7",               // EndOfFileLine
-    L"7",               // MarkedLine
+    L"30;47",           // MarkedLine
     L"7;36",            // SearchFound
     L"97;45",           // EditedByte
     L"97;42",           // SavedByte

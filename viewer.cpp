@@ -1012,7 +1012,15 @@ LAutoFitContentWidth:
                     }
                     const unsigned width = m_context.FormatLineData(m_top + row, m_left, s, m_content_width, e, color, found_line);
                     if (width < m_content_width || show_scrollbar)
+                    {
+                        // WARNING:  Presumably this is actually defined VT
+                        // behavior, but when Windows Terminal applies CSI K
+                        // while SGR 7 (reverse video) is active, it applies
+                        // the CSI K as though SGR 7 is **not** active.  So,
+                        // in order for the display to look right, the
+                        // MarkedLine color should avoid using SGR 7.
                         s.Append(c_clreol);
+                    }
                     // s.AppendColor(norm);
                 }
                 else
