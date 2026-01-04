@@ -1,3 +1,8 @@
+## v0.28 -- 2026/01/04
+
+- Changed the default value of the MarkedLine color definition to avoid using reverse video.
+- Fixed highlight colors in the hex view characters pane.
+
 ## v0.27 -- 2025/12/26
 
 - Added `F10` to toggle showing a clickable "menu row" showing some commonly used key bindings.
