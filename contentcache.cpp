@@ -1824,7 +1824,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         BYTE c = ptr[ii];
         bool edited = false;
         ColorElement byte_color;
-        const WCHAR* new_color = norm;
+        const WCHAR* new_color = marked_color ? marked_color : norm;
 
         if (IsByteDirty(offset + ii, c, byte_color))
         {
@@ -1836,16 +1836,11 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         else if (marked_color)
         {
             if (found_line->len && offset + ii == found_line->offset)
-            {
                 highlighting_found_text = true;
-                new_color = GetColor(ColorElement::SearchFound);
-            }
             else if (highlighting_found_text && offset + ii == found_line->offset + found_line->len)
-            {
-                assert(marked_color);
                 highlighting_found_text = false;
-                new_color = marked_color;
-            }
+            if (highlighting_found_text)
+                new_color = GetColor(ColorElement::SearchFound);
         }
 
         if (c > 0 && c < ' ')
