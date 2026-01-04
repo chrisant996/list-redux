@@ -16,6 +16,6 @@
 
 #define    VERSION_STR  DOT_VER2( VERSION_MAJOR, VERSION_MINOR )
 
-#define STR_COPYRIGHTASCII "Copyright (c) 2025 Christopher Antos.  All rights reserved."
-#define STR_COPYRIGHT_RC "Copyright \xA9 2025 Christopher Antos.  All rights reserved.\0"
+#define STR_COPYRIGHTASCII "Copyright (c) 2025-2026 Christopher Antos.  All rights reserved."
+#define STR_COPYRIGHT_RC "Copyright \xA9 2025-2026 Christopher Antos.  All rights reserved.\0"
 
