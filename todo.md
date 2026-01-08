@@ -45,6 +45,14 @@
   - [x] enable/disable entries appropriately (always compute it, but only draw it if its content changed)
 - [x] `Alt-Shift-C` to save current settings into `.listredux` file as defaults
 - [ ] optionally build with RE2 regex library (and do it for official releases)
+  - Manual steps for building re2 locally:
+    - Clone re2:  `cd \repos` and `git clone https://github.com/google/re2.git`.
+    - Download bazel from https://github.com/bazelbuild/bazel/releases.
+    - Build re2:  `cd `\repos\re2` and `bazel build :all`.
+    - Now the re2 *.obj files are at `\repos\re2\bazel-out\x64_windows-fastbuild\bin\_objs\re2`.
+  - [ ] For now, manually build the re2 *.obj files and have premake reference them for linking?
+  - [ ] Maybe list-redux could include bazel configuration so that building with bazel includes re2 but building with msbuild omits re2?
+  - [ ] Ideally I'd like msbuild to be able to build everything end to end, including re2, but that will probably require a lot of reverse engineering first.
 - [ ] documentation for the `.listredux` file
 - [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
 
