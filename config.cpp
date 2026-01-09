@@ -178,6 +178,8 @@ static const OptionDefinition c_option_defs[] =
     { L"ShowFileOffsets",   GetShowFileOffsets, SetShowFileOffsets },
     { L"HexGrouping",       GetHexGrouping, SetHexGrouping },
     { L"ShowEndOfFileLine", GetShowEndOfFileLine, SetShowEndOfFileLine },
+    // TODO:  ShowRuler
+    // TODO:  HexMode
     { L"TabWidth",          GetTabWidth, SetTabWidth },
 #ifdef INCLUDE_MENU_ROW
     { L"MenuRow",           GetMenuRow, SetMenuRow },
