@@ -395,8 +395,8 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
     bool do_search = false;
     if (!find_text.Empty())
     {
-        const SearcherType type = use_regex ? SearcherType::ECMAScriptRegex : SearcherType::Literal;
-        g_options.searcher = Searcher::Create(type, find_text.Text(), ignore_case, true, e);
+        const SearcherType type = use_regex ? SearcherType::Regex : SearcherType::Literal;
+        g_options.searcher = Searcher::Create(type, find_text.Text(), ignore_case, e);
         if (e.Test())
             return e.Report();
         do_search = true;

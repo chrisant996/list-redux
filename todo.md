@@ -45,15 +45,19 @@
   - [x] enable/disable entries appropriately (always compute it, but only draw it if its content changed)
 - [x] `Alt-Shift-C` to save current settings into `.listredux` file as defaults
 - [ ] some ways to exit:  clear screen, restore screen, or leave screen as-is (which actually means restore the screen and then overwrite it with the List-Redux screen again before finishing exiting)
-- [ ] optionally build with RE2 regex library (and do it for official releases)
+- [x] optionally build with RE2 regex library
+  - **FWIW:** ChatGPT and/or Claude were wrong; the MSVC implementation of ECMAScript regular expressions does allow numeric escapes like `\x40`, and it is not necessary to use the RE2 library to gain numeric escapes.  But RE2 has other benefits.
   - Manual steps for building re2 locally:
     - Clone re2:  `cd \repos` and `git clone https://github.com/google/re2.git`.
     - Download bazel from https://github.com/bazelbuild/bazel/releases.
-    - Build re2:  `cd `\repos\re2` and `bazel build :all`.
-    - Now the re2 *.obj files are at `\repos\re2\bazel-out\x64_windows-fastbuild\bin\_objs\re2`.
-  - [ ] For now, manually build the re2 *.obj files and have premake reference them for linking?
-  - [ ] Maybe list-redux could include bazel configuration so that building with bazel includes re2 but building with msbuild omits re2?
-  - [ ] Ideally I'd like msbuild to be able to build everything end to end, including re2, but that will probably require a lot of reverse engineering first.
+    - Build re2:  `cd \repos\re2` and `bazel build :all --features=static_link_msvcrt` (add `-c dbg` for debug builds).
+    - Now the re2 *.obj files are at `\repos\re2\bazel-out\x64_windows-fastbuild\bin\_objs\re2` (use `x64_windows-dbg` for debug builds).
+  - [x] For now, require manually building the re2 *.lib files, and have premake reference the pre-built files for linking.
+  - [x] Should official releases link with ECMAScript or RE2 regular expressions?
+    - with ECMAScript `list.exe` ends up about 640KB.
+    - with RE2 `list.exe` ends up about 1980KB.
+    - it's hard to justify an extra 1300KB just for RE2, especially when ECMAScript in fact does support numeric escapes like `\x40`.
+    - [x] **NO, for now official releases will not use the RE2 library.**
 - [ ] documentation for the `.listredux` file
 - [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
 - [x] remember Literal/Regex mode in a session
@@ -116,7 +120,7 @@
   - [x] make search interruptible with `Ctrl-Break`
   - [x] search for regex (search line by line)
   - [x] viewer should inherit most recent search string from chooser (unless viewer has a more recent search string?)
-  - [ ] search for hex bytes in hex mode (RE2 supports numeric escapes `\xAB`, but it searches _after conversion to UTF8_ and doesn't see "raw" bytes)
+  - [ ] a way to search for raw hex bytes in hex mode -- because using regex numeric escapes like `\xAB` searches converted content (UTF16 for ECMAScript or UTF8 for RE2) rather than the raw unconverted content (unless the content is already natively UTF16 or UTF8, depending on ECMAScript or RE2)
 - hex mode
   - [x] always show hex ruler on a second header row
   - [x] go to offset

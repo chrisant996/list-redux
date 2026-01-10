@@ -76,6 +76,21 @@ void StrW::SetFromCodepage(UINT codepage, const char* p, size_t len)
     m_p[used] = '\0';
 }
 
+void StrUtf8::SetW(const WCHAR* p, size_t len)
+{
+    Clear();
+
+    if (int(len) < 0)
+        len = StrLen(p);
+
+    const size_t needed = WideCharToMultiByte(CP_UTF8, 0, p, int(len), 0, 0, 0, 0);
+    int used = WideCharToMultiByte(CP_UTF8, 0, p, int(len), Reserve(needed + 1), int(needed), 0, 0);
+
+    assert(unsigned(used) < Capacity());
+    m_length = used;
+    m_p[used] = '\0';
+}
+
 WCHAR* CopyStr(const WCHAR* p)
 {
     if (!p)

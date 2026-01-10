@@ -2080,13 +2080,9 @@ bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, un
             }
         }
 
-        StrW tmp;
-        m_map.GetLineText(ptr, len, tmp);
-        TrimLineEnding(tmp);
-
         // FUTURE:  Optional regex search?
         // PERF:  Boyer-Moore search?
-        if (searcher->Match(tmp.Text(), tmp.Length(), e))
+        if (searcher->Match(m_map, ptr, len, e))
         {
             if (e.Test())
                 return false;
@@ -2209,11 +2205,7 @@ bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, un
         }
 
 // TODO:  Non-convertible characters will make conversion go haywire.
-        StrW tmp;
-        m_map.GetLineText(ptr, len, tmp, true/*hex_mode*/);
-        TrimLineEnding(tmp);
-
-        if (searcher->Match(tmp.Text(), tmp.Length(), e))
+        if (searcher->Match(m_map, ptr, len, e))
         {
             if (e.Test())
                 return false;

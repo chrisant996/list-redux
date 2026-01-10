@@ -210,6 +210,21 @@ public:
     void                SetW(const StrW& s) { SetW(s.Text(), s.Length()); }
 };
 
+class StrUtf8 : public Str<char>
+{
+public:
+                        StrUtf8() = default;
+                        StrUtf8(const char* p) { Set(p); }
+                        StrUtf8(const StrUtf8& s) { Set(s); }
+                        StrUtf8(StrUtf8&& s) { Set(std::move(s)); }
+
+    StrUtf8&            operator=(StrUtf8&& s) { Set(std::move(s)); return *this; }
+
+    void                SetW(const WCHAR* p, size_t len=-1);
+
+    void                SetW(const StrW& s) { SetW(s.Text(), s.Length()); }
+};
+
 template <class T>
 unsigned Str<T>::Length() const
 {

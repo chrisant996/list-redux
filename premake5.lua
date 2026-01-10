@@ -5,6 +5,15 @@ if _ACTION == "gmake2" then
     error("Use `premake5 gmake` instead; gmake2 neglects to link resources.")
 end
 
+local use_re2 = (_OPTIONS["re2"] and true or nil)
+if _ACTION and _ACTION:match("^vs") then
+    if use_re2 then
+        print("\x1b[0;35;1mUsing RE2 library.\x1b[m")
+    else
+        print("\x1b[0;36;1mNot using RE2 library.\x1b[m")
+    end
+end
+
 
 --------------------------------------------------------------------------------
 local function init_configuration(cfg)
@@ -68,6 +77,12 @@ define_exe("list")
     links("shlwapi")
 
     includedirs(".build/" .. toolchain .. "/bin") -- for the generated manifest.xml
+    if use_re2 then
+        defines("INCLUDE_RE2")
+        includedirs("../re2")
+        includedirs("../re2/bazel-re2/external/abseil-cpp+")
+    end
+
     files("*.cpp")
     files("wildmatch/*.cpp")
     files("main.rc")
@@ -75,6 +90,29 @@ define_exe("list")
     filter "action:vs*"
         defines("_CRT_SECURE_NO_WARNINGS")
         defines("_CRT_NONSTDC_NO_WARNINGS")
+
+    if use_re2 then
+        local function link_re2_libs(flavor)
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/re2.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/base/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/container/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/debugging/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/hash/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/log/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/log/internal/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/numeric/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/strings/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/synchronization/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/time/*.lib")
+            links("../re2/bazel-out/x64_windows-"..flavor.."/bin/external/abseil-cpp+/absl/time/internal/cctz/*.lib")
+        end
+
+        filter "debug"
+            link_re2_libs("dbg")
+
+        filter "release"
+            link_re2_libs("fastbuild")
+    end
 
 
 
@@ -398,6 +436,12 @@ newaction {
 newoption {
     trigger     = "nosign",
     description = "List: don't sign the release files"
+}
+
+--------------------------------------------------------------------------------
+newoption {
+    trigger     = "re2",
+    description = "List: generate SLN using RE2"
 }
 
 --------------------------------------------------------------------------------

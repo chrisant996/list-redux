@@ -28,3 +28,25 @@ Some highlights:
 - Built-in terminal emulator for use when running on versions of Windows that don't include native VT support.
 
 The "todo" list can be found [here](https://github.com/chrisant996/list-redux/blob/main/todo.md).
+
+### How to build it
+
+List Redux uses [Premake](http://premake.github.io) to generate Visual Studio solutions or makefiles for MinGW. Note that Premake >= 5.0.0-beta1 is required.
+
+1. Cd to your git clone of the [list-redux](https://github.com/chrisant996/list-redux) repo.
+2. Run `premake5.exe _toolchain_` (where `_toolchain_` is one of Premake's actions such as `vs2022` -- see `premake5.exe --help`).
+   - If building with the RE2 library (see below), then add the `--re2` flag to the end of the command (e.g. `premake5 vs2022 --re2`).
+3. Build scripts will be generated in `.build\_toolchain_`. For example `.build\vs2022\list-redux.sln`.
+4. Call your toolchain of choice (VS, mingw32-make.exe, msbuild.exe, etc). GNU makefiles (Premake's _gmake_ target) have a **help** target for more info.
+
+#### Including the RE2 library
+
+The list-redux repo defaults to using ECMAScript regular expressions, but you can optionally build using the RE2 regular expression engine. Here are the additional steps for that.
+
+1. Make sure [bazel](https://bazel.build) is installed.
+2. Cd to your git clone of the [RE2](https://github.com/google/re2) repo. Note that the re2 repo directory needs to be a sibling of the list-redux repo directory.
+3. Run `bazel build :all --features=static_link_msvcrt` and/or `bazel build :all -c dbg --features=static_link_msvcrt` (for debug build).
+4. Follow the normal steps for building List-Redux, but add the `--re2` flag where appropriate.
+
+> [!NOTE]
+> Using the RE2 library more than triples the size of the `list.exe` executable file.

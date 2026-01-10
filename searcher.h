@@ -8,16 +8,22 @@
 
 #include "error.h"
 
-enum class SearcherType { Literal, ECMAScriptRegex };
+class FileLineMap;
+
+enum class SearcherType
+{
+    Literal,
+    Regex,
+};
 
 class Searcher : public std::enable_shared_from_this<Searcher>
 {
 public:
-    static std::shared_ptr<Searcher> Create(SearcherType type, const WCHAR* s, bool caseless, bool optimize, Error& e);
+    static std::shared_ptr<Searcher> Create(SearcherType type, const WCHAR* s, bool caseless, Error& e);
 
                     ~Searcher() = default;
 
-    bool            Match(const WCHAR* line, unsigned len, Error& e);
+    bool            Match(FileLineMap& map, const BYTE* line, unsigned len, Error& e);
 
     unsigned        GetMatchStart() const { return m_match_index; }
     unsigned        GetMatchLength() const { return m_match_length; }
@@ -28,7 +34,7 @@ public:
 protected:
                     Searcher() { SetExhausted(); }
 
-    virtual bool    DoNext(const WCHAR* line, unsigned cchLine, Error& e) = 0;
+    virtual bool    DoNext(FileLineMap& map, const BYTE* line, unsigned len, Error& e) = 0;
 
     void            SetExhausted() { m_exhausted = true; m_match_index = 0; m_match_length = 0; }
     bool            IsStarted() const { return m_started; }
@@ -36,16 +42,19 @@ protected:
     void            SetMatch(unsigned index, unsigned length) { m_match_index = index + m_consumed; m_match_length = length; }
 
 private:
-    bool            Next(Error& e);
+    bool            Next(FileLineMap& map, Error& e);
 
 private:
     bool            m_started;
     bool            m_exhausted;
-    const WCHAR*    m_line;
+    const BYTE*     m_line;
     unsigned        m_length;
     unsigned        m_match_index;
     unsigned        m_match_length;
     unsigned        m_consumed;
+
+protected:
+    StrW            m_tmp;
 };
 
 void TrimLineEnding(StrW& s);

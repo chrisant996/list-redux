@@ -7,6 +7,11 @@
 #include "output.h"
 #include "ecma48.h"
 #include "colors.h"
+#include "contentcache.h"
+
+#ifdef INCLUDE_RE2
+#include "re2/re2.h"
+#endif
 
 #include <regex>
 #include <memory>
@@ -16,29 +21,35 @@ static bool s_regex = false;    // Starts out false in every session.
 class Searcher_Literal : public Searcher
 {
 public:
-                    Searcher_Literal(const WCHAR* s, bool caseless, bool /*optimize*/, Error& e);
+                    Searcher_Literal(const WCHAR* s, bool caseless, Error& e);
                     ~Searcher_Literal() = default;
 
     SearcherType    GetSearcherType() const override { return SearcherType::Literal; }
     unsigned        GetNeedleDelta() const override { return m_find.Length(); }
 
 protected:
-    bool            DoNext(const WCHAR* line, unsigned length, Error& e) override;
+    bool            DoNext(FileLineMap& map, const BYTE* line, unsigned length, Error& e) override;
 
 private:
     const bool      m_caseless;
     const StrW      m_find;
 };
 
-Searcher_Literal::Searcher_Literal(const WCHAR* s, bool caseless, bool /*optimize*/, Error& e)
+Searcher_Literal::Searcher_Literal(const WCHAR* s, bool caseless, Error& e)
 : m_caseless(caseless)
 , m_find(s)
 {
 }
 
-bool Searcher_Literal::DoNext(const WCHAR* line, unsigned length, Error& e)
+bool Searcher_Literal::DoNext(FileLineMap& map, const BYTE* _line, unsigned _length, Error& e)
 {
     // FUTURE:  Boyer-Moore?
+
+    map.GetLineText(_line, _length, m_tmp);
+    TrimLineEnding(m_tmp);
+
+    const WCHAR* const line = m_tmp.Text();
+    const unsigned length = m_tmp.Length();
 
     const WCHAR* const end = line + length - (m_find.Length() - 1);
     for (const WCHAR* p = line; p < end; ++p)
@@ -57,29 +68,29 @@ bool Searcher_Literal::DoNext(const WCHAR* line, unsigned length, Error& e)
     return false;
 }
 
+#ifndef INCLUDE_RE2
 class Searcher_ECMAScriptRegex : public Searcher
 {
 public:
-                    Searcher_ECMAScriptRegex(const WCHAR* s, bool caseless, bool optimize, Error& e);
+                    Searcher_ECMAScriptRegex(const WCHAR* s, bool caseless, Error& e);
                     ~Searcher_ECMAScriptRegex() = default;
 
-    SearcherType    GetSearcherType() const override { return SearcherType::ECMAScriptRegex; }
+    SearcherType    GetSearcherType() const override { return SearcherType::Regex; }
 
 protected:
-    bool            DoNext(const WCHAR* line, unsigned length, Error& e) override;
+    bool            DoNext(FileLineMap& map, const BYTE* line, unsigned length, Error& e) override;
 
 private:
     std::regex_constants::syntax_option_type m_syntax;
     std::unique_ptr<std::wregex> m_wregex;
 };
 
-Searcher_ECMAScriptRegex::Searcher_ECMAScriptRegex(const WCHAR* s, bool caseless, bool optimize, Error& e)
+Searcher_ECMAScriptRegex::Searcher_ECMAScriptRegex(const WCHAR* s, bool caseless, Error& e)
 {
     std::regex_constants::syntax_option_type flags = std::regex_constants::ECMAScript;
+    flags |= std::regex_constants::optimize;
     if (caseless)
         flags |= std::regex_constants::icase;
-    if (optimize)
-        flags |= std::regex_constants::optimize;
 
     try
     {
@@ -94,8 +105,14 @@ Searcher_ECMAScriptRegex::Searcher_ECMAScriptRegex(const WCHAR* s, bool caseless
     }
 }
 
-bool Searcher_ECMAScriptRegex::DoNext(const WCHAR* line, unsigned length, Error& e)
+bool Searcher_ECMAScriptRegex::DoNext(FileLineMap& map, const BYTE* _line, unsigned _length, Error& e)
 {
+    map.GetLineText(_line, _length, m_tmp);
+    TrimLineEnding(m_tmp);
+
+    const WCHAR* const line = m_tmp.Text();
+    const unsigned length = m_tmp.Length();
+
     std::wcmatch matches;
     try
     {
@@ -120,8 +137,89 @@ bool Searcher_ECMAScriptRegex::DoNext(const WCHAR* line, unsigned length, Error&
     SetMatch(unsigned(matches.position(0)), unsigned(matches.length(0)));
     return true;
 }
+#endif
 
-std::shared_ptr<Searcher> Searcher::Create(SearcherType type, const WCHAR* s, bool caseless, bool optimize, Error& e)
+#ifdef INCLUDE_RE2
+class Searcher_RE2 : public Searcher
+{
+public:
+                    Searcher_RE2(const WCHAR* s, bool caseless, Error& e);
+                    ~Searcher_RE2() { delete m_re2; }
+
+    SearcherType    GetSearcherType() const override { return SearcherType::Regex; }
+
+protected:
+    bool            DoNext(FileLineMap& map, const BYTE* line, unsigned length, Error& e) override;
+
+private:
+    RE2*            m_re2 = nullptr;
+    StrW            m_tmp;
+    StrUtf8         m_line;
+};
+
+Searcher_RE2::Searcher_RE2(const WCHAR* _s, bool caseless, Error& e)
+{
+    StrUtf8 s;
+    s.SetW(_s);
+
+    RE2::Options options;
+    options.set_case_sensitive(!caseless);
+
+    m_re2 = new RE2(s.Text(), options);
+
+    if (!m_re2->ok())
+    {
+        StrW err;
+        err.SetFromCodepage(CP_UTF8, m_re2->error().c_str());
+        err.TrimRight();
+        e.Set(err.Text());
+    }
+}
+
+bool Searcher_RE2::DoNext(FileLineMap& map, const BYTE* _line, unsigned length, Error& e)
+{
+    if (!m_re2)
+    {
+exhausted:
+        SetExhausted();
+        return false;
+    }
+
+    const UINT cp = map.GetCodePage();
+    const char* line;
+    if (cp == CP_USASCII || cp == CP_UTF8)
+    {
+        // If the content is natively UTF8, then use it as-is.
+        line = reinterpret_cast<const char*>(_line);
+    }
+    else
+    {
+        // Get the content as UTF16 and convert it to UTF8 for RE2.
+        map.GetLineText(_line, length, m_tmp);
+        m_line.SetW(m_tmp.Text());
+        line = m_line.Text();
+        length = m_line.Length();
+    }
+
+    absl::string_view match;
+    absl::string_view sv(line, length);
+    if (!m_re2->Match(sv, 0, length, RE2::UNANCHORED, &match, 1))
+        goto exhausted;
+
+    const size_t mpos = match.data() - sv.data();
+    const size_t mlen = match.size();
+
+    // Translate mpos and mlen from UTF8 to WCHAR.
+    // TODO:  MB_ERR_INVALID_CHARS?
+    const size_t mpos_begin = MultiByteToWideChar(cp, 0, line, unsigned(mpos), nullptr, 0);
+    const size_t mpos_end = MultiByteToWideChar(cp, 0, line, unsigned(mpos + mlen), nullptr, 0);
+
+    SetMatch(unsigned(mpos_begin), unsigned(mpos_end - mpos_begin));
+    return true;
+}
+#endif
+
+std::shared_ptr<Searcher> Searcher::Create(SearcherType type, const WCHAR* s, bool caseless, Error& e)
 {
     std::shared_ptr<Searcher> searcher;
 
@@ -129,10 +227,14 @@ std::shared_ptr<Searcher> Searcher::Create(SearcherType type, const WCHAR* s, bo
     {
     default:
     case SearcherType::Literal:
-        searcher = std::make_shared<Searcher_Literal>(s, caseless, optimize, e);
+        searcher = std::make_shared<Searcher_Literal>(s, caseless, e);
         break;
-    case SearcherType::ECMAScriptRegex:
-        searcher = std::make_shared<Searcher_ECMAScriptRegex>(s, caseless, optimize, e);
+    case SearcherType::Regex:
+#ifdef INCLUDE_RE2
+        searcher = std::make_shared<Searcher_RE2>(s, caseless, e);
+#else
+        searcher = std::make_shared<Searcher_ECMAScriptRegex>(s, caseless, e);
+#endif
         break;
     }
 
@@ -141,7 +243,7 @@ std::shared_ptr<Searcher> Searcher::Create(SearcherType type, const WCHAR* s, bo
     return searcher;
 }
 
-bool Searcher::Match(const WCHAR* line, unsigned length, Error& e)
+bool Searcher::Match(FileLineMap& map, const BYTE* line, unsigned length, Error& e)
 {
     m_started = false;
     m_exhausted = false;
@@ -150,16 +252,16 @@ bool Searcher::Match(const WCHAR* line, unsigned length, Error& e)
     m_match_index = 0;
     m_match_length = 0;
     m_consumed = 0;
-    return Next(e);
+    return Next(map, e);
 }
 
-bool Searcher::Next(Error& e)
+bool Searcher::Next(FileLineMap& map, Error& e)
 {
     if (m_exhausted)
         return false;
 
     if (m_consumed > m_length ||
-        !DoNext(m_line + m_consumed, m_length - m_consumed, e))
+        !DoNext(map, m_line + m_consumed, m_length - m_consumed, e))
     {
         SetExhausted();
         return false;
@@ -257,6 +359,6 @@ toggle_caseless:
 
     std::shared_ptr<Searcher> searcher;
     if (s.Length())
-        searcher = Searcher::Create(s_regex ? SearcherType::ECMAScriptRegex : SearcherType::Literal, s.Text(), caseless, true, e);
+        searcher = Searcher::Create(s_regex ? SearcherType::Regex : SearcherType::Literal, s.Text(), caseless, e);
     return searcher;
 }
