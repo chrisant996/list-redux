@@ -122,6 +122,33 @@ static void SetShowFileOffsets(const WCHAR* value)
     g_options.show_file_offsets = ParseBoolean(value);
 }
 
+static void GetShowEndOfFileLine(StrW& out)
+{
+    out = BooleanValue(g_options.show_endoffile_line);
+}
+static void SetShowEndOfFileLine(const WCHAR* value)
+{
+    g_options.show_endoffile_line = ParseBoolean(value);
+}
+
+static void GetShowRuler(StrW& out)
+{
+    out = BooleanValue(g_options.show_ruler);
+}
+static void SetShowRuler(const WCHAR* value)
+{
+    g_options.show_ruler = ParseBoolean(value);
+}
+
+static void GetHexMode(StrW& out)
+{
+    out = BooleanValue(g_options.hex_mode);
+}
+static void SetHexMode(const WCHAR* value)
+{
+    g_options.hex_mode = ParseBoolean(value);
+}
+
 static void GetHexGrouping(StrW& out)
 {
     out.Printf(L"%u", g_options.hex_grouping);
@@ -131,15 +158,6 @@ static void SetHexGrouping(const WCHAR* value)
     ULONGLONG n;
     if (ParseULongLong(value, n) && n < 4)
         g_options.hex_grouping = uint8(n);
-}
-
-static void GetShowEndOfFileLine(StrW& out)
-{
-    out = BooleanValue(g_options.show_endoffile_line);
-}
-static void SetShowEndOfFileLine(const WCHAR* value)
-{
-    g_options.show_endoffile_line = ParseBoolean(value);
 }
 
 static void GetTabWidth(StrW& out)
@@ -176,10 +194,10 @@ static const OptionDefinition c_option_defs[] =
     { L"ShowLineEndings",   GetShowLineEndings, SetShowLineEndings },
     { L"ShowLineNumbers",   GetShowLineNumbers, SetShowLineNumbers },
     { L"ShowFileOffsets",   GetShowFileOffsets, SetShowFileOffsets },
-    { L"HexGrouping",       GetHexGrouping, SetHexGrouping },
     { L"ShowEndOfFileLine", GetShowEndOfFileLine, SetShowEndOfFileLine },
-    // TODO:  ShowRuler
-    // TODO:  HexMode
+    { L"ShowRuler",         GetShowRuler, SetShowRuler },
+    { L"HexMode",           GetHexMode, SetHexMode },
+    { L"HexGrouping",       GetHexGrouping, SetHexGrouping },
     { L"TabWidth",          GetTabWidth, SetTabWidth },
 #ifdef INCLUDE_MENU_ROW
     { L"MenuRow",           GetMenuRow, SetMenuRow },
