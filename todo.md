@@ -159,8 +159,6 @@
 
 ### Future
 
-- [ ] add config for ruler
-- [ ] add config for hex mode
 - [ ] a key to force going to the chooser, even if the program was started with a filename and initially went directly to the viewer (it was `Alt-V` in the original LIST)
 - [ ] improve message box routine (make it not full terminal width, have clickable buttons, etc)
   - [ ] mouse input in message box routine
@@ -181,8 +179,6 @@
 - show used and free space in chooser?
 - persist history lists for input prompts?
 - cut and paste to new or existing file [did it really "cut" or just "copy"?]
-- the original LIST had a way of marking lines (`Alt-M` for top, `Alt-B` for bottom) and writing them to a file (`Alt-D`) or appending them to the previously written file (`Alt-O`); using them repeatedly only grows the marked section; shrinking is only possible via `Alt-U` to clear the marked section and start over
-- the original LIST considers "found text" as already marked, for the purposes of `Alt-D` and `Alt-O` (and maybe other things?)
 - allow copying, moving tagged files?
 - `/Nnn` lock the first `nn` lines of the file at the top of the display
 - `/Cnn` lock the first `nn` columns of each line on the left side of the display
@@ -198,10 +194,12 @@
 - `\` present a directory tree of the selected drive; select a subdirectory to list by moving the cursor and pressing Enter
   - list.com shows 8 levels, but selecting any directory just goes to its top level parent directory
 - the original LIST had a "pre-loading" feature which would load the entire file into memory before displaying anything (and add a config for it)?
-- the original LIST had a "junk filter" feature which treated CR (0x0D) as though a LF (0x0A) follows it (even if it doesn't) and made BS (0x08) actually back up one character (and add a config for it)?
-- the original LIST had a `1` command which jumped back to the first file in the viewer, when viewing multiple files
 - the original LIST had a "toggle screen saving" command (and add a config for it)?
 - the original LIST had up to 10 "bookmarks"; `^Y` to set a bookmark, `Alt-Y` to go to the last bookmark, and "found text" and "marked lines" are automatically treated as bookmarks (unclear how to cycle between bookmarks)
+- the original LIST had a way of marking lines (`Alt-M` for top, `Alt-B` for bottom) and writing them to a file (`Alt-D`) or appending them to the previously written file (`Alt-O`); using them repeatedly only grows the marked section; shrinking is only possible via `Alt-U` to clear the marked section and start over
+- the original LIST considers "found text" as already marked, for the purposes of `Alt-D` and `Alt-O` (and maybe other things?)
+- the original LIST had a "junk filter" feature which treated CR (0x0D) as though a LF (0x0A) follows it (even if it doesn't) and made BS (0x08) actually back up one character (and add a config for it)?
+- the original LIST had a `1` command which jumped back to the first file in the viewer, when viewing multiple files
 
 
 
