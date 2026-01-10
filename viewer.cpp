@@ -2316,7 +2316,7 @@ void Viewer::DoSearch(bool next, bool caseless)
     OutputConsole(s.Text(), s.Length());
 
     Error e;
-    auto searcher = ReadSearchInput(m_terminal_height - 1, m_terminal_width, caseless, false, e);
+    auto searcher = ReadSearchInput(m_terminal_height - 1, m_terminal_width, caseless, e);
 
     OutputConsole(c_norm);
     m_force_update = true;

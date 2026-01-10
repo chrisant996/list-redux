@@ -56,6 +56,7 @@
   - [ ] Ideally I'd like msbuild to be able to build everything end to end, including re2, but that will probably require a lot of reverse engineering first.
 - [ ] documentation for the `.listredux` file
 - [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
+- [x] remember Literal/Regex mode in a session
 
 ### File Chooser (list files in directory)
 

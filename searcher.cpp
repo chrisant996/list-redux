@@ -11,6 +11,8 @@
 #include <regex>
 #include <memory>
 
+static bool s_regex = false;    // Starts out false in every session.
+
 class Searcher_Literal : public Searcher
 {
 public:
@@ -183,7 +185,7 @@ void TrimLineEnding(StrW& s)
     }
 }
 
-std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, bool regex, Error& e)
+std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, Error& e)
 {
     StrW tmp;
     ClickableRow cr;
@@ -196,7 +198,7 @@ std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
 
         cr.AddKeyName(L"^I", ColorElement::Footer, caseless ? L"IgnoreCase" : L"ExactCase ", ID_IGNORECASE, 99, true);
         cr.Add(nullptr, 3, 89, true);
-        cr.AddKeyName(L"^X", ColorElement::Footer, regex ? L"RegExp " : L"Literal", ID_REGEXP, 89, true);
+        cr.AddKeyName(L"^X", ColorElement::Footer, s_regex ? L"RegExp " : L"Literal", ID_REGEXP, 89, true);
 
         tmp.Set(L"\r");
         cr.BuildOutput(tmp, GetColor(ColorElement::Footer));
@@ -214,7 +216,7 @@ std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
             case 'X'-'@':
                 // 'Ctrl-X' toggles regex mode.
 toggle_regex:
-                regex = !regex;
+                s_regex = !s_regex;
                 printcontext();
                 return 1;
             }
@@ -255,6 +257,6 @@ toggle_caseless:
 
     std::shared_ptr<Searcher> searcher;
     if (s.Length())
-        searcher = Searcher::Create(regex ? SearcherType::ECMAScriptRegex : SearcherType::Literal, s.Text(), caseless, true, e);
+        searcher = Searcher::Create(s_regex ? SearcherType::ECMAScriptRegex : SearcherType::Literal, s.Text(), caseless, true, e);
     return searcher;
 }

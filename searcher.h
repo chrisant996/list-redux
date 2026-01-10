@@ -50,4 +50,4 @@ private:
 
 void TrimLineEnding(StrW& s);
 
-std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, bool regex, Error& e);
+std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width, bool caseless, Error& e);
