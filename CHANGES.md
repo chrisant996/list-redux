@@ -7,6 +7,7 @@
 - Added `Alt-V` in the viewer to force going to the chooser (even when `Esc` would exit the program).
 - Added `Q` in the viewer to quit from the viewer if on the last file, otherwise go to the next file.
 - Added `1` in the viewer to go to the first file.
+- Added `F1` in the search prompt to view the regular expression syntax documention.
 - Changed to remember the regex search mode during the current session.
 
 ## v0.28 -- 2026/01/04

@@ -292,14 +292,16 @@ std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
     StrW tmp;
     ClickableRow cr;
 
-    enum { ID_IGNORECASE, ID_REGEXP };
+    enum { ID_HELP, ID_IGNORECASE, ID_REGEXP };
 
     auto printcontext = [&]()
     {
         cr.Init(row, terminal_width, 20);
 
+        cr.AddKeyName(L"F1", ColorElement::Footer, L"Help", ID_HELP, 79, true);
+        cr.Add(nullptr, 2, 79, true);
         cr.AddKeyName(L"^I", ColorElement::Footer, caseless ? L"IgnoreCase" : L"ExactCase ", ID_IGNORECASE, 99, true);
-        cr.Add(nullptr, 3, 89, true);
+        cr.Add(nullptr, 2, 89, true);
         cr.AddKeyName(L"^X", ColorElement::Footer, s_regex ? L"RegExp " : L"Literal", ID_REGEXP, 89, true);
 
         tmp.Set(L"\r");
@@ -326,6 +328,19 @@ toggle_regex:
         case InputType::Key:
             switch (input.key)
             {
+            case Key::F1:
+                if (input.modifier == Modifier::None)
+                {
+help_url:
+#ifdef INCLUDE_RE2
+                    const char* const url = "https://github.com/google/re2/wiki/Syntax";
+#else
+                    const char* const url = "https://learn.microsoft.com/en-us/cpp/standard-library/regular-expressions-cpp";
+#endif
+                    AllowSetForegroundWindow(ASFW_ANY);
+                    ShellExecuteA(0, nullptr, url, 0, 0, SW_NORMAL);
+                }
+                break;
             case Key::TAB:
                 // 'Ctrl-I' toggles ignore case.
                 if (input.modifier == Modifier::CTRL)
@@ -340,6 +355,7 @@ toggle_caseless:
         case InputType::Mouse:
             switch (cr.InterpretInput(input))
             {
+            case ID_HELP:           goto help_url;
             case ID_IGNORECASE:     goto toggle_caseless;
             case ID_REGEXP:         goto toggle_regex;
             }

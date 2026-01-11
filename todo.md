@@ -62,7 +62,7 @@
     - it's hard to justify an extra 1300KB just for RE2, especially when ECMAScript in fact does support numeric escapes like `\x40`.
     - [x] **NO, for now official releases will not use the RE2 library.**
 - [ ] documentation for the `.listredux` file
-- [ ] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
+- [x] documentation for regular expressions (link to MSVC ECMAScript or RE2 syntax page)
 - [x] remember Literal/Regex mode in a session
 
 ### File Chooser (list files in directory)
