@@ -117,6 +117,8 @@
 - [x] remember scroll position in each file
 - [x] `Ctrl-T` override tab stop width
 - [x] `Alt-V` forces going to the chooser, even if the program was started with a filename and initially went directly to the viewer (it was `Alt-V` in the original LIST)
+- [x] `Q` mimics the behavior from the original LIST; quit from the file viewer if on the last file, otherwise go to the next file
+- [x] `1` go to the first file
 - searching
   - [x] search in text mode (/ for case sensitive, \ for caseless)
   - [x] search in hex mode

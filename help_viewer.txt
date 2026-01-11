@@ -74,6 +74,8 @@ MISCELLANEOUS:
    Alt-Shift-C  Write current settings to config file (%USERPROFILE%\.listredux).
          Alt-D  Toggle showing debug info.
          Alt-V  Exit the file viewer and go to the file chooser.
+             Q  Quit from the file viewer if on the last file, otherwise go to next file.
+             1  Jump to the first file in the viewer.
 
 MOUSE INPUT:
 

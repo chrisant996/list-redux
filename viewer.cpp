@@ -1798,6 +1798,12 @@ hex_edit_right:
                 ShowFileList();
             }
             break;
+        case '1':
+            if (input.modifier == Modifier::None)
+            {
+                SetFile(0);
+            }
+            break;
 
         case 'a':
             if (input.modifier == Modifier::ALT)
@@ -1909,6 +1915,16 @@ hex_edit_right:
             else if (input.modifier == Modifier::ALT)
             {
                 OpenNewFile(e);
+            }
+            break;
+        case 'q':
+            if (input.modifier == Modifier::None)
+            {
+                if (m_hex_edit && !ToggleHexEditMode(e))
+                    break;
+                if (size_t(m_index) >= m_files->size() || size_t(m_index + 1) >= m_files->size())
+                    return ViewerOutcome::RETURN;
+                NextFile(true/*next*/, e);
             }
             break;
         case 'r':
@@ -2827,7 +2843,13 @@ void Viewer::DoUndo(Error& e)
 
 void Viewer::NextFile(bool next, Error& e)
 {
-    if (!m_hex_edit || ToggleHexEditMode(e))
+    if (m_hex_edit && !ToggleHexEditMode(e))
+        m_feedback = L"*** Editing ***";
+    else if (!next && !m_index)
+        m_feedback = L"*** No Previous File ***";
+    else if (next && m_index + 1 >= intptr_t(m_files->size()))
+        m_feedback = L"*** No Next File ***";
+    else
         SetFile(m_index + (next ? 1 : -1));
 }
 

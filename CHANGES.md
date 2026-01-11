@@ -5,6 +5,8 @@
 - Added `X` and `Alt-X` to exit the program immediately.
 - Added `Shift-X` and `Alt-Shift-X` to exit the program and do the opposite of the current `RestoreScreenOnExit` config setting.
 - Added `Alt-V` in the viewer to force going to the chooser (even when `Esc` would exit the program).
+- Added `Q` in the viewer to quit from the viewer if on the last file, otherwise go to the next file.
+- Added `1` in the viewer to go to the first file.
 - Changed to remember the regex search mode during the current session.
 
 ## v0.28 -- 2026/01/04
