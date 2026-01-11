@@ -457,11 +457,11 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         do_search = false;
     }
 
+    interactive.End();
+    MaybeReprintLastScreen();
+
     if (e.Test())
-    {
-        interactive.End();
         return e.Report();
-    }
 
     OutputConsole(c_norm);
     SetGracefulExit();

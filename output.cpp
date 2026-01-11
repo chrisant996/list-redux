@@ -10,6 +10,7 @@
 #include "colors.h"
 #include "ecma48.h"
 #include "terminal.h"
+#include "vieweroptions.h"
 #include "wcwidth.h"
 #include "wcwidth_iter.h"
 
@@ -21,6 +22,8 @@ const WCHAR c_show_cursor[] = L"\x1b[?25h";
 static HANDLE s_hout = GetStdHandle(STD_OUTPUT_HANDLE);
 
 static int s_emulation = -1;
+static StrW s_last_screen;
+static bool s_locked_last_screen = false;
 static Terminal* s_terminal = new Terminal;
 
 bool IsConsole(HANDLE h)
@@ -671,6 +674,39 @@ bool ReportError(Error& e, ReportErrorFlags flags)
 LDone:
     e.Clear();
     return ret;
+}
+
+/*
+ * Reprinting the last screen.
+ */
+
+void PrepareReprintLastScreen(StrW& s, bool lock)
+{
+    assert(!g_options.restore_screen_on_exit);
+    if (!s_locked_last_screen)
+    {
+        s_last_screen = std::move(s);
+        if (lock)
+            s_locked_last_screen = true;
+    }
+}
+
+void MaybeReprintLastScreen()
+{
+    if (g_options.restore_screen_on_exit)
+        return;
+    if (s_last_screen.Empty())
+        return;
+
+    const DWORD colsrows = GetConsoleColsRows();
+    unsigned terminal_height = HIWORD(colsrows);
+
+    StrW tmp;
+    for (int16 rows = HIWORD(colsrows); --rows >= 0;)
+        tmp.Append(L"\r\n");
+    OutputConsole(tmp.Text(), tmp.Length());
+
+    OutputConsole(s_last_screen.Text(), s_last_screen.Length());
 }
 
 /*

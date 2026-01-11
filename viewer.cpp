@@ -263,7 +263,7 @@ public:
 
 private:
     unsigned        CalcMarginWidth();
-    void            UpdateDisplay();
+    void            UpdateDisplay(StrW* last_screen=nullptr);
     void            MakeFooter(StrW& s, const WCHAR* msg=nullptr);
     void            InitHexWidth();
     unsigned        LinePercent(size_t line) const;
@@ -284,7 +284,7 @@ private:
     void            ChooseTabWidth();
     void            OpenNewFile(Error& e);
     ViewerOutcome   CloseCurrentFile(Error& e);
-    void            DoHelp();
+    ViewerOutcome   DoHelp();
     void            ShowOriginalScreen();
     void            DoSave(Error& e);
     void            DoUndo(Error& e);
@@ -458,13 +458,25 @@ ViewerOutcome Viewer::Go(Error& e, bool do_search)
                 m_command_mode = false;
 #endif
                 const ViewerOutcome outcome = HandleInput(input, e);
+                if (outcome != ViewerOutcome::CONTINUE)
+                {
+                    if (!g_options.restore_screen_on_exit)
+                    {
+                        StrW last_screen;
+                        m_force_update = true;
+#ifdef INCLUDE_MENU_ROW
+                        m_command_mode = true;
+#endif
+                        UpdateDisplay(&last_screen);
+                        PrepareReprintLastScreen(last_screen, outcome == ViewerOutcome::EXITAPP);
+                    }
+                    return outcome;
+                }
                 if (e.Test())
                 {
                     ReportError(e);
                     m_force_update = true;
                 }
-                if (outcome != ViewerOutcome::CONTINUE)
-                    return outcome;
             }
             break;
         }
@@ -478,7 +490,7 @@ static void PadToWidth(StrW& s, unsigned min_width)
         s.AppendSpaces(min_width - cells);
 }
 
-void Viewer::UpdateDisplay()
+void Viewer::UpdateDisplay(StrW* last_screen)
 {
 #ifdef DEBUG
     static bool s_no_accumulate = false;
@@ -685,7 +697,7 @@ LAutoFitContentWidth:
     const bool update_hex_edit = (m_force_update_hex_edit_offset != FileOffset(-1));
     const FileOffset update_hex_edit_offset = m_force_update_hex_edit_offset;
     update_command_line |= (m_force_update || m_force_update_footer || feedback_changed);
-    if (!update_header && !update_menu_row && !update_content && !update_command_line && !hex_meta_pos_changed)
+    if (!last_screen && !update_header && !update_menu_row && !update_content && !update_command_line && !hex_meta_pos_changed)
         return;
     const bool update_debug_row = debug_row;
 
@@ -1117,9 +1129,16 @@ LAutoFitContentWidth:
     // Footer.
     StrW left;
     if (m_searching)
+    {
         left.Append(L"Searching... (Ctrl-Break to cancel)");
+    }
     else
-        left.Printf(L"Command%s %s", c_prompt_char, m_feedback.Text());
+    {
+        const WCHAR* feedback = m_feedback.Text();
+        if (last_screen && !*feedback)
+            feedback = m_last_feedback.Text();
+        left.Printf(L"Command%s %s", c_prompt_char, feedback);
+    }
     if (update_command_line)
     {
         if (m_searching && !m_searching_file.Empty())
@@ -1181,11 +1200,19 @@ LAutoFitContentWidth:
             cursor_x = cell_count(left.Text()) + 1;
         }
 
-        OutputConsole(c_hide_cursor);
         s.Printf(L"\x1b[%u;%uH", cursor_y, cursor_x);
         s.Append(c_norm);
-        s.Append(c_show_cursor);
-        OutputConsole(s.Text(), s.Length());
+
+        if (last_screen)
+        {
+            (*last_screen) = std::move(s);
+        }
+        else
+        {
+            s.Append(c_show_cursor);
+            OutputConsole(c_hide_cursor);
+            OutputConsole(s.Text(), s.Length());
+        }
     }
 
     m_feedback.Clear();
@@ -1323,7 +1350,7 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
         case Key::F1:
             if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
             {
-                DoHelp();
+                return DoHelp();
             }
             break;
 #ifdef INCLUDE_MENU_ROW
@@ -1918,6 +1945,15 @@ hex_edit_right:
                 ToggleWrap();
             }
             break;
+        case 'x':
+        case 'X':
+            if ((input.modifier & ~(Modifier::ALT|Modifier::SHIFT)) == Modifier::None)
+            {
+                if ((input.modifier & Modifier::SHIFT) == Modifier::SHIFT)
+                    g_options.restore_screen_on_exit = !g_options.restore_screen_on_exit;
+                return ViewerOutcome::EXITAPP;
+            }
+            break;
 
         case 's':
         case 'S':
@@ -2078,8 +2114,7 @@ ViewerOutcome Viewer::OnLeftClick(const InputRecord& input, Error& e)
     switch (id)
     {
     case ID_HELP:
-        DoHelp();
-        break;
+        return DoHelp();
     case ID_ORIGSCREEN:
         ShowOriginalScreen();
         break;
@@ -2745,11 +2780,12 @@ ViewerOutcome Viewer::CloseCurrentFile(Error& e)
     return ViewerOutcome::CONTINUE;
 }
 
-void Viewer::DoHelp()
+ViewerOutcome Viewer::DoHelp()
 {
     Error e;
-    ViewHelp(Help::VIEWER, e);
+    const ViewerOutcome vo = ViewHelp(Help::VIEWER, e);
     m_force_update = true;
+    return (vo == ViewerOutcome::EXITAPP) ? vo : ViewerOutcome::CONTINUE;
 }
 
 void Viewer::ShowOriginalScreen()
@@ -2948,7 +2984,11 @@ ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title, bool help
     Viewer viewer(text, title);
     ViewerOutcome ret = viewer.Go(e);
 
-    g_options = old;
+    // Don't restore g_options when exiting, so that Alt-X can toggle the
+    // restore_screen_on_exit option.
+    if (ret != ViewerOutcome::EXITAPP)
+        g_options = old;
+
     return ret;
 }
 

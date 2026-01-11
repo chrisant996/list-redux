@@ -232,13 +232,25 @@ ChooserOutcome Chooser::Go(Error& e, bool do_search)
                 m_command_mode = false;
 #endif
                 const ChooserOutcome outcome = HandleInput(input, e);
+                if (outcome != ChooserOutcome::CONTINUE)
+                {
+                    if (!g_options.restore_screen_on_exit)
+                    {
+                        StrW last_screen;
+                        ForceUpdateAll();
+#ifdef INCLUDE_MENU_ROW
+                        m_command_mode = true;
+#endif
+                        UpdateDisplay(&last_screen);
+                        PrepareReprintLastScreen(last_screen, outcome == ChooserOutcome::EXITAPP);
+                    }
+                    return outcome;
+                }
                 if (e.Test())
                 {
                     ReportError(e);
                     ForceUpdateAll();
                 }
-                if (outcome != ChooserOutcome::CONTINUE)
-                    return outcome;
             }
             break;
         }
@@ -285,7 +297,7 @@ void Chooser::ForceUpdateAll()
     assert(m_prev_visible_rows > 0);
 }
 
-void Chooser::UpdateDisplay()
+void Chooser::UpdateDisplay(StrW* last_screen)
 {
     if (!m_last_feedback.Equal(m_feedback))
         m_dirty_footer = true;
@@ -488,10 +500,13 @@ void Chooser::UpdateDisplay()
         if (padding > 0)
             m_clickable_footer.Add(nullptr, padding, padding_prio, false);
 
-        if (m_feedback.Length())
+        const WCHAR* feedback = m_feedback.Text();
+        if (last_screen && !*feedback)
+            feedback = m_last_feedback.Text();
+        if (*feedback)
         {
             m_clickable_footer.Add(nullptr, 4, padding_prio, false);
-            m_clickable_footer.Add(m_feedback.Text(), -1, feedback_prio, false, RIGHT);
+            m_clickable_footer.Add(feedback, -1, feedback_prio, false, RIGHT);
         }
 
         if (size_t(m_index) < m_files.size())
@@ -516,7 +531,11 @@ void Chooser::UpdateDisplay()
         m_dirty_footer = false;
     }
 
-    if (s.Length())
+    if (last_screen)
+    {
+        (*last_screen) = std::move(s);
+    }
+    else if (s.Length())
     {
         unsigned y = 1/*for zero based to one based*/ + 1/*for header row*/;
         unsigned x = 1/*for zero based to one based*/;
@@ -527,9 +546,9 @@ void Chooser::UpdateDisplay()
                 x += m_col_widths[ii] + m_padding;
         }
 
-        OutputConsole(c_hide_cursor);
         s.Printf(L"\x1b[%u;%uH", y, x);
         s.Append(c_show_cursor);
+        OutputConsole(c_hide_cursor);
         OutputConsole(s.Text(), s.Length());
     }
 
@@ -663,7 +682,7 @@ ChooserOutcome Chooser::HandleInput(const InputRecord& input, Error& e)
         case Key::F1:
             if (input.modifier == Modifier::None)
             {
-                DoHelp();
+                return DoHelp();
             }
             break;
         case Key::F2:
@@ -957,6 +976,15 @@ LNext:
             if (input.modifier == Modifier::None)
             {
                 SweepFiles(e);
+            }
+            break;
+        case 'x':
+        case 'X':
+            if ((input.modifier & ~(Modifier::ALT|Modifier::SHIFT)) == Modifier::None)
+            {
+                if ((input.modifier & Modifier::SHIFT) == Modifier::SHIFT)
+                    g_options.restore_screen_on_exit = !g_options.restore_screen_on_exit;
+                return ChooserOutcome::EXITAPP;
             }
             break;
 
@@ -1393,8 +1421,7 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
         ChangeAttributes(e, true/*only_current*/);
         break;
     case ID_HELP:
-        DoHelp();
-        break;
+        return DoHelp();
     case ID_VIEW:
         return ViewOneFile();
     case ID_DETAILS:
@@ -1431,11 +1458,12 @@ ChooserOutcome Chooser::OnLeftClick(const InputRecord& input, Error& e)
     return ChooserOutcome::CONTINUE;
 }
 
-void Chooser::DoHelp()
+ChooserOutcome Chooser::DoHelp()
 {
     Error e;
-    ViewHelp(Help::CHOOSER, e);
+    const ViewerOutcome vo = ViewHelp(Help::CHOOSER, e);
     ForceUpdateAll();
+    return (vo == ViewerOutcome::EXITAPP) ? ChooserOutcome::EXITAPP : ChooserOutcome::CONTINUE;
 }
 
 void Chooser::ShowOriginalScreen()

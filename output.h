@@ -30,6 +30,9 @@ DEFINE_ENUM_FLAG_OPERATORS(ReportErrorFlags);
 StrW MakeMsgBoxText(const WCHAR* message, const WCHAR* directive, ColorElement color_elm);
 bool ReportError(Error& e, ReportErrorFlags flags=ReportErrorFlags::NONE);
 
+void PrepareReprintLastScreen(StrW& s, bool lock=false);
+void MaybeReprintLastScreen();
+
 #ifdef DEBUG
 void dbgprintf(const WCHAR* format, ...);
 #endif

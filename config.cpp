@@ -86,6 +86,15 @@ static void SetScrollbar(const WCHAR* value)
     g_options.show_scrollbar = ParseBoolean(value);
 }
 
+static void GetRestoreScreenOnExit(StrW& out)
+{
+    out = BooleanValue(g_options.restore_screen_on_exit);
+}
+static void SetRestoreScreenOnExit(const WCHAR* value)
+{
+    g_options.restore_screen_on_exit = ParseBoolean(value);
+}
+
 static void GetAsciiFilter(StrW& out)
 {
     out = BooleanValue(g_options.ascii_filter);
@@ -183,27 +192,28 @@ struct OptionDefinition
 
 static const OptionDefinition c_option_defs[] =
 {
-    { L"Details",           GetDetails, SetDetails },
+    { L"Details",               GetDetails, SetDetails },
 #ifndef DEBUG
     // MaxLineLength is overridden in DEBUG builds, so avoid writing out the
     // value when running a DEBUG build.
-    { L"MaxLineLength",     GetMaxLineLength, SetMaxLineLength },
+    { L"MaxLineLength",         GetMaxLineLength, SetMaxLineLength },
 #endif
-    { L"Wrap",              GetWrapping, SetWrapping },
-    { L"AsciiFilter",       GetAsciiFilter, SetAsciiFilter },
-    { L"ShowLineEndings",   GetShowLineEndings, SetShowLineEndings },
-    { L"ShowLineNumbers",   GetShowLineNumbers, SetShowLineNumbers },
-    { L"ShowFileOffsets",   GetShowFileOffsets, SetShowFileOffsets },
-    { L"ShowEndOfFileLine", GetShowEndOfFileLine, SetShowEndOfFileLine },
-    { L"ShowRuler",         GetShowRuler, SetShowRuler },
-    { L"HexMode",           GetHexMode, SetHexMode },
-    { L"HexGrouping",       GetHexGrouping, SetHexGrouping },
-    { L"TabWidth",          GetTabWidth, SetTabWidth },
+    { L"Wrap",                  GetWrapping, SetWrapping },
+    { L"AsciiFilter",           GetAsciiFilter, SetAsciiFilter },
+    { L"ShowLineEndings",       GetShowLineEndings, SetShowLineEndings },
+    { L"ShowLineNumbers",       GetShowLineNumbers, SetShowLineNumbers },
+    { L"ShowFileOffsets",       GetShowFileOffsets, SetShowFileOffsets },
+    { L"ShowEndOfFileLine",     GetShowEndOfFileLine, SetShowEndOfFileLine },
+    { L"ShowRuler",             GetShowRuler, SetShowRuler },
+    { L"HexMode",               GetHexMode, SetHexMode },
+    { L"HexGrouping",           GetHexGrouping, SetHexGrouping },
+    { L"TabWidth",              GetTabWidth, SetTabWidth },
 #ifdef INCLUDE_MENU_ROW
-    { L"MenuRow",           GetMenuRow, SetMenuRow },
+    { L"MenuRow",               GetMenuRow, SetMenuRow },
 #endif
-    { L"Scrollbar",         GetScrollbar, SetScrollbar },
-    { L"Emulate",           GetEmulation, SetEmulation },
+    { L"Scrollbar",             GetScrollbar, SetScrollbar },
+    { L"RestoreScreenOnExit",   GetRestoreScreenOnExit, SetRestoreScreenOnExit },
+    { L"Emulate",               GetEmulation, SetEmulation },
 };
 
 static void ReadOptions(const WCHAR* ini_filename)

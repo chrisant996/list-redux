@@ -43,6 +43,7 @@ struct ViewerOptions
     CtrlMode ctrl_mode = CtrlMode::OEM437;
     uint8 details = 1;
     bool allow_mouse = true;
+    bool restore_screen_on_exit = true;
     bool wrapping = false;
     bool hex_mode = false;
     bool expand_tabs = true;

@@ -54,7 +54,7 @@ public:
 private:
     void            Reset();
     void            ForceUpdateAll();
-    void            UpdateDisplay();
+    void            UpdateDisplay(StrW* last_screen=nullptr);
     void            Relayout();
     void            EnsureColumnWidths();
     ChooserOutcome  HandleInput(const InputRecord& input, Error &e);
@@ -69,7 +69,7 @@ private:
     void            WaitToContinue(bool erase_after=false, bool new_line=false);
 
     ChooserOutcome  OnLeftClick(const InputRecord& input, Error& e);
-    void            DoHelp();
+    ChooserOutcome  DoHelp();
     void            ShowOriginalScreen();
     ChooserOutcome  ViewOneFile();
     ChooserOutcome  ViewTaggedFiles();
