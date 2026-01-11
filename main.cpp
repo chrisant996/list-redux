@@ -422,6 +422,10 @@ int __cdecl _tmain(int argc, const WCHAR** argv)
         {
             switch (ViewFiles(files, s, e, do_search))
             {
+            case ViewerOutcome::CHOOSER:
+                if (s.Length())
+                    chooser.Navigate(s.Text(), e);
+                break;
             case ViewerOutcome::RETURN:
                 if (navigate)
                     break;

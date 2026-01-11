@@ -44,7 +44,10 @@
   - [x] clickable
   - [x] enable/disable entries appropriately (always compute it, but only draw it if its content changed)
 - [x] `Alt-Shift-C` to save current settings into `.listredux` file as defaults
-- [ ] some ways to exit:  clear screen, restore screen, or leave screen as-is (which actually means restore the screen and then overwrite it with the List-Redux screen again before finishing exiting)
+- [x] some ways to exit:  clear screen, restore screen, or leave screen as-is (which actually means restore the screen and then overwrite it with the List-Redux screen again before finishing exiting)
+  - [x] `RestoreScreenOnExit` in `.listredux`
+  - [x] `X` and `Alt-X` force exit immediately
+  - [x] `Shift-X` and `Alt-Shift-X` force exit and do the opposite of current `RestoreScreenOnExit` setting
 - [x] optionally build with RE2 regex library
   - **FWIW:** ChatGPT and/or Claude were wrong; the MSVC implementation of ECMAScript regular expressions does allow numeric escapes like `\x40`, and it is not necessary to use the RE2 library to gain numeric escapes.  But RE2 has other benefits.
   - Manual steps for building re2 locally:
@@ -113,6 +116,7 @@
 - [x] `F5` to reprocess/reload the file (but not documented, since the file is opened with deny shared writing)
 - [x] remember scroll position in each file
 - [x] `Ctrl-T` override tab stop width
+- [x] `Alt-V` forces going to the chooser, even if the program was started with a filename and initially went directly to the viewer (it was `Alt-V` in the original LIST)
 - searching
   - [x] search in text mode (/ for case sensitive, \ for caseless)
   - [x] search in hex mode
@@ -164,7 +168,6 @@
 
 ### Future
 
-- [ ] a key to force going to the chooser, even if the program was started with a filename and initially went directly to the viewer (it was `Alt-V` in the original LIST)
 - [ ] improve message box routine (make it not full terminal width, have clickable buttons, etc)
   - [ ] mouse input in message box routine
 - [ ] some way to configure colors inside the app (could benefit from ability to navigate between different input boxes)

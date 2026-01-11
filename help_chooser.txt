@@ -2,6 +2,7 @@
 GENERAL KEYS:
 
            ESC  Exit the file chooser (and exits the LIST program).
+    Alt-X or X  Exit the program (add Shift to invert RestoreScreenOnExit).
 
        F1 or ?  Show this help.
            F12  Show original screen until a key is pressed.

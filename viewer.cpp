@@ -1939,6 +1939,12 @@ hex_edit_right:
                 }
             }
             break;
+        case 'v':
+            if (input.modifier == Modifier::ALT)
+            {
+                return ViewerOutcome::CHOOSER;
+            }
+            break;
         case 'w':
             if (input.modifier == Modifier::None)
             {
