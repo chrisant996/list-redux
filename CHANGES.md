@@ -1,3 +1,12 @@
+## v0.29 -- TBD
+
+- Added `ShowRuler` and `HexMode` config settings in `.listredux` file.
+- Added `RestoreScreenOnExit` config setting in `.listredux` file.
+- Added `X` and `Alt-X` to exit the program immediately.
+- Added `Shift-X` and `Alt-Shift-X` to exit the program and do the opposite of the current `RestoreScreenOnExit` config setting.
+- Added `Alt-V` in the viewer to force going to the chooser (even when `Esc` would exit the program).
+- Changed to remember the regex search mode during the current session.
+
 ## v0.28 -- 2026/01/04
 
 - Changed the default value of the MarkedLine color definition to avoid using reverse video.
