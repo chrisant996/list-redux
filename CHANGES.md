@@ -1,4 +1,4 @@
-## v0.29 -- TBD
+## v0.29 -- 2026/01/11
 
 - Added `ShowRuler` and `HexMode` config settings in `.listredux` file.
 - Added `RestoreScreenOnExit` config setting in `.listredux` file.
