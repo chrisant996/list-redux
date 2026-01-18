@@ -2078,6 +2078,7 @@ void Chooser::RunFile(bool edit, Error& e, bool new_console)
             {
                 PROCESS_INFORMATION pi = {};
                 STARTUPINFOW si = { sizeof(si) };
+                adapt.Init();
                 if (CreateProcessW(file.Text(), nullptr, nullptr, nullptr, false, DETACHED_PROCESS, nullptr, dir.Text(), &si, &pi))
                 {
                     CloseHandle(pi.hThread);
@@ -2117,14 +2118,9 @@ LShellExecute:
                         }
                         else
                         {
-                            adapt.Init();
-
                             PROCESS_INFORMATION pi = {};
                             STARTUPINFOW si = { sizeof(si) };
-                            si.dwFlags = STARTF_USESTDHANDLES;
-                            si.hStdInput = INVALID_HANDLE_VALUE;
-                            si.hStdOutput = INVALID_HANDLE_VALUE;
-                            si.hStdError = INVALID_HANDLE_VALUE;
+                            adapt.Init();
                             if (!CreateProcessW(nullptr, tmp.Reserve(0), nullptr, nullptr, false, DETACHED_PROCESS, nullptr, dir.Text(), &si, &pi))
                             {
                                 e.Sys();
@@ -2175,11 +2171,11 @@ LShellExecute:
             cmdline.AppendMaybeQuoted(comspec.Text());
             cmdline.Append(L" /c ");
             cmdline.Append(s);
-
-            adapt.Init();
+            cmdline.Append(L" & echo. & pause");
 
             PROCESS_INFORMATION pi = {};
             STARTUPINFOW si = { sizeof(si) };
+            adapt.Init();
             if (!CreateProcessW(nullptr, cmdline.Reserve(0), nullptr, nullptr, false, CREATE_NEW_CONSOLE, nullptr, dir.Text(), &si, &pi))
             {
                 e.Sys();
