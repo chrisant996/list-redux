@@ -21,7 +21,7 @@ GENERAL KEYS:
 
     Alt-G or G  Go to line or file offset (press again to toggle).
     Alt-J or J  Jump to marked line.
-    Alt-M or M  Mark line (or file offset in hex mode).
+    Alt-M or M  Mark the middle line (or file offset in hex mode).
     Alt-U or U  Clear marked line (unmark).
 
        F2 or '  Show list of files, jump to selected file.
@@ -76,6 +76,11 @@ MISCELLANEOUS:
          Alt-V  Exit the file viewer and go to the file chooser.
              Q  Quit from the file viewer if on the last file, otherwise go to next file.
              1  Jump to the first file in the viewer.
+
+        Ctrl-Y  Bookmark the middle line.
+         Alt-Y  Cycle through bookmarks in reverse order.
+   Alt-Shift-Y  Cycle through bookmarks in forward order.
+ Ctl-Alt-Shf-Y  Clear bookmarks.
 
 MOUSE INPUT:
 

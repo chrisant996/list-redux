@@ -122,6 +122,18 @@ void FoundOffset::Clear()
     len = 0;
 }
 
+bool FoundOffset::Equals(const FoundOffset& other) const
+{
+    if (!is_valid != !other.is_valid)
+        return false;
+    if (!is_valid && !other.is_valid)
+        return true;
+    assert(is_valid && other.is_valid);
+    if (offset == other.offset && len == other.len)
+        return true;
+    return false;
+}
+
 void FoundOffset::MarkOffset(FileOffset found_offset)
 {
     is_valid = true;
@@ -1371,7 +1383,7 @@ unsigned ContentCache::CalcMarginWidth(bool hex_mode)
     return margin;
 }
 
-unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, StrW& s, const unsigned max_width, Error& e, const WCHAR* const color, const FoundOffset* const found_line, unsigned max_len)
+unsigned ContentCache::FormatLineData(const size_t line, bool middle, unsigned left_offset, StrW& s, const unsigned max_width, Error& e, const WCHAR* const color, const FoundOffset* const found_line, unsigned max_len)
 {
     if (!EnsureFileData(line, e))
         return 0;
@@ -1407,8 +1419,11 @@ unsigned ContentCache::FormatLineData(const size_t line, unsigned left_offset, S
                 s.Append(L" ");
             s.Printf(L"%0*lx%s", m_file_size_width, offset, c_div_char);
         }
+        if (middle)
+            s.Append(L">", 1);
         s.AppendColor(norm);
-        s.Append(L" ");
+        if (!middle)
+            s.Append(L" ", 1);
 #ifdef DEBUG
         assert(cell_count(s.Text() + begin_index) == margin_width);
 #endif
@@ -1668,7 +1683,7 @@ LOut:
     return visible_len;
 }
 
-bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundOffset* found_line)
+bool ContentCache::FormatHexData(FileOffset offset, bool middle, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const WCHAR* marked_color, const FoundOffset* found_line)
 {
     offset += row * hex_bytes;
 
@@ -1718,11 +1733,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         }
     }
 
-    const WCHAR* marked_color = nullptr;
     bool highlighting_found_text = false;
-    assert(!found_line || !found_line->Empty());
-    if (found_line && offset <= found_line->offset && found_line->offset < offset + hex_bytes)
-        marked_color = GetColor(ColorElement::MarkedLine);
 
 #ifdef DEBUG
     const unsigned begin_index = s.Length();
@@ -1731,9 +1742,19 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
     // Format the offset.
     s.AppendColor((offset % 0x400 == 0) ? hilite : norm);
     s.Printf(L"%0*.*x", m_hex_size_width, m_hex_size_width, offset);
-    if (offset % 0x400 == 0)
+    if (middle)
+    {
+        s.AppendColorOverlay(norm, GetColor(ColorElement::LineNumber));
+        s.Append(L">", 1);
         s.AppendColor(norm);
-    s.Append(L"  ", 2);
+        s.Append(L" ", 1);
+    }
+    else
+    {
+        if (offset % 0x400 == 0)
+            s.AppendColor(norm);
+        s.Append(L"  ", 2);
+    }
 
     // Format line number.
     if (m_options.show_line_numbers)
@@ -1769,7 +1790,7 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
             if (ii % (1 << m_options.hex_grouping) == 0)
                 s.Append(L"  ", ((ii % 8) == 0) ? 2 : 1);
         }
-        if (marked_color && found_line->len && offset + ii == found_line->offset)
+        if (marked_color && found_line && found_line->len && offset + ii == found_line->offset)
         {
             highlighting_found_text = true;
             s.AppendColor(GetColor(ColorElement::SearchFound));
@@ -1834,12 +1855,16 @@ bool ContentCache::FormatHexData(FileOffset offset, unsigned row, unsigned hex_b
         }
         else if (marked_color)
         {
-            if (found_line->len && offset + ii == found_line->offset)
-                highlighting_found_text = true;
-            else if (highlighting_found_text && offset + ii == found_line->offset + found_line->len)
-                highlighting_found_text = false;
-            if (highlighting_found_text)
-                new_color = GetColor(ColorElement::SearchFound);
+            assert(implies(!found_line, !highlighting_found_text));
+            if (found_line)
+            {
+                if (found_line->len && offset + ii == found_line->offset)
+                    highlighting_found_text = true;
+                else if (highlighting_found_text && offset + ii == found_line->offset + found_line->len)
+                    highlighting_found_text = false;
+                if (highlighting_found_text)
+                    new_color = GetColor(ColorElement::SearchFound);
+            }
         }
 
         if (c > 0 && c < ' ')
@@ -2095,10 +2120,10 @@ bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, un
             found_line.Found(GetOffset(index) + index_in_line, needle_len);
             // Calculate horizontal scroll offset.
             tmp.Clear();
-            FormatLineData(index, 0, tmp, -1, e, nullptr, nullptr, index_in_line);
+            FormatLineData(index, false, 0, tmp, -1, e, nullptr, nullptr, index_in_line);
             const unsigned prefix_cells = cell_count(tmp.Text());
             tmp.Clear();
-            FormatLineData(index, 0, tmp, -1, e, nullptr, nullptr, index_in_line + needle_len);
+            FormatLineData(index, false, 0, tmp, -1, e, nullptr, nullptr, index_in_line + needle_len);
             const unsigned prefixneedle_cells = cell_count(tmp.Text());
             const unsigned needle_cells = prefixneedle_cells - prefix_cells;
             if (prefix_cells + needle_cells + c_find_horiz_scroll_threshold <= max_width)
@@ -2113,7 +2138,7 @@ bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, un
                 // Nudge the left offset so it doesn't scroll past the
                 // wrap width or line length.
                 tmp.Clear();
-                const unsigned line_cells = FormatLineData(index, 0, tmp, -1, e);
+                const unsigned line_cells = FormatLineData(index, false, 0, tmp, -1, e);
                 if (line_cells)
                 {
                     if (m_map.GetWrapWidth())

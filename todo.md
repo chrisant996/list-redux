@@ -127,6 +127,12 @@
   - [x] search for regex (search line by line)
   - [x] viewer should inherit most recent search string from chooser (unless viewer has a more recent search string?)
   - [ ] a way to search for raw hex bytes in hex mode -- because using regex numeric escapes like `\xAB` searches converted content (UTF16 for ECMAScript or UTF8 for RE2) rather than the raw unconverted content (unless the content is already natively UTF16 or UTF8, depending on ECMAScript or RE2)
+- bookmarks
+  - [x] 'Ctrl-Y` to add a bookmark
+  - [x] 'Alt-Y` to cycle through bookmarks in reverse order
+  - [x] 'Alt-Shift-Y` to cycle through bookmarks in forward order
+  - [x] 'Ctrl-Alt-Shift-Y` to clear bookmarks (also cleared when closing the file or exiting the viewer)
+  - [x] indicator for the middle line, when line number or file offsets are visible
 - hex mode
   - [x] always show hex ruler on a second header row
   - [x] go to offset
@@ -205,11 +211,9 @@
   - list.com shows 8 levels, but selecting any directory just goes to its top level parent directory
 - the original LIST had a "pre-loading" feature which would load the entire file into memory before displaying anything (and add a config for it)?
 - the original LIST had a "toggle screen saving" command (and add a config for it)?
-- the original LIST had up to 10 "bookmarks"; `^Y` to set a bookmark, `Alt-Y` to go to the last bookmark, and "found text" and "marked lines" are automatically treated as bookmarks (unclear how to cycle between bookmarks)
 - the original LIST had a way of marking lines (`Alt-M` for top, `Alt-B` for bottom) and writing them to a file (`Alt-D`) or appending them to the previously written file (`Alt-O`); using them repeatedly only grows the marked section; shrinking is only possible via `Alt-U` to clear the marked section and start over
 - the original LIST considers "found text" as already marked, for the purposes of `Alt-D` and `Alt-O` (and maybe other things?)
 - the original LIST had a "junk filter" feature which treated CR (0x0D) as though a LF (0x0A) follows it (even if it doesn't) and made BS (0x08) actually back up one character (and add a config for it)?
-- the original LIST had a `1` command which jumped back to the first file in the viewer, when viewing multiple files
 
 
 

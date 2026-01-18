@@ -19,6 +19,7 @@ struct FoundOffset
 {
                     FoundOffset() { Clear(); }
     bool            Empty() const { return !is_valid; }
+    bool            Equals(const FoundOffset& other) const;
     void            Clear();
     void            MarkOffset(FileOffset found_offset);
     void            Found(FileOffset found_offset, unsigned found_len);
@@ -230,8 +231,8 @@ public:
     void            ClearProcessed();
     void            SetWrapWidth(unsigned wrap);
     unsigned        CalcMarginWidth(bool hex_mode);
-    unsigned        FormatLineData(size_t line, unsigned left_offset, StrW& s, unsigned max_width, Error& e, const WCHAR* color=nullptr, const FoundOffset* found_line=nullptr, unsigned max_len=-1);
-    bool            FormatHexData(FileOffset offset, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const FoundOffset* found_line=nullptr);
+    unsigned        FormatLineData(size_t line, bool middle, unsigned left_offset, StrW& s, unsigned max_width, Error& e, const WCHAR* marked_color=nullptr, const FoundOffset* found_line=nullptr, unsigned max_len=-1);
+    bool            FormatHexData(FileOffset offset, bool middle, unsigned row, unsigned hex_bytes, StrW& s, Error& e, const WCHAR* marked_color=nullptr, const FoundOffset* found_line=nullptr);
 
     bool            ProcessThrough(size_t line, Error& e, bool cancelable=false);
     bool            ProcessToEnd(Error& e, bool cancelable=false);

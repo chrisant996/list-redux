@@ -245,12 +245,20 @@ class Viewer
 {
     friend class ScopedWorkingIndicator;
 
+    typedef std::vector<FoundOffset> BookmarkList;
+
     struct ScrollPosition
     {
-        FileOffset  top = 0;
-        unsigned    left = 0;
-        FileOffset  hex_top = 0;
-        FileOffset  hex_pos = 0;
+        FileOffset      top = 0;
+        unsigned        left = 0;
+        FileOffset      hex_top = 0;
+        FileOffset      hex_pos = 0;
+    };
+
+    struct FileStateEntry
+    {
+        ScrollPosition  scrollpos;
+        BookmarkList    bookmarks;
     };
 
 public:
@@ -262,6 +270,7 @@ public:
     StrW            GetCurrentFile() const;
 
 private:
+    // Internal worker functions.
     unsigned        CalcContentHeight() const;
     void            UpdateDisplay(StrW* last_screen=nullptr);
     void            MakeFooter(StrW& s, const WCHAR* msg=nullptr);
@@ -272,13 +281,21 @@ private:
     void            EnsureAltFiles();
     void            SetFile(intptr_t index, ContentCache* context=nullptr, bool force=false);
     size_t          CountForDisplay() const;
+    size_t          GetFoundLineIndex(const FoundOffset& found_line);
+    FileOffset      GetFoundOffset(const FoundOffset& found_line, unsigned* offset_highlight=nullptr);
+    unsigned        GetMarkRow() const;
+    FoundOffset     MakeBookmark() const;
+    bool            IsBookmarked(FileOffset row_offset, unsigned row_length) const;
+
+    // Command functions.
     void            DoSearch(bool next, bool caseless);
     void            FindNext(bool next=true);
     void            JumpNextEdit(bool next=true);
+    void            ClearBookmarks();
+    void            SetBookmark();
+    void            JumpBookmark(bool next=true);
     void            Center(const FoundOffset& found_line);
     void            GoTo(Error& e);
-    size_t          GetFoundLineIndex(const FoundOffset& found_line);
-    FileOffset      GetFoundOffset(const FoundOffset& found_line, unsigned* offset_highlight=nullptr);
     void            ShowFileList();
     void            ChooseEncoding();
     void            ChooseTabWidth();
@@ -316,7 +333,7 @@ private:
     StrW            m_title;
     const char*     m_text = nullptr;
     const std::vector<StrW>* m_files = nullptr;
-    std::map<const WCHAR*, ScrollPosition> m_file_positions;
+    std::map<const WCHAR*, FileStateEntry> m_file_state_map;
     std::vector<StrW> m_alt_files;
     intptr_t        m_index = -1;
 
@@ -373,6 +390,9 @@ private:
 
     bool            m_multifile_search = false;
     FoundOffset     m_found_line;
+
+    size_t          m_cur_bookmark = -1;
+    std::vector<FoundOffset> m_bookmarks;
 };
 
 void ScopedWorkingIndicator::ShowFeedback(bool completed, unsigned __int64 processed, unsigned __int64 target, Viewer* viewer, bool bytes)
@@ -970,7 +990,16 @@ LAutoFitContentWidth:
                 if (update_content || (update_hex_edit && m_hex_top + (row * m_hex_width) == update_hex_edit_offset))
                 {
                     const uint32 orig_length = s.Length();
-                    m_context.FormatHexData(m_hex_top, row, m_hex_width, s, e, found_line);
+                    const WCHAR* marked_color = nullptr;
+                    const FileOffset row_offset = m_hex_top + (row * m_hex_width);
+
+                    assert(!found_line || !found_line->Empty());
+                    if (found_line && row_offset <= found_line->offset && found_line->offset < row_offset + m_hex_width)
+                        marked_color = GetColor(ColorElement::MarkedLine);
+                    if ((!marked_color || !found_line || found_line->len) && IsBookmarked(row_offset, m_hex_width))
+                        marked_color = GetColor(ColorElement::BookmarkedLine);
+
+                    m_context.FormatHexData(m_hex_top, row == GetMarkRow(), row, m_hex_width, s, e, marked_color, found_line);
 
                     if (m_vert_scroll_car.has_car())
                     {
@@ -1026,15 +1055,17 @@ LAutoFitContentWidth:
                 }
                 else if (m_top + row < m_context.Count())
                 {
-                    const WCHAR* color = nullptr;
-                    if (found_line)
-                    {
-                        const FileOffset row_offset = m_context.GetOffset(m_top + row);
-                        const size_t row_length = m_context.GetLength(m_top + row);
-                        if (row_offset <= found_line->offset && found_line->offset < row_offset + max<size_t>(1, row_length))
-                            color = GetColor(ColorElement::MarkedLine);
-                    }
-                    const unsigned width = m_context.FormatLineData(m_top + row, m_left, s, m_content_width, e, color, found_line);
+                    const WCHAR* marked_color = nullptr;
+                    const FileOffset row_offset = m_context.GetOffset(m_top + row);
+                    const unsigned row_length = m_context.GetLength(m_top + row);
+
+                    assert(!found_line || !found_line->Empty());
+                    if (found_line && row_offset <= found_line->offset && found_line->offset < row_offset + max<size_t>(1, row_length))
+                        marked_color = GetColor(ColorElement::MarkedLine);
+                    if ((!marked_color || !found_line || found_line->len) && IsBookmarked(row_offset, row_length))
+                        marked_color = GetColor(ColorElement::BookmarkedLine);
+
+                    const unsigned width = m_context.FormatLineData(m_top + row, row == GetMarkRow(), m_left, s, m_content_width, e, marked_color, found_line);
                     if (width < m_content_width || show_scrollbar)
                     {
                         // WARNING:  Presumably this is actually defined VT
@@ -1796,6 +1827,12 @@ hex_edit_right:
                 }
             }
             break;
+        case 'Y'-'@':   // CTRL-Y
+            if (input.modifier == Modifier::CTRL)
+            {
+                SetBookmark();
+            }
+            break;
         case 'Z'-'@':   // CTRL-Z
             if (input.modifier == Modifier::CTRL)
             {
@@ -1905,12 +1942,7 @@ hex_edit_right:
         case 'm':
             if (!HasModifier(input.modifier, ~Modifier::ALT))
             {
-                if (!m_hex_mode)
-                    m_found_line.MarkOffset(m_context.GetOffset(m_top + (std::min<size_t>(m_content_height, m_context.Count()) / 2)));
-                else if (!m_hex_edit)
-                    m_found_line.MarkOffset(std::min<FileOffset>(m_hex_top + (m_content_height / 2) * m_hex_width, m_context.GetFileSize()));
-                else
-                    m_found_line.MarkOffset(m_hex_pos);
+                m_found_line = MakeBookmark();
                 m_force_update = true;
             }
             break;
@@ -1987,6 +2019,21 @@ hex_edit_right:
                 if (HasModifier(input.modifier, Modifier::SHIFT))
                     g_options.restore_screen_on_exit = !g_options.restore_screen_on_exit;
                 return ViewerOutcome::EXITAPP;
+            }
+            break;
+        case 'y':
+        case 'Y':
+            if (input.modifier == (Modifier::ALT|Modifier::CTRL|Modifier::SHIFT))
+            {
+                ClearBookmarks();
+            }
+            else if (input.modifier == (Modifier::ALT) ||
+                     input.modifier == (Modifier::ALT|Modifier::SHIFT))
+            {
+                // For everything else, SHIFT means "prev", but for bookmarks
+                // SHIFT means "next" for compatibility with LIST.COM where
+                // ALT-Y is "prev bookmark" and there was no "next bookmark".
+                JumpBookmark(HasModifier(input.modifier, Modifier::SHIFT)/*next*/);
             }
             break;
 
@@ -2237,18 +2284,18 @@ void Viewer::EnsureAltFiles()
         for (const auto& file : *m_files)
             m_alt_files.emplace_back(file);
 
-        // Rebuild the file positions list.
-        std::map<const WCHAR*, ScrollPosition> alt_positions;
+        // Rebuild the file state map.
+        std::map<const WCHAR*, FileStateEntry> alt_state_map;
         for (size_t i = 0; i < m_files->size(); ++i)
         {
-            auto& fpos = m_file_positions.find((*m_files)[i].Text());
-            if (fpos != m_file_positions.end())
-                alt_positions.emplace(m_alt_files[i].Text(), fpos->second);
+            auto& state = m_file_state_map.find((*m_files)[i].Text());
+            if (state != m_file_state_map.end())
+                alt_state_map.emplace(m_alt_files[i].Text(), state->second);
         }
 
         // Switch to using the modifiable list.
         m_files = &m_alt_files;
-        m_file_positions = std::move(alt_positions);
+        m_file_state_map = std::move(alt_state_map);
     }
 }
 
@@ -2285,31 +2332,34 @@ void Viewer::SetFile(intptr_t index, ContentCache* context, bool force)
 
     if (m_index >= 0)
     {
-        auto& oldfpos = m_file_positions.find((*m_files)[m_index].Text());
-        if (oldfpos != m_file_positions.end())
+        auto& oldstate = m_file_state_map.find((*m_files)[m_index].Text());
+        if (oldstate != m_file_state_map.end())
         {
-            oldfpos->second.top = m_top;
-            oldfpos->second.left = m_left;
-            oldfpos->second.hex_top = m_hex_top;
-            oldfpos->second.hex_pos = m_hex_pos;
+            oldstate->second.scrollpos.top = m_top;
+            oldstate->second.scrollpos.left = m_left;
+            oldstate->second.scrollpos.hex_top = m_hex_top;
+            oldstate->second.scrollpos.hex_pos = m_hex_pos;
+            oldstate->second.bookmarks = m_bookmarks;
         }
     }
 
-    auto& newfpos = m_file_positions.find((*m_files)[index].Text());
-    if (newfpos != m_file_positions.end())
+    auto& newstate = m_file_state_map.find((*m_files)[index].Text());
+    if (newstate != m_file_state_map.end())
     {
-        m_top = newfpos->second.top;
-        m_left = newfpos->second.left;
-        m_hex_top = newfpos->second.hex_top;
-        m_hex_pos = newfpos->second.hex_pos;
+        m_top = newstate->second.scrollpos.top;
+        m_left = newstate->second.scrollpos.left;
+        m_hex_top = newstate->second.scrollpos.hex_top;
+        m_hex_pos = newstate->second.scrollpos.hex_pos;
+        m_bookmarks = newstate->second.bookmarks;
     }
     else
     {
-        m_file_positions.emplace((*m_files)[index].Text(), ScrollPosition());
+        m_file_state_map.emplace((*m_files)[index].Text(), FileStateEntry());
         m_top = 0;
         m_left = 0;
         m_hex_top = 0;
         m_hex_pos = 0;
+        m_bookmarks.clear();
     }
 
     m_errmsg.Clear();
@@ -2522,6 +2572,80 @@ void Viewer::JumpNextEdit(bool next)
             Center(found);
         }
     }
+}
+
+unsigned Viewer::GetMarkRow() const
+{
+    if (!m_hex_mode)
+        return unsigned(std::min<size_t>(m_content_height, m_context.Count()) / 2);
+    else if (!m_hex_edit)
+        return unsigned(std::min<size_t>(m_content_height / 2, (m_context.GetFileSize() + m_hex_width - 1) / m_hex_width / 2));
+    else
+    {
+        assert(m_hex_pos >= m_hex_pos && m_hex_pos < m_hex_top + m_content_height * m_hex_width);
+        return unsigned((m_hex_pos - m_hex_top) / m_hex_width);
+    }
+}
+
+FoundOffset Viewer::MakeBookmark() const
+{
+    FoundOffset bookmark;
+    if (!m_hex_mode)
+        bookmark.MarkOffset(m_context.GetOffset(m_top + GetMarkRow()));
+    else if (!m_hex_edit)
+        bookmark.MarkOffset(std::min<FileOffset>(m_hex_top + GetMarkRow() * m_hex_width, m_context.GetFileSize()));
+    else
+        bookmark.MarkOffset(m_hex_pos);
+    return bookmark;
+}
+
+bool Viewer::IsBookmarked(FileOffset row_offset, unsigned row_length) const
+{
+    for (const auto& bm : m_bookmarks)
+    {
+        assert(!bm.len);
+        if (row_offset <= bm.offset && bm.offset < row_offset + row_length)
+            return true;
+    }
+    return false;
+}
+
+void Viewer::ClearBookmarks()
+{
+    if (!m_bookmarks.empty())
+    {
+        m_cur_bookmark = -1;
+        m_bookmarks.clear();
+        m_force_update = true;
+    }
+}
+
+void Viewer::SetBookmark()
+{
+    FoundOffset bookmark = MakeBookmark();
+
+    // Prevent setting the same bookmark multiple times in a row.
+    if (!m_bookmarks.empty() && bookmark.Equals(m_bookmarks.back()))
+        return;
+
+    // Add bookmark at end.
+    m_bookmarks.emplace_back(bookmark);
+    m_force_update = true;
+}
+
+void Viewer::JumpBookmark(bool next)
+{
+    if (m_bookmarks.empty())
+        return;
+
+    size_t cur = m_cur_bookmark;
+    if (cur >= m_bookmarks.size())
+        cur = next ? (0) : (m_bookmarks.size() - 1);
+    else
+        cur = (next ? (cur + 1) : (cur + m_bookmarks.size() - 1)) % m_bookmarks.size();
+
+    m_cur_bookmark = cur;
+    Center(m_bookmarks[cur]);
 }
 
 void Viewer::Center(const FoundOffset& found_line)
@@ -2804,7 +2928,7 @@ ViewerOutcome Viewer::CloseCurrentFile(Error& e)
     if (m_text || m_files->size() <= 1)
         return ViewerOutcome::RETURN;
 
-    m_file_positions.erase((*m_files)[m_index].Text());
+    m_file_state_map.erase((*m_files)[m_index].Text());
 
     EnsureAltFiles();
     m_alt_files.erase(m_alt_files.begin() + m_index);

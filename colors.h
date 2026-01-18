@@ -71,6 +71,7 @@ enum class ColorElement
     FilteredByte,
     EndOfFileLine,
     MarkedLine,
+    BookmarkedLine,
     SearchFound,
     EditedByte,
     SavedByte,

@@ -78,6 +78,7 @@ static const WCHAR* c_default_colors[] =
     L"90",              // FilteredByte
     L"7",               // EndOfFileLine
     L"30;47",           // MarkedLine
+    L"30;43",           // BookmarkedLine
     L"7;36",            // SearchFound
     L"97;45",           // EditedByte
     L"97;42",           // SavedByte
@@ -862,6 +863,7 @@ static const WCHAR* const c_reg_color_name[] =
     L"FilteredByte",
     L"EndOfFileLine",
     L"MarkedLine",
+    L"BookmarkedLine",
     L"SearchFound",
     L"EditedByte",
     L"SavedByte",
