@@ -5,6 +5,7 @@
 
 #include "pch.h"
 #include "filesys.h"
+#include "fileinfo.h"
 
 FileType GetFileType(const WCHAR* p)
 {
@@ -133,4 +134,95 @@ int Recycle(const std::vector<StrW>& names, Error& e)
     }
 
     return 1;
+}
+
+SubsystemType GetExecutableSubsystem(const wchar_t* p)
+{
+    SubsystemType result = SubsystemType::Unknown;
+
+    do
+    {
+        const wchar_t* ext = FindExtension(p);
+        if (!ext)
+            break;
+        if (!wcsicmp(ext, L".cmd") || !wcsicmp(ext, L".bat"))
+        {
+            result = SubsystemType::Console;
+            break;
+        }
+        if (wcsicmp(ext, L".exe") && wcsicmp(ext, L".com"))
+            break;
+
+        SHFile shFile;
+        DWORD bytesRead;
+
+        shFile = CreateFileW(p, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (!shFile)
+            break;
+
+        IMAGE_DOS_HEADER dosHeader;
+        if (!ReadFile(shFile, &dosHeader, sizeof(dosHeader), &bytesRead, nullptr))
+            break;
+        if (bytesRead != sizeof(dosHeader))
+            break;
+        if (dosHeader.e_magic != IMAGE_DOS_SIGNATURE)
+            break;
+
+        if (SetFilePointer(shFile, dosHeader.e_lfanew, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
+            break;
+
+        DWORD ntSignature;
+        if (!ReadFile(shFile, &ntSignature, sizeof(ntSignature), &bytesRead, nullptr))
+            break;
+        if (bytesRead != sizeof(ntSignature))
+            break;
+        if (ntSignature != IMAGE_NT_SIGNATURE)
+            break;
+
+        IMAGE_FILE_HEADER fileHeader;
+        if (!ReadFile(shFile, &fileHeader, sizeof(fileHeader), &bytesRead, nullptr))
+            break;
+        if (bytesRead != sizeof(fileHeader))
+            break;
+
+        WORD magic;
+        if (!ReadFile(shFile, &magic, sizeof(magic), &bytesRead, nullptr))
+            break;
+        if (bytesRead != sizeof(magic))
+            break;
+
+        DWORD subsystemOffset = 0;
+        switch (magic)
+        {
+        case IMAGE_NT_OPTIONAL_HDR32_MAGIC:
+        case IMAGE_NT_OPTIONAL_HDR64_MAGIC:
+            // 32-bit and 64-bit: Subsystem is at offset 68 in optional header.
+            subsystemOffset = dosHeader.e_lfanew + sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER) + 68;
+            break;
+        }
+        if (!subsystemOffset)
+            break;
+
+        if (SetFilePointer(shFile, subsystemOffset, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
+            break;
+
+        WORD subsystem;
+        if (!ReadFile(shFile, &subsystem, sizeof(subsystem), &bytesRead, nullptr))
+            break;
+        if (bytesRead != sizeof(subsystem))
+            break;
+
+        switch (subsystem)
+        {
+        case IMAGE_SUBSYSTEM_WINDOWS_GUI:
+            result = SubsystemType::GUI;
+            break;
+        case IMAGE_SUBSYSTEM_WINDOWS_CUI:
+            result = SubsystemType::Console;
+            break;
+        }
+    }
+    while (false);
+
+    return result;
 }

@@ -21,6 +21,7 @@
 #include "os.h"
 
 #include <algorithm>
+#include <shlwapi.h>
 
 constexpr bool c_floating = true;
 constexpr scroll_bar_style c_sbstyle = scroll_bar_style::half_line_chars;
@@ -49,6 +50,177 @@ enum
     ID_RUN,
     ID_ORIGSCREEN,
 };
+
+class SH_RegCloseKey { protected: void Free(HANDLE h) { RegCloseKey(HKEY(h)); } };
+
+class AdaptiveWait
+{
+public:
+                    AdaptiveWait() = default;
+                    ~AdaptiveWait() = default;
+    void            Init();
+    bool            NeedAdapt() const { return m_adapt && m_shProcess; }
+    bool            NeedWait() const;
+    void            AttachWaitProcess(HANDLE hProcess) { assert(m_adapt); m_shProcess = hProcess; }
+    HANDLE          GetWaitProcess() const { return m_shProcess; }
+private:
+    COORD           m_before;
+    SHBasic         m_shProcess;
+    bool            m_adapt = false;
+};
+
+void AdaptiveWait::Init()
+{
+    // Make sure the cursor is positioned far enough from the bottom of the
+    // terminal that it's possible to detect if it moves, and whether it moves
+    // by more than one line.
+    OutputConsole(L"\r\n\r\n\x1b[2A");
+
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+        return;
+
+    m_before = csbi.dwCursorPosition;
+    m_adapt = true;
+}
+
+bool AdaptiveWait::NeedWait() const
+{
+    if (!m_adapt || !m_shProcess)
+        return true;
+
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    const HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (!GetConsoleScreenBufferInfo(hout, &csbi))
+        return true;
+
+    if (m_before.X || csbi.dwCursorPosition.X)
+        return true;
+
+    // If the cursor didn't move, then don't need to wait.
+    if (m_before.Y == csbi.dwCursorPosition.Y)
+        return false;
+
+    // If the cursor moved by more than one line (or if the cursor position
+    // makes it impossible to tell), then need to wait.
+    const DWORD colsrows = GetConsoleColsRows();
+    const unsigned terminal_width = LOWORD(colsrows);
+    const unsigned terminal_height = HIWORD(colsrows);
+    if (unsigned(m_before.Y + 2) >= terminal_height)
+        return true;
+    if (m_before.Y != csbi.dwCursorPosition.Y - 1)
+        return true;
+
+    // The cursor moved by one line.  Check if the output was a blank line.
+    StrW buffer;
+    DWORD len = 0;
+    if (!buffer.Reserve(terminal_width + 1/*for NUL*/))
+        return true;
+    if (!ReadConsoleOutputCharacterW(hout, buffer.Reserve(0), terminal_width, m_before, &len))
+        return true;
+
+    buffer.OverrideLength(len);
+    buffer.Append(L""); // Force NUL termination, just for thoroughness.
+    while (true)
+    {
+        DWORD len = buffer.Length();
+        if (!len)
+            break;
+        --len;
+        if (!iswspace(buffer.Text()[len]))
+            break;
+        buffer.SetLength(len);
+    }
+
+    // If the output was a blank line, then don't need to wait.
+    return !buffer.Empty();
+}
+
+bool __AssocQueryString(ASSOCF assocf, ASSOCSTR assocstr, const WCHAR* ext, StrW& out, Error& e)
+{
+    DWORD len = 0;
+    HRESULT hr = AssocQueryStringW(assocf, assocstr, ext, nullptr, nullptr, &len);
+    if (FAILED(hr))
+    {
+LFailed:
+        e.Sys();
+        return false;
+    }
+
+    if (hr != S_FALSE || !len || len > 4096)
+    {
+LInvalid:
+        e.Sys(ERROR_INVALID_DATA);
+        return false;
+    }
+
+    out.Clear();
+    WCHAR* data = out.Reserve(len);
+    out.ResyncLength();
+    hr = AssocQueryStringW(assocf, assocstr, ext, nullptr, data, &len);
+    if (FAILED(hr))
+        goto LFailed;
+
+    if (hr == S_FALSE || len > out.Capacity())
+        goto LInvalid;
+
+    return true;
+}
+
+bool __ShellExecuteEx(const WCHAR* file, const WCHAR* dir, AdaptiveWait* adapt, Error& e)
+{
+    e.Clear();
+
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.fMask = SEE_MASK_NO_CONSOLE|SEE_MASK_FLAG_DDEWAIT|SEE_MASK_FLAG_NO_UI;
+    sei.hwnd = GetConsoleWindow();
+    sei.lpFile = file;
+    sei.lpDirectory = dir;
+    sei.nShow = SW_SHOWNORMAL;
+
+    if (adapt)
+    {
+        adapt->Init();
+        sei.fMask |= SEE_MASK_NOCLOSEPROCESS;
+    }
+
+    if (!ShellExecuteExW(&sei))
+        e.Sys();
+
+    if (adapt)
+        adapt->AttachWaitProcess(sei.hProcess);
+
+    return !e.Test();
+}
+
+static bool ReplaceArg(StrW& s, const WCHAR* arg)
+{
+    StrW out;
+    bool replaced = false;
+
+    const WCHAR* in = s.Text();
+    while (*in)
+    {
+        const WCHAR* sub = wcsstr(in, L"\"%1\"");
+        if (!sub)
+        {
+            out.Append(in);
+            break;
+        }
+        replaced = true;
+        out.Append(in, sub - in);
+        out.Append(L"\"");
+        out.Append(arg);
+        out.Append(L"\"");
+        in = sub + 4;
+    }
+
+    if (!replaced)
+        return false;
+
+    s = std::move(out);
+    return true;
+}
 
 static void ApplyAttr(DWORD& mask, DWORD& attr, bool& minus, DWORD flag)
 {
@@ -86,7 +258,7 @@ static bool MkDir(const WCHAR* dir, Error& e)
     return false;
 }
 
-static bool RunProgram(const WCHAR* commandline, Error& e)
+static bool RunProgram(const WCHAR* commandline)
 {
     errno = 0;
     return (_wsystem(commandline) >= 0 || !errno);
@@ -861,7 +1033,7 @@ LNext:
         switch (input.key_char)
         {
         case '?':
-            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::SHIFT)))
             {
                 if (ViewHelp(Help::CHOOSER, e) == ViewerOutcome::EXITAPP)
                     return ChooserOutcome::EXITAPP;
@@ -882,7 +1054,7 @@ LNext:
 
         case '\'':
         case '@':
-            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::SHIFT)))
             {
                 ShowFileList();
             }
@@ -899,21 +1071,21 @@ LNext:
 
         case 's':
         case 'S':
-            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::SHIFT)))
             {
                 SearchAndTag(e, input.modifier == Modifier::None/*caseless*/);
             }
             break;
         case '/':
         case '\\':
-            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::SHIFT)))
             {
                 SearchAndTag(e, input.key_char == '\\'/*caseless*/);
             }
             break;
 
         case '*':
-            if ((input.modifier & (Modifier::ALT|Modifier::CTRL)) == Modifier::None)
+            if (!HasModifier(input.modifier, (Modifier::ALT|Modifier::CTRL)))
             {
                 RefreshDirectoryListing(e);
             }
@@ -963,13 +1135,14 @@ LNext:
             }
             break;
         case 'r':
+        case 'R':
             if (input.modifier == Modifier::None)
             {
                 RenameEntry(e);
             }
-            else if (input.modifier == Modifier::ALT)
+            else if (MatchModifier(input.modifier, Modifier::ALT|Modifier::CTRL, Modifier::ALT))
             {
-                RunFile(false/*edit*/, e);
+                RunFile(false/*edit*/, e, HasModifier(input.modifier, Modifier::SHIFT));
             }
             break;
         case 'w':
@@ -980,9 +1153,9 @@ LNext:
             break;
         case 'x':
         case 'X':
-            if ((input.modifier & ~(Modifier::ALT|Modifier::SHIFT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::ALT|Modifier::SHIFT)))
             {
-                if ((input.modifier & Modifier::SHIFT) == Modifier::SHIFT)
+                if (HasModifier(input.modifier, Modifier::SHIFT))
                     g_options.restore_screen_on_exit = !g_options.restore_screen_on_exit;
                 return ChooserOutcome::EXITAPP;
             }
@@ -1830,49 +2003,211 @@ void Chooser::DeleteEntries(Error& e, bool recycle)
     }
 }
 
-void Chooser::RunFile(bool edit, Error& e)
+void Chooser::RunFile(bool edit, Error& e, bool new_console)
 {
     const StrW file = GetSelectedFile(true/*only_files*/).Text();
     if (file.Empty())
         return;
 
-    StrW s;
-    if (edit)
-    {
-        StrW editor;
-        if (!OS::GetEnv(L"EDITOR", editor))
-            editor = L"notepad.exe";
-        s.AppendMaybeQuoted(editor.Text());
-        s.Append(L" ");
-        s.AppendMaybeQuoted(file.Text());
-    }
-    else
-    {
-        bool ok = false;
 #ifdef DISALLOW_DESTRUCTIVE_OPERATIONS
+    if (!edit)
+    {
         SetLastError(ERROR_ACCESS_DENIED);
         e.Sys(L"(Destructive operations are disallowed.)");
-#else
-        s.AppendMaybeQuoted(file.Text());
-#endif
-    }
-
-    if (s.Empty())
         return;
+    }
+#endif
 
-    // Swap back to original screen and console modes.
+    PathW dir;
+    dir.Set(m_dir);
+    dir.ToParent();                     // Strip file mask.
+
+    // GOAL:  When launching a GUI app, let it launch asynchronously without
+    // access to our console, don't wait for it to exit, and don't prompt the
+    // user to continue.
+    //
+    // IMPORTANT:  It'd be understandable to expect that launching a GUI app
+    // could simply launch it without a console and return immediately without
+    // waiting or prompting.  But no.  Unfortunately, even when launching a
+    // new process with DETACH_PROCESS or CREATE_NEW_CONSOLE and no STD
+    // handles, the process can still aggressively track down our console and
+    // forcibly write to it.  This isn't hypothetical, it's confirmed:  Visual
+    // Studio Code does exactly that (and it looks like Electron itself is
+    // doing that, so maybe all Electron apps do that).  So, to mitigate that
+    // kind of (asynchronous!!) corruption of the console, certain measures
+    // are taken here.
+    //
+    // The conservative procedure is:  (1) restore the original screen (2)
+    // print a message (3) launch the app (4) wait for it to exit (5) prompt
+    // the user to press a key to continue (6) swap to the alternate screen
+    // again and redraw the app display.
+    //
+    // When launching a GUI app, the procedure is modified slightly:  (4) use
+    // WaitForInputIdle instead of waiting for the app to exit (5) check if
+    // the cursor moved during WaitForInputIdle and if not then skip prompting
+    // the user.
+
+    // (1) Swap back to original screen and console modes.
     std::unique_ptr<Interactive> inverted = m_interactive->MakeReverseInteractive();
 
+    // (2) Print a note that the file is being edited or ran.
     StrW msg;
     msg.Printf(L"\r\n%s '%s'...\r\n", edit ? L"Editing" : L"Running", file.Text());
     OutputConsole(msg.Text(), msg.Length());
 
-    RunProgram(s.Text(), e);
+    // (3) Launch the app (what a convoluted mess this is).
+    AdaptiveWait adapt;
+    do
+    {
+        StrW s;
+        if (edit)
+        {
+            // Launching an editor always waits (unless optionally running in
+            // a new console window).
+            StrW editor;
+            if (!OS::GetEnv(L"EDITOR", editor))
+                editor = L"notepad.exe";
+            s.AppendMaybeQuoted(editor.Text());
+            s.Append(L" ");
+            s.AppendMaybeQuoted(file.Text());
+        }
+        else
+        {
+            // If it's a GUI program then run without waiting for it to exit.
+            if (GetExecutableSubsystem(file.Text()) == SubsystemType::GUI)
+            {
+                PROCESS_INFORMATION pi = {};
+                STARTUPINFOW si = { sizeof(si) };
+                if (CreateProcessW(file.Text(), nullptr, nullptr, nullptr, false, DETACHED_PROCESS, nullptr, dir.Text(), &si, &pi))
+                {
+                    CloseHandle(pi.hThread);
+                    adapt.AttachWaitProcess(pi.hProcess);
+                }
+                else
+                {
+                    e.Sys();
+                    if (e.Code() == ERROR_BAD_EXE_FORMAT)
+                        __ShellExecuteEx(file.Text(), dir.Text(), &adapt, e);
+                }
+                break;
+            }
 
-    if (!edit)
+            StrW ext(FindExtension(file.Text()));
+            if (!ext.Empty())
+            {
+                StrW tmp;
+                const ASSOCF assocf = ASSOCF_INIT_IGNOREUNKNOWN|ASSOCF_NOFIXUPS|ASSOCF_NOTRUNCATE;
+                if (__AssocQueryString(assocf, ASSOCSTR_EXECUTABLE, ext.Text(), tmp, e))
+                {
+                    // If the file is associated with a GUI program, then launch
+                    // it without waiting for the process to exit.
+                    if (GetExecutableSubsystem(tmp.Text()) == SubsystemType::GUI)
+                    {
+                        // Using ShellExecuteEx to run a .cpp file associated with
+                        // VS Code results in something printing a newline to the
+                        // console, and it happens asynchronously.  Attempt to
+                        // prevent that by launching with CreateProcess and
+                        // DETACHED_PROCESS.  (Note that replacing the STD handles
+                        // does not prevent it.)
+                        if (!__AssocQueryString(assocf, ASSOCSTR_COMMAND, ext.Text(), tmp, e) ||
+                            !ReplaceArg(tmp, file.Text()))
+                        {
+LShellExecute:
+                            __ShellExecuteEx(file.Text(), dir.Text(), &adapt, e);
+                        }
+                        else
+                        {
+                            adapt.Init();
+
+                            PROCESS_INFORMATION pi = {};
+                            STARTUPINFOW si = { sizeof(si) };
+                            si.dwFlags = STARTF_USESTDHANDLES;
+                            si.hStdInput = INVALID_HANDLE_VALUE;
+                            si.hStdOutput = INVALID_HANDLE_VALUE;
+                            si.hStdError = INVALID_HANDLE_VALUE;
+                            if (!CreateProcessW(nullptr, tmp.Reserve(0), nullptr, nullptr, false, DETACHED_PROCESS, nullptr, dir.Text(), &si, &pi))
+                            {
+                                e.Sys();
+                            }
+                            else
+                            {
+                                CloseHandle(pi.hThread);
+                                adapt.AttachWaitProcess(pi.hProcess);
+                            }
+                        }
+                        break;
+                    }
+                }
+                else if (__AssocQueryString(assocf, ASSOCSTR_PROGID, ext.Text(), tmp, e))
+                {
+                    // For UWP/Store apps, AssocQueryStringW doesn't return an
+                    // executable path.  To check that case, get the ProgId and
+                    // check if there's a PackageId registry value.  If yes, then
+                    // launch via ShellExecuteEx without waiting for the process
+                    // to exit.
+                    DWORD dwType = 0;
+                    SH<HKEY, 0, SH_RegCloseKey> shKey;
+                    tmp.Append(L"\\Shell\\open");
+                    if (RegOpenKey(HKEY_CLASSES_ROOT, tmp.Text(), &shKey) == ERROR_SUCCESS &&
+                        RegQueryValueExW(shKey, L"PackageId", nullptr, &dwType, nullptr, nullptr) == ERROR_SUCCESS &&
+                        dwType == REG_SZ)
+                    {
+                        goto LShellExecute;
+                    }
+                }
+            }
+
+            s.AppendMaybeQuoted(file.Text());
+        }
+
+        // Optionally run the file in a new console window.
+        if (new_console)
+        {
+            PathW dir;
+            dir.Set(m_dir);
+            dir.ToParent();                 // Strip file mask.
+
+            StrW comspec;
+            if (!OS::GetEnv(L"COMSPEC", comspec))
+                comspec = L"cmd.exe";
+
+            StrW cmdline;
+            cmdline.AppendMaybeQuoted(comspec.Text());
+            cmdline.Append(L" /c ");
+            cmdline.Append(s);
+
+            adapt.Init();
+
+            PROCESS_INFORMATION pi = {};
+            STARTUPINFOW si = { sizeof(si) };
+            if (!CreateProcessW(nullptr, cmdline.Reserve(0), nullptr, nullptr, false, CREATE_NEW_CONSOLE, nullptr, dir.Text(), &si, &pi))
+            {
+                e.Sys();
+            }
+            else
+            {
+                CloseHandle(pi.hThread);
+                adapt.AttachWaitProcess(pi.hProcess);
+            }
+            break;
+        }
+
+        // (4a) Wait for the process to exit.
+        RunProgram(s.Text());
+    }
+    while (false);
+
+    // (4b) Wait for input idle.
+    if (adapt.NeedAdapt())
+    {
+        WaitForInputIdle(adapt.GetWaitProcess(), 10000);
+    }
+
+    // (5) Maybe prompt before continuing.
+    if (!edit && adapt.NeedWait())
         WaitToContinue(true/*erase_after*/, true/*new_line*/);
 
-    // Swap back to alternate screen and console modes.
+    // (6) Swap back to alternate screen and console modes.
     inverted.reset();
 
     ForceUpdateAll();
@@ -1991,7 +2326,7 @@ void Chooser::SweepFiles(Error& e)
             s.Append(L" ");
             s.Append(args_after.Text());
         }
-        ok = RunProgram(s.Text(), e);
+        ok = RunProgram(s.Text());
 #endif
         if (!ok)
         {

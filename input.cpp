@@ -48,6 +48,24 @@ static DWORD GetButtonState()
 
 #pragma endregion //dwButtonState workaround
 
+bool HasModifier(const Modifier modifier, const Modifier mask)
+{
+    assert(mask != Modifier::None);
+    return ((modifier & mask) != Modifier::None);
+}
+
+bool MatchModifier(const Modifier modifier, const Modifier mask)
+{
+    assert(mask != Modifier::None);
+    return ((modifier & mask) == mask);
+}
+
+bool MatchModifier(const Modifier modifier, const Modifier mask, const Modifier match)
+{
+    assert(mask != Modifier::None);
+    return ((modifier & mask) == match);
+}
+
 InputRecord::InputRecord()
 {
 #ifdef DEBUG

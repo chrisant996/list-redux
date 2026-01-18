@@ -79,7 +79,7 @@ private:
     void            NewDirectory(Error& e);
     void            RenameEntry(Error& e);
     void            DeleteEntries(Error& e, bool recycle);
-    void            RunFile(bool edit, Error& e);
+    void            RunFile(bool edit, Error& e, bool new_console=false);
     void            SweepFiles(Error& e);
     void            ShowFileList();
     void            SearchAndTag(Error& e, bool caseless);

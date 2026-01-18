@@ -83,6 +83,10 @@ enum class Modifier
 };
 DEFINE_ENUM_FLAG_OPERATORS(Modifier);
 
+bool HasModifier(const Modifier modifier, const Modifier mask);
+bool MatchModifier(const Modifier modifier, const Modifier mask);
+bool MatchModifier(const Modifier modifier, const Modifier mask, const Modifier match);
+
 struct InputRecord
 {
                     InputRecord();

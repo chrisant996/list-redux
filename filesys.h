@@ -12,3 +12,6 @@ FileType GetFileType(const WCHAR* p);
 
 int Recycle(const std::vector<StrW>& names, Error& e);
 
+enum class SubsystemType { Unknown, Console, GUI };
+SubsystemType GetExecutableSubsystem(const wchar_t* p);
+

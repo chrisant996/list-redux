@@ -1348,7 +1348,7 @@ ViewerOutcome Viewer::HandleInput(const InputRecord& input, Error& e)
         switch (input.key)
         {
         case Key::F1:
-            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::SHIFT)))
             {
                 return DoHelp();
             }
@@ -1620,7 +1620,7 @@ hex_edit_right:
         case Key::F3:
             {
                 // F3 = forward, Shift-F3 = backward.
-                const bool next = (input.modifier & Modifier::SHIFT) == Modifier::None;
+                const bool next = !HasModifier(input.modifier, Modifier::SHIFT);
                 FindNext(next);
             }
             break;
@@ -1705,7 +1705,7 @@ hex_edit_right:
                     break;
                 case 'a':   case 'b':   case 'c':   case 'd':   case 'e':   case 'f':
                 case 'A':   case 'B':   case 'C':   case 'D':   case 'E':   case 'F':
-                    if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
+                    if (!HasModifier(input.modifier, ~Modifier::SHIFT))
                     {
                         const BYTE ten_char = (input.key_char >= 'a' && input.key_char <= 'f') ? 'a' : 'A';
                         const BYTE value = input.key_char - ten_char + 10;
@@ -1716,7 +1716,7 @@ hex_edit_right:
                     break;
                 }
             }
-            else if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
+            else if (!HasModifier(input.modifier, ~Modifier::SHIFT))
             {
                 // Interpret typeable characters as input.
                 char multibyte[32];
@@ -1736,7 +1736,7 @@ hex_edit_right:
         switch (input.key_char)
         {
         case '?':
-            if ((input.modifier & ~(Modifier::SHIFT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::SHIFT)))
             {
                 if (!m_text && ViewHelp(Help::VIEWER, e) == ViewerOutcome::EXITAPP)
                 {
@@ -1793,7 +1793,7 @@ hex_edit_right:
 
         case '\'':
         case '@':
-            if ((input.modifier & ~(Modifier::SHIFT|Modifier::ALT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::SHIFT|Modifier::ALT)))
             {
                 ShowFileList();
             }
@@ -1829,7 +1829,7 @@ hex_edit_right:
             }
             __fallthrough;
         case '^':
-            if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
+            if (!HasModifier(input.modifier, ~Modifier::SHIFT))
             {
                 ToggleCtrlMode();
             }
@@ -1851,7 +1851,7 @@ hex_edit_right:
             }
             break;
         case 'g':
-            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
+            if (!HasModifier(input.modifier, ~Modifier::ALT))
             {
                 GoTo(e);
             }
@@ -1883,14 +1883,14 @@ hex_edit_right:
             }
             break;
         case 'j':
-            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
+            if (!HasModifier(input.modifier, ~Modifier::ALT))
             {
                 if (!m_found_line.Empty())
                     Center(m_found_line);
             }
             break;
         case 'm':
-            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
+            if (!HasModifier(input.modifier, ~Modifier::ALT))
             {
                 if (!m_hex_mode)
                     m_found_line.MarkOffset(m_context.GetOffset(m_top + (std::min<size_t>(m_content_height, m_context.Count()) / 2)));
@@ -1902,7 +1902,7 @@ hex_edit_right:
             }
             break;
         case 'n':
-            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
+            if (!HasModifier(input.modifier, ~Modifier::ALT))
             {
                 ToggleLineNumbers();
             }
@@ -1946,7 +1946,7 @@ hex_edit_right:
             }
             break;
         case 'u':
-            if ((input.modifier & ~Modifier::ALT) == Modifier::None)
+            if (!HasModifier(input.modifier, ~Modifier::ALT))
             {
                 if (!m_found_line.Empty())
                 {
@@ -1969,9 +1969,9 @@ hex_edit_right:
             break;
         case 'x':
         case 'X':
-            if ((input.modifier & ~(Modifier::ALT|Modifier::SHIFT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::ALT|Modifier::SHIFT)))
             {
-                if ((input.modifier & Modifier::SHIFT) == Modifier::SHIFT)
+                if (HasModifier(input.modifier, Modifier::SHIFT))
                     g_options.restore_screen_on_exit = !g_options.restore_screen_on_exit;
                 return ViewerOutcome::EXITAPP;
             }
@@ -1979,14 +1979,14 @@ hex_edit_right:
 
         case 's':
         case 'S':
-            if ((input.modifier & ~(Modifier::SHIFT|Modifier::ALT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::SHIFT|Modifier::ALT)))
             {
-                DoSearch(true, (input.modifier & Modifier::SHIFT) == Modifier::None/*caseless*/);
+                DoSearch(true, !HasModifier(input.modifier, Modifier::SHIFT)/*caseless*/);
             }
             break;
         case '/':
         case '\\':
-            if ((input.modifier & ~(Modifier::SHIFT|Modifier::ALT)) == Modifier::None)
+            if (!HasModifier(input.modifier, ~(Modifier::SHIFT|Modifier::ALT)))
             {
                 DoSearch(true, input.key_char == '\\'/*caseless*/);
             }
@@ -2549,7 +2549,7 @@ void Viewer::GoTo(Error& e)
     {
         if (input.type != InputType::Char)
             return 0; // Accept.
-        if ((input.modifier & ~Modifier::SHIFT) == Modifier::None)
+        if (!HasModifier(input.modifier, ~Modifier::SHIFT))
         {
             if (input.key_char >= '0' && input.key_char <= '9')
                 return 0; // Accept decimal digits for both line number and offset.

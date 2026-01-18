@@ -19,6 +19,7 @@ public:
     T       Get() const             { return m_h; }
     T       operator=(T h)          { assert(T(empty_value) == m_h); return m_h = h; }
     T       operator=(this_type&& other) { m_h = other.m_h; other.m_h = T(empty_value); return m_h; }
+    T*      operator&()             { assert(T(empty_value) == m_h); return &m_h; }
     void    Set(T h)                { if (T(empty_value) != m_h) base::Free(m_h); m_h = h; }
     void    Close()                 { Set(T(empty_value)); }
     bool    Empty() const           { return empty_value == reinterpret_cast<DWORD_PTR>(m_h); }

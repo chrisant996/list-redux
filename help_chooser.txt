@@ -40,6 +40,7 @@ ACTION KEYS:
 
              E  Edit the file with %EDTIOR% or notepad.exe.
          Alt-R  Run the file or program associated with the file.
+   Alt-Shift-R  Run the file or program associated with the file in a new console window.
 
 TAGGING KEYS:
 
