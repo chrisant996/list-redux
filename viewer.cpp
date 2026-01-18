@@ -262,7 +262,7 @@ public:
     StrW            GetCurrentFile() const;
 
 private:
-    unsigned        CalcMarginWidth();
+    unsigned        CalcContentHeight() const;
     void            UpdateDisplay(StrW* last_screen=nullptr);
     void            MakeFooter(StrW& s, const WCHAR* msg=nullptr);
     void            InitHexWidth();
@@ -490,6 +490,18 @@ static void PadToWidth(StrW& s, unsigned min_width)
         s.AppendSpaces(min_width - cells);
 }
 
+unsigned Viewer::CalcContentHeight() const
+{
+    const unsigned debug_row = !!g_options.show_debug_info;
+#ifdef INCLUDE_MENU_ROW
+    const unsigned menu_row = !!g_options.show_menu;
+#else
+    const unsigned menu_row = false;
+#endif
+    const unsigned hex_ruler = !!m_hex_mode;
+    return max(int32(m_terminal_height - (1 + hex_ruler + debug_row + menu_row + 1)), 0);
+}
+
 void Viewer::UpdateDisplay(StrW* last_screen)
 {
 #ifdef DEBUG
@@ -511,7 +523,7 @@ void Viewer::UpdateDisplay(StrW* last_screen)
     const DWORD colsrows = GetConsoleColsRows();
     m_terminal_width = LOWORD(colsrows);
     m_terminal_height = HIWORD(colsrows);
-    m_content_height = max(int32(m_terminal_height - (1 + hex_ruler + debug_row + menu_row + 1)), 0);
+    m_content_height = CalcContentHeight();
     const bool show_scrollbar = (g_options.show_scrollbar &&
                                  m_content_height >= 4 &&
                                  !(m_errmsg.Length() || !m_context.HasContent()) &&
@@ -1863,6 +1875,7 @@ hex_edit_right:
                 {
                     m_hex_mode = !m_hex_mode;
                     g_options.hex_mode = m_hex_mode;
+                    m_content_height = CalcContentHeight();
                     InitHexWidth();
                     if (!m_found_line.Empty())
                         Center(m_found_line);
