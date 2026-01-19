@@ -1,3 +1,11 @@
+## v0.30 -- 2026/01/18
+
+- Added bookmarks in the file viewer (`Ctrl-Y` sets a bookmark, `Alt-Y` cycles through bookmarks, etc).
+- Added `Alt-Shift-R` which is the same as `Alt-R` except that non-GUI programs start a new console window.
+- Added a visual indicator next to the "middle" row in the file viewer, when line numbers or file offsets are visible.  That's the row that used when marking a line or setting a bookmark.
+- Changed `Alt-R` to avoid prompting to continue after launching a GUI program (unless the GUI program forcibly writes to its parent's console...which, surprisingly, some programs actually do).
+- Fixed inaccurate centering when toggling hex mode.
+
 ## v0.29 -- 2026/01/11
 
 - Added `ShowRuler` and `HexMode` config settings in `.listredux` file.
