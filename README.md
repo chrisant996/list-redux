@@ -31,7 +31,7 @@ The "todo" list can be found [here](https://github.com/chrisant996/list-redux/bl
 
 ### How to build it
 
-List Redux uses [Premake](http://premake.github.io) to generate Visual Studio solutions or makefiles for MinGW. Note that Premake >= 5.0.0-beta1 is required.
+List Redux uses [Premake](http://premake.github.io) to generate Visual Studio solutions or makefiles for MinGW. Note that Premake >= 5.0.0-beta4 is required.
 
 1. Cd to your git clone of the [list-redux](https://github.com/chrisant996/list-redux) repo.
 2. Run `premake5.exe _toolchain_` (where `_toolchain_` is one of Premake's actions such as `vs2022` -- see `premake5.exe --help`).

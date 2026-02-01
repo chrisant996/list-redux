@@ -26,7 +26,7 @@ end
 --------------------------------------------------------------------------------
 local function define_exe(name, exekind)
     project(name)
-    flags("fatalwarnings")
+    fatalwarnings("all")
     language("c++")
     cppdialect("c++17")
     kind(exekind or "consoleapp")
@@ -40,7 +40,7 @@ workspace("list")
     location(to)
 
     characterset("Unicode")
-    flags("NoManifest")
+    manifest("off")
     staticruntime("on")
     symbols("on")
     exceptionhandling("on")
@@ -65,7 +65,7 @@ workspace("list")
         defines("NDEBUG")
 
     filter {"release", "action:vs*"}
-        flags("LinkTimeOptimization")
+        linktimeoptimization("on")
 
 --------------------------------------------------------------------------------
 define_exe("list")
