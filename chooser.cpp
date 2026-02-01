@@ -1715,7 +1715,7 @@ void Chooser::NewFileMask(Error& e)
     s.Printf(L"\r\x1b[KEnter new file mask or path%s ", c_prompt_char);
     OutputConsole(s.Text(), s.Length());
 
-    ReadInput(s, History::FileMask);
+    ReadInput(s, History::FileMask, 2048, 2048);
 
     OutputConsole(c_norm);
     ForceUpdateAll();
