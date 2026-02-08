@@ -286,6 +286,7 @@ private:
     unsigned        GetMarkRow() const;
     FoundOffset     MakeBookmark() const;
     bool            IsBookmarked(FileOffset row_offset, unsigned row_length) const;
+    bool            CanUseHexEditMode() const;
 
     // Command functions.
     void            DoSearch(bool next, bool caseless);
@@ -1302,7 +1303,7 @@ void Viewer::MakeFooter(StrW& s, const WCHAR* msg)
 
         // Hex edit key.
         m_clickable_footer.Add(nullptr, 6, 25, true);
-        m_clickable_footer.AddKeyName(L"Alt-E", ColorElement::Footer, m_hex_edit ? L"EDITING " : L"EditMode", ID_HEXEDIT, 25, true);
+        m_clickable_footer.AddKeyName(L"Alt-E", ColorElement::Footer, m_hex_edit ? L"EDITING " : L"EditMode", ID_HEXEDIT, 25, true, CanUseHexEditMode());
     }
     else
     {
@@ -2610,6 +2611,11 @@ bool Viewer::IsBookmarked(FileOffset row_offset, unsigned row_length) const
     return false;
 }
 
+bool Viewer::CanUseHexEditMode() const
+{
+    return m_hex_mode && !m_text && !m_context.IsPipe();
+}
+
 void Viewer::ClearBookmarks()
 {
     if (!m_bookmarks.empty())
@@ -2992,7 +2998,7 @@ void Viewer::NextFile(bool next, Error& e)
 
 bool Viewer::ToggleHexEditMode(Error& e)
 {
-    if (!m_hex_mode || m_text || m_context.IsPipe())
+    if (!CanUseHexEditMode())
         return false;
 
     if (m_hex_edit && m_context.IsDirty())
