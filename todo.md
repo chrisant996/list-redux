@@ -2,6 +2,7 @@
 
 - What if codepage 437 isn't installed?  It's our fallback, but if it's not installed then choose another?
 - Sometimes detects `clink.log` file as Binary when `debug.log_terminal` is enabled, but it's really UTF8 (maybe there's a 0x08 backspace character?).
+- [ ] Searching in the chooser doesn't necessary catch all matching files.
 
 # FEATURES
 
@@ -85,6 +86,7 @@
 - [x] `F` `S` `/` `\` search for text in files in file chooser (tag matching files)
 - [x] `Ctrl-N` invert tagged files
 - [x] show count of tagged files at the bottom
+- [ ] some way to configure per-file colors similar to `dirx`
 
 ### File Viewer (list file content)
 
