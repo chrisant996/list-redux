@@ -2438,7 +2438,7 @@ void Chooser::SearchAndTag(std::shared_ptr<Searcher> searcher, Error& e)
         }
 
         unsigned left_offset = 0;
-        const bool found = ctx.Find(true, searcher, 999, found_line, left_offset, e);
+        const bool found = ctx.Find(true, searcher, 999, found_line, left_offset, e, true/*first*/);
         if (e.Code() == E_ABORT)
         {
             canceled = true;

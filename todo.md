@@ -2,7 +2,6 @@
 
 - What if codepage 437 isn't installed?  It's our fallback, but if it's not installed then choose another?
 - Sometimes detects `clink.log` file as Binary when `debug.log_terminal` is enabled, but it's really UTF8 (maybe there's a 0x08 backspace character?).
-- [ ] Searching in the chooser doesn't necessary catch all matching files.
 
 # FEATURES
 

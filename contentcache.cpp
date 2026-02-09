@@ -2004,7 +2004,7 @@ unsigned ContentCache::GetLength(size_t line) const
     return 0;
 }
 
-bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned max_width, FoundOffset& found_line, unsigned& left_offset, Error& e)
+bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned max_width, FoundOffset& found_line, unsigned& left_offset, Error& e, bool first)
 {
     StrW tmp;
     const unsigned needle_delta = searcher->GetNeedleDelta();
@@ -2049,9 +2049,9 @@ bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, un
             // IMPORTANT:  Must process through the _next_ line to get an
             // accurate length for the current line.
             const unsigned c_resolve_pending_wrap = 1;
-            if (index + 1 + c_resolve_pending_wrap >= Count())
+            if (index + !first + c_resolve_pending_wrap >= Count())
             {
-                ProcessThrough(index + 1 + c_resolve_pending_wrap, e, true/*cancelable*/);
+                ProcessThrough(index + !first + c_resolve_pending_wrap, e, true/*cancelable*/);
                 if (e.Test())
                 {
                     if (e.Code() == E_ABORT)
@@ -2061,17 +2061,23 @@ bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, un
                     }
                     return false;
                 }
+            }
+            if (!first)
+            {
                 if (index + 1 >= Count())
                     return false;
+                ++index;
             }
-            ++index;
         }
         else
         {
             // Going in reverse doesn't need to use ProcessThrough().
-            if (!index || index > Count())
-                return false;
-            --index;
+            if (!first)
+            {
+                if (!index || index > Count())
+                    return false;
+                --index;
+            }
         }
 
         if (!EnsureFileData(index, e))
@@ -2150,10 +2156,12 @@ bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, un
             }
             return true;
         }
+
+        first = false;
     }
 }
 
-bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned hex_width, FoundOffset& found_line, Error& e)
+bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned hex_width, FoundOffset& found_line, Error& e, bool first)
 {
     StrW tmp;
     const unsigned needle_delta = searcher->GetNeedleDelta();

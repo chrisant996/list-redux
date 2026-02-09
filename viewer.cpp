@@ -456,7 +456,8 @@ ViewerOutcome Viewer::Go(Error& e, bool do_search)
             if (g_options.searcher)
             {
                 m_multifile_search = (m_files->size() > 1);
-                FindNext();
+                assert(m_found_line.Empty()); // So that FindNext doesn't skip the first line.
+                FindNext(true);
                 UpdateDisplay();
             }
         }
@@ -2481,8 +2482,8 @@ void Viewer::FindNext(bool next)
     Error e;
     unsigned left_offset = m_left;
     bool found = (m_hex_mode ?
-            m_context.Find(next, g_options.searcher, m_hex_width, m_found_line, e) :
-            m_context.Find(next, g_options.searcher, m_content_width, m_found_line, left_offset, e));
+            m_context.Find(next, g_options.searcher, m_hex_width, m_found_line, e, m_found_line.Empty()/*first*/) :
+            m_context.Find(next, g_options.searcher, m_content_width, m_found_line, left_offset, e, m_found_line.Empty()/*first*/));
     bool canceled = (e.Code() == E_ABORT);
 
     if (!found && !canceled && !m_text && m_multifile_search && m_files)
@@ -2517,8 +2518,8 @@ void Viewer::FindNext(bool next)
             FoundOffset found_line;
             ctx.SetWrapWidth(m_wrap ? m_content_width : 0);
             found = (m_hex_mode ?
-                    ctx.Find(next, g_options.searcher, m_hex_width, found_line, e) :
-                    ctx.Find(next, g_options.searcher, m_content_width, found_line, left_offset, e));
+                    ctx.Find(next, g_options.searcher, m_hex_width, found_line, e, true/*first*/) :
+                    ctx.Find(next, g_options.searcher, m_content_width, found_line, left_offset, e, true/*first*/));
             if (e.Code() == E_ABORT)
             {
                 SetFile(index, &ctx);

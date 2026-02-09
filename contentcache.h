@@ -249,8 +249,8 @@ public:
     size_t          FriendlyLineNumberToIndex(size_t index) const { return m_map.FriendlyLineNumberToIndex(index); }
     unsigned        GetLength(size_t index) const;
 
-    bool            Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned max_width, FoundOffset& found, unsigned& left_offset, Error& e);
-    bool            Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned hex_width, FoundOffset& found, Error& e);
+    bool            Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned max_width, FoundOffset& found, unsigned& left_offset, Error& e, bool first);
+    bool            Find(bool next, const std::shared_ptr<Searcher>& searcher, unsigned hex_width, FoundOffset& found, Error& e, bool first);
 
     FileOffset      GetBufferOffset() const { return m_data_offset; }
     unsigned        GetBufferLength() const { return m_data_length; }
