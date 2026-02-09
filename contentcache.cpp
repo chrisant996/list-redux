@@ -2081,7 +2081,11 @@ bool ContentCache::Find(bool next, const std::shared_ptr<Searcher>& searcher, un
         }
 
         if (!EnsureFileData(index, e))
+        {
+            if (e.Code() == ERROR_HANDLE_EOF)
+                e.Clear();
             return false;
+        }
 
         const FileOffset offset = GetOffset(index);
         assert(offset >= m_data_offset);
@@ -2465,7 +2469,10 @@ bool ContentCache::LoadData(const FileOffset offset, DWORD& end_slop, Error& e)
     liMove.QuadPart = begin + kept_at_head;
     if (!SetFilePointerEx(m_file, liMove, nullptr, FILE_BEGIN))
     {
-        e.Sys();
+LError:
+        const DWORD err = GetLastError();
+        if (err && err != ERROR_HANDLE_EOF)
+            e.Sys(err);
         m_eof = true;
         return false;
     }
@@ -2474,12 +2481,8 @@ bool ContentCache::LoadData(const FileOffset offset, DWORD& end_slop, Error& e)
     assert(kept_at_head + to_read + kept_at_tail <= c_data_buffer_max);
     if (!ReadFile(m_file, m_data + kept_at_head, to_read, &bytes_read, nullptr))
     {
-        const DWORD err = GetLastError();
-        if (err && err != ERROR_HANDLE_EOF)
-            e.Sys(err);
-        m_eof = true;
         assert(!bytes_read);
-        return false;
+        goto LError;
     }
 
     m_data_offset = begin;
