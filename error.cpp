@@ -127,6 +127,7 @@ ErrorArgs& ErrorArgs::operator<<(WCHAR ch)
 void Error::Clear()
 {
     m_set = false;
+    m_code = 0;
     ClearStrings();
 }
 
