@@ -443,6 +443,7 @@ ViewerOutcome Viewer::Go(Error& e, bool do_search)
     while (true)
     {
         e.Clear();
+        ClearSignaled();
 
 #ifdef INCLUDE_MENU_ROW
         m_command_mode = true;
@@ -2470,8 +2471,6 @@ void Viewer::FindNext(bool next)
         DoSearch(next, true/*caseless*/);
         return;
     }
-
-    ClearSignaled();
 
     assert(!m_searching);
     m_searching = true;

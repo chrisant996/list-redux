@@ -11,6 +11,7 @@
 #include "list_format.h"
 #include "input.h"
 #include "output.h"
+#include "signaled.h"
 #include "popuplist.h"
 #include "config.h"
 #include "colors.h"
@@ -364,6 +365,9 @@ ChooserOutcome Chooser::Go(Error& e, bool do_search)
 
     while (true)
     {
+        e.Clear();
+        ClearSignaled();
+
 #ifdef INCLUDE_MENU_ROW
         m_command_mode = true;
 #endif
