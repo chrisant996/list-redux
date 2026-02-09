@@ -127,6 +127,8 @@ private:
     bool            m_dirty_menu = false;
 #endif
     bool            m_dirty_footer = false;
+    bool            m_searching = false;
+    StrW            m_searching_file;
     intptr_t        m_prev_visible_rows = 0;
 
     StrW            m_last_feedback;
