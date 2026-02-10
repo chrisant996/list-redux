@@ -512,9 +512,9 @@ void Chooser::UpdateDisplay(StrW* last_screen)
         m_clickable_menu.BuildOutput(menu, GetColor(ColorElement::MenuRow));
         m_dirty_menu |= (!m_last_menu.Equal(menu));
     }
-    const bool update_menu_row = (g_options.show_menu && m_dirty_menu);
+    const bool update_menu_row = (g_options.show_menu && m_dirty_menu) || m_searching;
 #else
-    const bool update_menu_row = false;
+    const bool update_menu_row = m_searching;
 #endif
 
     if (!m_dirty_header &&
@@ -645,8 +645,31 @@ void Chooser::UpdateDisplay(StrW* last_screen)
     }
 
     // Menu row.
+    if (m_searching)
+    {
+        static const WCHAR c_searching_prolog[] = L"Searching:  ";
+        const uint32 c_reserve = _countof(c_searching_prolog) - 1/*NUL*/ + 1/*space*/;
+
+        tmp.Clear();
+        tmp.Printf(L"\x1b[%uH", m_terminal_height - 1);
+        s.Append(tmp);
 #ifdef INCLUDE_MENU_ROW
-    if (update_menu_row)
+        s.AppendColor(GetColor(ColorElement::MenuRow));
+#else
+        s.AppendColor(GetColor(ColorElement::Footer));
+#endif
+
+        const bool include_prolog = (m_terminal_width > c_reserve + 20);
+        const uint32 limit = include_prolog ? m_terminal_width - c_reserve : m_terminal_width - 1;
+        ellipsify_ex(FindName(m_searching_file.Text()), limit, RIGHT, tmp);
+
+        if (include_prolog)
+            s.Append(c_searching_prolog);
+        s.Append(tmp);
+        s.Append(c_clreol);
+    }
+#ifdef INCLUDE_MENU_ROW
+    else if (update_menu_row)
     {
         s.Printf(L"\x1b[%uH", m_terminal_height - 1);
         s.Append(menu);
@@ -659,77 +682,48 @@ void Chooser::UpdateDisplay(StrW* last_screen)
     {
         m_clickable_footer.Init(m_terminal_height - 1, m_terminal_width);
 
-        const bool searching = (m_searching && !m_searching_file.Empty());
-        const bool has_feedback = searching || !m_feedback.Empty();
+        const bool has_feedback = !m_feedback.Empty();
         const int16 files_prio = has_feedback ? 89 : 99;
         const int16 padding_prio = has_feedback ? 89 : 98;
         const int16 feedback_prio = has_feedback ? 99 : -1;
 
         tmp.Clear();
         tmp.Printf(L"Files: %lu of %lu", m_index + 1, m_count);
-        if (!searching)
+        if (m_tagged.AnyMarked())
         {
-            if (m_tagged.AnyMarked())
-            {
-                const size_t n = NumTaggedFiles();
-                if (n > 0)
-                    tmp.Printf(L"  (%lu tagged)", n);
-            }
+            const size_t n = NumTaggedFiles();
+            if (n > 0)
+                tmp.Printf(L"  (%lu tagged)", n);
         }
         m_clickable_footer.Add(tmp.Text(), ID_FILELIST, files_prio, false, RIGHT);
         const int padding = (20 - tmp.Length());
         if (padding > 0)
             m_clickable_footer.Add(nullptr, padding, padding_prio, false);
 
-        if (searching)
+        const WCHAR* feedback = m_feedback.Text();
+        if (last_screen && !*feedback)
+            feedback = m_last_feedback.Text();
+        if (*feedback)
         {
-            const int32 filestext_len = tmp.Length();
-            tmp.Clear();
-
-            const WCHAR* name = FindName(m_searching_file.Text());
-            int32 limit = m_terminal_width - 21 - filestext_len;
-            if (cell_count(name) <= 20 && limit >= 20)
-            {
-                StrW only_path;
-                only_path.Set(m_searching_file.Text(), name - m_searching_file.Text());
-                ellipsify_ex(only_path.Text(), limit, ellipsify_mode::PATH, tmp);
-                tmp.Append(name);
-            }
-            else
-            {
-                limit = m_terminal_width - 1 - filestext_len;
-                ellipsify_ex(m_searching_file.Text(), limit, ellipsify_mode::PATH, tmp);
-            }
             m_clickable_footer.Add(nullptr, 4, padding_prio, false);
-            m_clickable_footer.Add(tmp.Text(), -1, feedback_prio, false);
+            m_clickable_footer.Add(feedback, -1, feedback_prio, false, RIGHT);
         }
-        else
-        {
-            const WCHAR* feedback = m_feedback.Text();
-            if (last_screen && !*feedback)
-                feedback = m_last_feedback.Text();
-            if (*feedback)
-            {
-                m_clickable_footer.Add(nullptr, 4, padding_prio, false);
-                m_clickable_footer.Add(feedback, -1, feedback_prio, false, RIGHT);
-            }
 
-            if (size_t(m_index) < m_files.size())
+        if (size_t(m_index) < m_files.size())
+        {
+            tmp.Clear();
+            FormatFileData(tmp, m_files[m_index], true/*include_size*/);
+            const WCHAR* after_last_space = tmp.Text();
+            for (const WCHAR* p = tmp.Text(); *p; ++p)
             {
-                tmp.Clear();
-                FormatFileData(tmp, m_files[m_index], true/*include_size*/);
-                const WCHAR* after_last_space = tmp.Text();
-                for (const WCHAR* p = tmp.Text(); *p; ++p)
-                {
-                    if (*p == ' ')
-                        after_last_space = p + 1;
-                }
-                StrW attrs(after_last_space);
-                tmp.SetLength(tmp.Length() - attrs.Length());
-                m_clickable_footer.Add(nullptr, 4, 59, true);
-                m_clickable_footer.Add(tmp.Text(), -1, 59, true);
-                m_clickable_footer.Add(attrs.Text(), ID_ONE_ATTR, 59, true);
+                if (*p == ' ')
+                    after_last_space = p + 1;
             }
+            StrW attrs(after_last_space);
+            tmp.SetLength(tmp.Length() - attrs.Length());
+            m_clickable_footer.Add(nullptr, 4, 59, true);
+            m_clickable_footer.Add(tmp.Text(), -1, 59, true);
+            m_clickable_footer.Add(attrs.Text(), ID_ONE_ATTR, 59, true);
         }
 
         s.Printf(L"\x1b[%uH", m_terminal_height);
@@ -2442,6 +2436,7 @@ void Chooser::SearchAndTag(std::shared_ptr<Searcher> searcher, Error& e)
     g_options.searcher = searcher;
 
     assert(!m_searching);
+    m_searching = true;
 
     StrW s;
     bool canceled = false;
@@ -2454,9 +2449,9 @@ void Chooser::SearchAndTag(std::shared_ptr<Searcher> searcher, Error& e)
             continue;
 
         m_files[index].GetPathName(s);
-        m_searching = true;
         m_searching_file = s.Text();
         m_dirty_footer = true;
+        m_feedback.Set(L"*** Ctrl-Break to cancel ***");
         UpdateDisplay();
 
         ctx.Open(s.Text(), e);

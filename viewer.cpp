@@ -537,10 +537,11 @@ void Viewer::UpdateDisplay(StrW* last_screen)
     // decided yet because it may depend on the margin width (which depends on
     // the highest, i.e. widest, file number or file offset).
     const unsigned debug_row = !!g_options.show_debug_info;
+    const bool show_searching_file = (m_searching && !m_searching_file.Empty());
 #ifdef INCLUDE_MENU_ROW
-    const unsigned menu_row = !!g_options.show_menu;
+    const unsigned menu_row = !!g_options.show_menu || show_searching_file;
 #else
-    const unsigned menu_row = false;
+    const unsigned menu_row = show_searching_file;
 #endif
     const unsigned hex_ruler = !!m_hex_mode;
     const DWORD colsrows = GetConsoleColsRows();
@@ -787,9 +788,9 @@ LAutoFitContentWidth:
     }
 
     // Header.
+    StrW tmp;
     if (update_header)
     {
-        StrW tmp;
         StrW tmp2;
         StrW details;
         const unsigned c_min_filename_width = 24;
@@ -1164,8 +1165,31 @@ LAutoFitContentWidth:
     }
 
     // Menu row.
+    if (show_searching_file)
+    {
+        static const WCHAR c_searching_prolog[] = L"Searching:  ";
+        const uint32 c_reserve = _countof(c_searching_prolog) - 1/*NUL*/ + 1/*space*/;
+
+        tmp.Clear();
+        tmp.Printf(L"\x1b[%uH", m_terminal_height - 1);
+        s.Append(tmp);
 #ifdef INCLUDE_MENU_ROW
-    if (menu_row && update_menu_row)
+        s.AppendColor(GetColor(ColorElement::MenuRow));
+#else
+        s.AppendColor(GetColor(ColorElement::Footer));
+#endif
+
+        const bool include_prolog = (m_terminal_width > c_reserve + 20);
+        const uint32 limit = include_prolog ? m_terminal_width - c_reserve : m_terminal_width - 1;
+        ellipsify_ex(FindName(m_searching_file.Text()), limit, RIGHT, tmp);
+
+        if (include_prolog)
+            s.Append(c_searching_prolog);
+        s.Append(tmp);
+        s.Append(c_clreol);
+    }
+#ifdef INCLUDE_MENU_ROW
+    else if (menu_row && update_menu_row)
     {
         s.Printf(L"\x1b[%uH", m_terminal_height - menu_row);
         s.Append(menu);
@@ -1174,47 +1198,34 @@ LAutoFitContentWidth:
 
     // Footer.
     StrW left;
+    unsigned cursor_x = 0;
+    static const WCHAR c_searching_msg[] = L"Searching... ";
     if (m_searching)
     {
-        left.Append(L"Searching... (Ctrl-Break to cancel)");
+        left.Append(c_searching_msg);
+        cursor_x = left.Length() + 1;
+        left.AppendSpaces(4 - 1/*already present*/);
+        left.Append(L"*** Ctrl-Break to cancel ***");
     }
     else
     {
         const WCHAR* feedback = m_feedback.Text();
         if (last_screen && !*feedback)
             feedback = m_last_feedback.Text();
-        left.Printf(L"Command%s %s", c_prompt_char, feedback);
+        left.Printf(L"Command%s ", c_prompt_char);
+        cursor_x = cell_count(left.Text()) + 1;
+        if (*feedback)
+        {
+            left.AppendSpaces(4 - 1/*already present*/);
+            left.Append(feedback);
+        }
     }
     if (update_command_line)
-    {
-        if (m_searching && !m_searching_file.Empty())
-        {
-            StrW tmp;
-            left.AppendSpaces(4);
-            // -1 because of how MakeFooter works inside.
-            const WCHAR* name = FindName(m_searching_file.Text());
-            int32 limit = m_terminal_width - 21 - left.Length();
-            if (cell_count(name) <= 20 && limit >= 20)
-            {
-                StrW only_path;
-                only_path.Set(m_searching_file.Text(), name - m_searching_file.Text());
-                ellipsify_ex(only_path.Text(), limit, ellipsify_mode::PATH, tmp);
-                tmp.Append(name);
-            }
-            else
-            {
-                limit = m_terminal_width - 1 - left.Length();
-                ellipsify_ex(m_searching_file.Text(), limit, ellipsify_mode::PATH, tmp);
-            }
-            left.Append(tmp.Text());
-        }
         MakeFooter(s, left.Text());
-    }
 
     if (s.Length() || hex_meta_pos_changed)
     {
         unsigned cursor_y;
-        unsigned cursor_x;
         if (m_hex_edit)
         {
             unsigned pos_in_row = (m_hex_pos % m_hex_width);
@@ -1243,7 +1254,7 @@ LAutoFitContentWidth:
         else
         {
             cursor_y = m_terminal_height;
-            cursor_x = cell_count(left.Text()) + 1;
+            assert(cursor_x > 0);
         }
 
         s.Printf(L"\x1b[%u;%uH", cursor_y, cursor_x);
@@ -2502,6 +2513,7 @@ void Viewer::FindNext(bool next)
             m_searching_file = (*m_files)[index].Text();
             m_force_update_footer = true;
             UpdateDisplay();
+            Sleep(250);
 
             Error e;
             ctx.Open((*m_files)[index].Text(), e);
