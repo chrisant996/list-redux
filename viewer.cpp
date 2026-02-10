@@ -517,9 +517,9 @@ unsigned Viewer::CalcContentHeight() const
 {
     const unsigned debug_row = !!g_options.show_debug_info;
 #ifdef INCLUDE_MENU_ROW
-    const unsigned menu_row = !!g_options.show_menu;
+    const unsigned menu_row = (g_options.show_menu || m_searching);
 #else
-    const unsigned menu_row = false;
+    const unsigned menu_row = m_searching;
 #endif
     const unsigned hex_ruler = !!m_hex_mode;
     return max(int32(m_terminal_height - (1 + hex_ruler + debug_row + menu_row + 1)), 0);
@@ -979,14 +979,11 @@ LAutoFitContentWidth:
                 {
                     ruler.Printf(L"%x", ii & 0xf);
                 }
-                PadToWidth(ruler, m_terminal_width);
+                ruler.Append(c_clreol);
                 ruler.Append(c_norm);
                 s.Append(ruler);
             }
-            else
-            {
-                s.Append(L"\n");
-            }
+            s.Append(L"\n");
 
             const FoundOffset* found_line = m_found_line.Empty() ? nullptr : &m_found_line;
             for (unsigned row = 0; row < m_content_height; ++row)
@@ -1003,7 +1000,8 @@ LAutoFitContentWidth:
                     if ((!marked_color || !found_line || found_line->len) && IsBookmarked(row_offset, m_hex_width))
                         marked_color = GetColor(ColorElement::BookmarkedLine);
 
-                    m_context.FormatHexData(m_hex_top, row == GetMarkRow(), row, m_hex_width, s, e, marked_color, found_line);
+                    if (!m_context.FormatHexData(m_hex_top, row == GetMarkRow(), row, m_hex_width, s, e, marked_color, found_line))
+                        s.AppendColor(norm);
 
                     if (m_vert_scroll_car.has_car())
                     {
