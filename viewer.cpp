@@ -2696,11 +2696,10 @@ void Viewer::Center(const FoundOffset& found_line)
 
 void Viewer::GoTo(Error& e)
 {
-    StrW s;
     bool lineno = !m_hex_mode;
     bool done = false;
 
-    auto callback = [&](const InputRecord& input, void* /*cookie*/)
+    auto callback = [&](const InputRecord& input, const ReadInputBuffer& buffer, void* /*cookie*/)
     {
         if (input.type != InputType::Char)
             return 0; // Accept.
@@ -2711,16 +2710,15 @@ void Viewer::GoTo(Error& e)
             if ((input.key_char >= 'A' && input.key_char <= 'F') || (input.key_char >= 'a' && input.key_char <= 'f'))
                 return lineno ? 1 : 0; // Accept hexadecimal digits only for offset.
             if (input.key_char == 'x' || input.key_char == 'X')
-                return s.Equal(L"0") ? 0 : 1; // Accept '0x' or '0X' prefix.
+                return buffer.GetText().Equal(L"0") ? 0 : 1; // Accept '0x' or '0X' prefix.
             if (input.key_char == '$' || input.key_char == '#')
-                return s.Empty() ? 0 : 1; // Accept '$' or '#' prefix.
+                return buffer.GetText().Empty() ? 0 : 1; // Accept '$' or '#' prefix.
         }
-        if (input.key_char == 'g')
+        if (input.key_char == 'g' || input.key_char == 'G')
         {
             // 'G' toggles between line number and offset.
             lineno = !lineno;
             done = false;
-            s.Clear();
             return -1;
         }
 
@@ -2731,6 +2729,7 @@ void Viewer::GoTo(Error& e)
     UpdateDisplay();
 #endif
 
+    StrW s;
     StrW right;
     while (!done)
     {

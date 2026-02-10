@@ -103,6 +103,64 @@ struct InputRecord
     int32           mouse_wheel_amount = 0;
 };
 
+struct SelectionState
+{
+                    SelectionState() : m_anchor(0), m_caret(0), m_dirty(false) { ResetWordAnchor(); }
+                    SelectionState(textpos_t caret) : m_anchor(caret), m_caret(caret), m_dirty(false) { ResetWordAnchor(); }
+                    SelectionState(textpos_t anchor, textpos_t caret) : m_anchor(anchor), m_caret(caret), m_dirty(false) { ResetWordAnchor(); }
+
+    void            SetCaret(textpos_t caret) { SetSelection(caret, caret); }
+    void            SetSelection(textpos_t anchor, textpos_t caret);
+#if 0
+    void            ResetWordAnchor() { m_word_anchor_begin = m_anchor; m_word_anchor_end = m_caret; }
+    void            ResetWordAnchor(textpos_t caret) { m_word_anchor_begin = m_anchor; m_word_anchor_end = caret; }
+#else
+    void            ResetWordAnchor() {}
+#endif
+
+    textpos_t       GetAnchor() const { return m_anchor; }
+    textpos_t       GetCaret() const { return m_caret; }
+    textpos_t       GetSelBegin() const { return min(m_anchor, m_caret); }
+    textpos_t       GetSelEnd() const { return max(m_anchor, m_caret); }
+#if 0
+    int             GetWordAnchorBegin() const { return m_word_anchor_begin; }
+    int             GetWordAnchorEnd() const { return m_word_anchor_end; }
+#endif
+    bool            HasSelection() const { return m_anchor != m_caret; }
+
+    bool            IsDirty() const { return m_dirty; }
+    void            ClearDirty() { m_dirty = false; }
+
+    textpos_t&      GetAnchorOut() { return m_anchor; }
+    textpos_t&      GetCaretOut() { return m_caret; }
+
+private:
+    textpos_t       m_anchor;
+    textpos_t       m_caret;
+#if 0
+    short           m_word_anchor_begin;
+    short           m_word_anchor_end;
+#endif
+    bool            m_dirty;
+};
+
+class ReadInputBuffer
+{
+public:
+                    ReadInputBuffer() = default;
+                    ~ReadInputBuffer() = default;
+
+    textpos_t       GetCaret() const { return m_sel.GetCaret(); }
+    const SelectionState& GetSelectionState() const { return m_sel; }
+
+    const StrW&     GetText() const { return m_s; }
+
+protected:
+    // Content and state.
+    StrW            m_s;
+    SelectionState  m_sel;
+};
+
 extern const WCHAR c_prompt_char[];
 
 class AutoMouseConsoleMode
@@ -196,7 +254,7 @@ private:
 };
 
 InputRecord SelectInput(DWORD timeout=INFINITE, AutoMouseConsoleMode* mouse=nullptr);
-bool ReadInput(StrW& out, History history=History::MAX, DWORD max_length=30, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&, void*)>> input_callback=std::nullopt);
+bool ReadInput(StrW& out, History history=History::MAX, DWORD max_length=30, DWORD max_width=32, std::optional<std::function<int32(const InputRecord&, const ReadInputBuffer&, void*)>> input_callback=std::nullopt);
 bool IsMouseLeftButtonDown();
 
 bool ParseULongLong(const WCHAR* s, ULONGLONG& out, int radix=10);

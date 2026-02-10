@@ -676,47 +676,6 @@ static textpos_t PosMover(const WCHAR* s, const unsigned len, textpos_t& pos, co
     return moved;
 }
 
-struct SelectionState
-{
-                    SelectionState() : m_anchor(0), m_caret(0), m_dirty(false) { ResetWordAnchor(); }
-                    SelectionState(textpos_t caret) : m_anchor(caret), m_caret(caret), m_dirty(false) { ResetWordAnchor(); }
-                    SelectionState(textpos_t anchor, textpos_t caret) : m_anchor(anchor), m_caret(caret), m_dirty(false) { ResetWordAnchor(); }
-
-    void            SetCaret(textpos_t caret) { SetSelection(caret, caret); }
-    void            SetSelection(textpos_t anchor, textpos_t caret);
-#if 0
-    void            ResetWordAnchor() { m_word_anchor_begin = m_anchor; m_word_anchor_end = m_caret; }
-    void            ResetWordAnchor(textpos_t caret) { m_word_anchor_begin = m_anchor; m_word_anchor_end = caret; }
-#else
-    void            ResetWordAnchor() {}
-#endif
-
-    textpos_t       GetAnchor() const { return m_anchor; }
-    textpos_t       GetCaret() const { return m_caret; }
-    textpos_t       GetSelBegin() const { return min(m_anchor, m_caret); }
-    textpos_t       GetSelEnd() const { return max(m_anchor, m_caret); }
-#if 0
-    int             GetWordAnchorBegin() const { return m_word_anchor_begin; }
-    int             GetWordAnchorEnd() const { return m_word_anchor_end; }
-#endif
-    bool            HasSelection() const { return m_anchor != m_caret; }
-
-    bool            IsDirty() const { return m_dirty; }
-    void            ClearDirty() { m_dirty = false; }
-
-    textpos_t&      GetAnchorOut() { return m_anchor; }
-    textpos_t&      GetCaretOut() { return m_caret; }
-
-private:
-    textpos_t       m_anchor;
-    textpos_t       m_caret;
-#if 0
-    short           m_word_anchor_begin;
-    short           m_word_anchor_end;
-#endif
-    bool            m_dirty;
-};
-
 void SelectionState::SetSelection(textpos_t anchor, textpos_t caret)
 {
     assert(anchor != static_cast<textpos_t>(-1));
@@ -774,7 +733,7 @@ void UndoEntry::Unlink(UndoEntry*& head, UndoEntry*& tail)
     m_next = nullptr;
 }
 
-class ReadInputState
+class ReadInputState : public ReadInputBuffer
 {
     enum class Outcome { Cancelled, Done, DontResetHistoryIndex, ResetHistoryIndex };
 
@@ -784,7 +743,7 @@ public:
 
     void            SetMaxWidth(DWORD m) { m_max_width = static_cast<textpos_t>(min<DWORD>(m, INT16_MAX)); }
     void            SetMaxLength(DWORD m) { m_max_length = static_cast<textpos_t>(min<DWORD>(m, INT16_MAX)); }
-    void            SetCallback(std::optional<std::function<int32(const InputRecord&, void*)>> input_callback);
+    void            SetCallback(std::optional<std::function<int32(const InputRecord&, const ReadInputBuffer&, void*)>> input_callback);
     void            SetHistory(std::vector<StrW>* history);
     void            SetHorizScrollMarkers(bool show) { m_horiz_scroll_markers = show; }
     void            SetOrigin(COORD coord) { m_origin = coord; }
@@ -807,7 +766,6 @@ public:
     void            CutToClipboard();
     void            PasteFromClipboard();
 
-    textpos_t       GetCaret() const { return m_sel.GetCaret(); }
     void            ReplaceFromHistory(const StrW& s, bool keep_undo);
     void            InsertChar(WCHAR c, WCHAR c2=0);
     void            InsertText(const WCHAR* s, size_t len);
@@ -835,18 +793,18 @@ private:
     void            UnlinkUndoEntry(UndoEntry* p);
 
 private:
+    // NOTE:  Content and selection are contained in the base class.
+
     // Configuration.
     uint16          m_max_width = 32;
     uint16          m_max_length = 32;
     COORD           m_origin = { -1, -1 };
     bool            m_horiz_scroll_markers = true;
 
-    // Content and state.
-    StrW            m_s;
+    // State.
     uint32          m_change_counter = 0;
     uint16          m_terminal_row = 0;
     textpos_t       m_left = 0;
-    SelectionState  m_sel;
     MouseHelper     m_mouse_helper;
     bool            m_can_drag = false;
 
@@ -863,7 +821,7 @@ private:
     StrW            m_curr_input_history;
 
     // Callback.
-    std::optional<std::function<int32(const InputRecord&, void*)>> m_callback;
+    std::optional<std::function<int32(const InputRecord&, const ReadInputBuffer&, void*)>> m_callback;
 };
 
 ReadInputState::ReadInputState()
@@ -876,7 +834,7 @@ ReadInputState::~ReadInputState()
     ClearUndoInternal();
 }
 
-void ReadInputState::SetCallback(std::optional<std::function<int32(const InputRecord&, void*)>> input_callback)
+void ReadInputState::SetCallback(std::optional<std::function<int32(const InputRecord&, const ReadInputBuffer&, void*)>> input_callback)
 {
     m_callback = input_callback;
 }
@@ -969,7 +927,7 @@ int32 ReadInputState::Go(void* cookie)
         case InputType::Mouse:
             if (m_callback)
             {
-                const int32 result = (*m_callback)(input, cookie);
+                const int32 result = (*m_callback)(input, *this, cookie);
                 // Negative means break out of the loop.
                 if (result < 0)
                     return -1;
@@ -1768,7 +1726,7 @@ void ReadInputState::DumpUndoStack()
 }
 #endif
 
-bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std::optional<std::function<int32(const InputRecord&, void*)>> input_callback)
+bool ReadInput(StrW& out, History hindex, DWORD max_length, DWORD max_width, std::optional<std::function<int32(const InputRecord&, const ReadInputBuffer&, void*)>> input_callback)
 {
     static std::vector<StrW> s_histories[size_t(History::MAX)];
 

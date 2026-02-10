@@ -310,7 +310,7 @@ std::shared_ptr<Searcher> ReadSearchInput(unsigned row, unsigned terminal_width,
         OutputConsole(tmp.Text(), tmp.Length());
     };
 
-    auto callback = [&](const InputRecord& input, void* /*cookie*/)
+    auto callback = [&](const InputRecord& input, const ReadInputBuffer& /*buffer*/, void* /*cookie*/)
     {
         switch (input.type)
         {
