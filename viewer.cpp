@@ -369,6 +369,7 @@ private:
     size_t          m_last_top = 0;
     size_t          m_last_left = 0;
     StrW            m_last_feedback = 0;
+    unsigned        m_last_mark_row = -1;
     FileOffset      m_last_hex_top = 0;
     bool            m_last_hex_edit = false;
     FileOffset      m_last_hex_pos = 0;
@@ -663,6 +664,8 @@ LAutoFitContentWidth:
         }
     }
 
+    const unsigned mark_row = GetMarkRow(); // Must happen after fixing top offset.
+
 #ifdef INCLUDE_MENU_ROW
     StrW menu;
     {
@@ -731,6 +734,7 @@ LAutoFitContentWidth:
 #endif
     const bool update_content = (m_force_update || top_changed);
     const bool update_hex_edit = (m_force_update_hex_edit_offset != FileOffset(-1));
+    const bool update_mark_row = (!update_content && !update_hex_edit && mark_row != m_last_mark_row);
     const FileOffset update_hex_edit_offset = m_force_update_hex_edit_offset;
     update_command_line |= (m_force_update || m_force_update_footer || feedback_changed);
     if (!last_screen && !update_header && !update_menu_row && !update_content && !update_command_line && !hex_meta_pos_changed)
@@ -740,6 +744,7 @@ LAutoFitContentWidth:
     StrW s;
 
     // Remember states that influence optimizing what to redraw.
+    const unsigned last_mark_row = m_last_mark_row;
     m_last_top = m_top;
     m_last_left = m_left;
     m_last_hex_top = m_hex_top;
@@ -749,6 +754,7 @@ LAutoFitContentWidth:
     m_last_hex_characters = m_hex_characters;
     m_last_index = m_index;
     m_last_feedback.Set(m_feedback);
+    m_last_mark_row = mark_row;
     m_last_processed = m_context.Processed();
     m_last_completed = m_context.Completed();
 #ifdef INCLUDE_MENU_ROW
@@ -901,7 +907,7 @@ LAutoFitContentWidth:
     }
 
     // Content.
-    if (update_content || update_hex_edit)
+    if (update_content || update_hex_edit || update_mark_row)
     {
         s.Printf(L"\x1b[%uH", 2);
 
@@ -918,6 +924,8 @@ LAutoFitContentWidth:
 
         if (m_errmsg.Length() || !m_context.HasContent())
         {
+            assert(!update_mark_row); // Performance issue if this ever happens.
+
             // There's no scrollbar when showing an error message.
             m_vert_scroll_car.set_extents(0, 0);
 
@@ -988,7 +996,9 @@ LAutoFitContentWidth:
             const FoundOffset* found_line = m_found_line.Empty() ? nullptr : &m_found_line;
             for (unsigned row = 0; row < m_content_height; ++row)
             {
-                if (update_content || (update_hex_edit && m_hex_top + (row * m_hex_width) == update_hex_edit_offset))
+                if (update_content ||
+                    (update_hex_edit && m_hex_top + (row * m_hex_width) == update_hex_edit_offset) ||
+                    (update_mark_row && (row == mark_row || row == last_mark_row)))
                 {
                     const uint32 orig_length = s.Length();
                     const WCHAR* marked_color = nullptr;
@@ -1000,7 +1010,7 @@ LAutoFitContentWidth:
                     if ((!marked_color || !found_line || found_line->len) && IsBookmarked(row_offset, m_hex_width))
                         marked_color = GetColor(ColorElement::BookmarkedLine);
 
-                    if (!m_context.FormatHexData(m_hex_top, row == GetMarkRow(), row, m_hex_width, s, e, marked_color, found_line))
+                    if (!m_context.FormatHexData(m_hex_top, row == mark_row, row, m_hex_width, s, e, marked_color, found_line))
                         s.AppendColor(norm);
 
                     if (m_vert_scroll_car.has_car())
@@ -1043,6 +1053,8 @@ LAutoFitContentWidth:
 
                 if (msg_text)
                 {
+                    assert(!update_mark_row); // Performance issue if this ever happens.
+
                     s2.Clear();
                     const uint32 content_width = m_terminal_width - !!show_scrollbar;
                     const unsigned cells = ellipsify_ex(msg_text, content_width, ellipsify_mode::RIGHT, s2, L"");
@@ -1054,6 +1066,10 @@ LAutoFitContentWidth:
                         s.Append(c_clreol);
                     msg_text = nullptr;
                     msg_color = nullptr;
+                }
+                else if (update_mark_row && row != mark_row && row != last_mark_row)
+                {
+                    s.Append(L"\n");
                 }
                 else if (m_top + row < m_context.Count())
                 {
@@ -1067,7 +1083,7 @@ LAutoFitContentWidth:
                     if ((!marked_color || !found_line || found_line->len) && IsBookmarked(row_offset, row_length))
                         marked_color = GetColor(ColorElement::BookmarkedLine);
 
-                    const unsigned width = m_context.FormatLineData(m_top + row, row == GetMarkRow(), m_left, s, m_content_width, e, marked_color, found_line);
+                    const unsigned width = m_context.FormatLineData(m_top + row, row == mark_row, m_left, s, m_content_width, e, marked_color, found_line);
                     if (width < m_content_width || show_scrollbar)
                     {
                         // WARNING:  Presumably this is actually defined VT

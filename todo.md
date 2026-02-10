@@ -3,7 +3,7 @@
 - What if codepage 437 isn't installed?  It's our fallback, but if it's not installed then choose another?
 - Sometimes detects `clink.log` file as Binary when `debug.log_terminal` is enabled, but it's really UTF8 (maybe there's a 0x08 backspace character?).
 - [ ] **BUG:** view `clink_dll_x64.dll` and `G` `13324` and `Down` --> asserts `C:\repos\list-redux\contentcache.cpp, line 937` after the third `FileLineIter::Next` inside `FileLineMap::Next`.
-- [ ] **BUG:** hex view uses the wrong color when the file is empty.
+  - Any run of whitespace or tabs that's too long triggers the assert (and an infinite loop).
 
 # FEATURES
 
