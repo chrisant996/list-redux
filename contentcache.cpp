@@ -1850,8 +1850,11 @@ bool ContentCache::FormatHexData(FileOffset offset, bool middle, unsigned row, u
         {
             edited = true;
             new_color = MakeOverlayColor(norm, GetColor(byte_color));
-            tmp2.SetFromCodepage(m_map.GetCodePage(true), reinterpret_cast<const char*>(&c), 1);
-            tmp.SetAt(tmp.Text() + ii, *tmp2.Text());
+            if (c)
+            {
+                tmp2.SetFromCodepage(m_map.GetCodePage(true), reinterpret_cast<const char*>(&c), 1);
+                tmp.SetAt(tmp.Text() + ii, *tmp2.Text());
+            }
         }
         else if (marked_color)
         {
