@@ -2,8 +2,7 @@
 
 - What if codepage 437 isn't installed?  It's our fallback, but if it's not installed then choose another?
 - Sometimes detects `clink.log` file as Binary when `debug.log_terminal` is enabled, but it's really UTF8 (maybe there's a 0x08 backspace character?).
-- [ ] **BUG:** cursor position can be wrong in Viewer depending on how ClickableRow collapses.
-- [ ] Put the "Searching..." feedback on a whole different row.  Otherwise the "Ctrl-Break to cancel" and the cursor position are difficult and have a lot of jitter.
+- [ ] **BUG:** view `clink_dll_x64.dll` and Search --> asserts `C:\repos\list-redux\contentcache.cpp, line 937`.
 
 # FEATURES
 
