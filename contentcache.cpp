@@ -680,8 +680,10 @@ calc_width:
         m_hanging_indent = 0;
         if (m_pending_wrap_indent || outcome >= BreakWrap)
         {
+            const unsigned max_hanging_indent = (m_wrap ? m_wrap : m_options.max_line_length) / 2;
+            assert(max_hanging_indent > 0);
             m_hanging_indent = m_pending_wrap_indent + m_options.hanging_extra;
-            m_hanging_indent = min(m_hanging_indent, m_options.max_line_length / 2);
+            m_hanging_indent = min(m_hanging_indent, max_hanging_indent);
         }
         // Reset pending state.
         m_pending_length = 0;
