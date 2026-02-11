@@ -596,7 +596,21 @@ calc_width:
                 }
                 else
                 {
-                    outcome = BreakWrap;
+                    const bool skip_trailing_whitespace = true;
+                    if (skip_trailing_whitespace)
+                    {
+                        // Skip trailing whitespace after break.  A long
+                        // space-only line shows as a single line that can
+                        // exceed the wrap width.
+                        outcome = BreakWrapSkip;
+                    }
+                    else
+                    {
+                        // Break and continue without skipping trailing
+                        // whitespace.  A long space-only line shows as
+                        // multiple lines broken at the actual wrap width.
+                        outcome = BreakWrap;
+                    }
                 }
                 break;
             }
@@ -687,9 +701,9 @@ calc_width:
         }
         // Reset pending state.
         m_pending_length = 0;
-        m_pending_width = m_pending_wrap_indent;
+        m_pending_width = 0;
         m_pending_wrap_length = 0;
-        m_pending_wrap_width = m_pending_wrap_indent;
+        m_pending_wrap_width = 0;
         m_consecutive_spaces = m_options.internal_help_mode ? 0 : -1;
         m_any_nonspace = !!m_hanging_indent;
 #ifdef DEBUG
