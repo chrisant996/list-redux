@@ -1,3 +1,19 @@
+## v0.31 -- 2026/02/10
+
+- Changed word wrap to limit the hanging indent to not exceed half of the terminal width.
+- Fixed infinite loop if word wrap encounters a line with leading whitespace that exceeds the wrap width.
+- Fixed searches not matching the first line of a file.
+- Fixed subsequent searches canceling immediately after `Ctrl-Break` used during a search.
+- Fixed showing search progress in the chooser.
+- Fixed failure when search in the chooser encounters an empty file.
+- Fixed entering `0x` in the GoTo prompt.
+- Fixed entering a `00` byte in hex edit mode.
+- Fixed rendering an empty file in hex view mode.
+- Fixed max path length when entering a new file path (was 32, now 2048).
+- Fixed `ESC` in the file viewer accidentally exiting if used after `Alt-V` after launching the program directly to the viewer.
+- Fixed the `Alt-E:EditMode` indicator to be disabled when viewing piped input.
+- Fixed updating the `>` mark row indicator (e.g. for `M` and `U`) as the cursor moves in hex edit mode.
+
 ## v0.30 -- 2026/01/18
 
 - Added bookmarks in the file viewer (`Ctrl-Y` sets a bookmark, `Alt-Y` cycles through bookmarks, etc).
