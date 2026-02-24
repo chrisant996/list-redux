@@ -3167,7 +3167,7 @@ ViewerOutcome ViewText(const char* text, Error& e, const WCHAR* title, bool help
     g_options.show_line_numbers = false;
     g_options.show_file_offsets = false;
     g_options.show_ruler = false;
-    g_options.show_endoffile_line = true;
+    g_options.show_endoffile_line = old.show_endoffile_line;
     g_options.show_debug_info = false;
 
     if (help)
