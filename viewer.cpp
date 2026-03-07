@@ -2906,7 +2906,14 @@ void Viewer::ChooseTabWidth()
 
     uint64 n;
     if (ParseULongLong(s.Text(), n) && n >= 2 && n <= 16)
-        g_options.tab_width = uint8(n);
+    {
+        if (n != g_options.tab_width)
+        {
+            g_options.tab_width = uint8(n);
+            if (g_options.wrapping)
+                m_context.ClearProcessed();
+        }
+    }
 }
 
 void Viewer::OpenNewFile(Error& e)
