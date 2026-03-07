@@ -484,6 +484,7 @@ FileLineIter::Outcome FileLineIter::Next(const BYTE*& out_bytes, uint32& out_len
 
     // Get cells until it's time to wrap.
     Outcome outcome = Exhausted;
+    const uint32 wrap = (m_wrap - (m_wrap > 1));
     const uint32 orig_pending_length = m_pending_length;
     {
         uint32 index = 0;
@@ -585,7 +586,7 @@ calc_width:
                 }
             }
 
-            if (m_wrap > clen && m_pending_width + clen > m_wrap)
+            if (wrap > clen && m_pending_width + clen > wrap)
             {
                 // Wrapping width reached.
                 if (m_pending_wrap_length)
@@ -694,7 +695,7 @@ calc_width:
         m_hanging_indent = 0;
         if (m_pending_wrap_indent || outcome >= BreakWrap)
         {
-            const unsigned max_hanging_indent = (m_wrap ? m_wrap : m_options.max_line_length) / 2;
+            const unsigned max_hanging_indent = (wrap ? wrap : m_options.max_line_length) / 2;
             assert(max_hanging_indent > 0);
             m_hanging_indent = m_pending_wrap_indent + m_options.hanging_extra;
             m_hanging_indent = min(m_hanging_indent, max_hanging_indent);
@@ -949,6 +950,8 @@ do_skip_whitespace:
 #endif
         if (outcome == FileLineIter::Exhausted)
             break;
+
+        fmt.m_wrapped = (outcome > FileLineIter::BreakNewline);
 
         assert(line_length);
         m_lines.emplace_back(m_pending_begin);
@@ -1680,6 +1683,11 @@ unsigned ContentCache::FormatLineData(const size_t line, bool middle, unsigned l
     }
 
 LOut:
+    if (m_options.wrapping && fmt.m_wrapped && m_options.wrap_char)
+    {
+        s.AppendColorOverlay(norm, GetColor(ColorElement::Wrapped));
+        append_text(&m_options.wrap_char, 1);
+    }
     if (m_options.show_debug_info && visible_len < max_width)
     {
         append_text(c_eol_marker, -1);

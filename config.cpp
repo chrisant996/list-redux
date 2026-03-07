@@ -66,6 +66,18 @@ void SetWrapping(const WCHAR* wrapping)
     g_options.wrapping = wrapping;
 }
 
+static void GetWrapChar(StrW& out)
+{
+    out.Printf(L"%u", g_options.wrap_char);
+}
+static void SetWrapChar(const WCHAR* value)
+{
+    ULONGLONG n;
+    if (ParseULongLong(value, n) && ((n >= 0 && n < 0xd800) ||
+                                     (n >= 0xe000 && n <= 0xffff)))
+        g_options.wrap_char = WCHAR(n);
+}
+
 #ifdef INCLUDE_MENU_ROW
 static void GetMenuRow(StrW& out)
 {
@@ -199,6 +211,7 @@ static const OptionDefinition c_option_defs[] =
     { L"MaxLineLength",         GetMaxLineLength, SetMaxLineLength },
 #endif
     { L"Wrap",                  GetWrapping, SetWrapping },
+    { L"WrapChar",              GetWrapChar, SetWrapChar },
     { L"AsciiFilter",           GetAsciiFilter, SetAsciiFilter },
     { L"ShowLineEndings",       GetShowLineEndings, SetShowLineEndings },
     { L"ShowLineNumbers",       GetShowLineNumbers, SetShowLineNumbers },

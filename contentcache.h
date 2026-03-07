@@ -78,6 +78,7 @@ struct FormattingInfo
 {
 // TODO:  Syntaxing highlighting info can go in here as well.
     BYTE            m_leading_indent = 0;
+    bool            m_wrapped = false;
 };
 
 class FileLineIter

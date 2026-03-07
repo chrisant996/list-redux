@@ -68,6 +68,7 @@ enum class ColorElement
     Content,
     Whitespace,
     CtrlCode,
+    Wrapped,
     FilteredByte,
     EndOfFileLine,
     MarkedLine,

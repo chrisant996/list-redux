@@ -45,6 +45,7 @@ struct ViewerOptions
     bool allow_mouse = true;
     bool restore_screen_on_exit = true;
     bool wrapping = false;
+    WCHAR wrap_char = 0x21b2;
     bool hex_mode = false;
     bool expand_tabs = true;
     bool ascii_filter = false;
