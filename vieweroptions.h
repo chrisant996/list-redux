@@ -45,7 +45,7 @@ struct ViewerOptions
     bool allow_mouse = true;
     bool restore_screen_on_exit = true;
     bool wrapping = false;
-    WCHAR wrap_char = 0x21b2;
+    WCHAR wrap_char = 0x21a9;           // 0x21a9 is rounded, 0x21b2 is right angle, 0x2199 is diagonal.
     bool hex_mode = false;
     bool expand_tabs = true;
     bool ascii_filter = false;
