@@ -85,6 +85,7 @@
 - [x] `F` `S` `/` `\` search for text in files in file chooser (tag matching files)
 - [x] `Ctrl-N` invert tagged files
 - [x] show count of tagged files at the bottom
+- [ ] `F7`/`F8` go to prev/next tagged file
 - [ ] some way to configure per-file colors similar to `dirx`
 
 ### File Viewer (list file content)
